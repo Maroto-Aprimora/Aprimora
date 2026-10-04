@@ -18,7 +18,9 @@ O portal começa pelo **módulo Comercial** e centraliza leads, funil de vendas,
 
 - [x] Levantamento e documento de escopo v1.0
 - [x] Fase 0: fundação (stack, login por pré-cadastro, diretorias e cargos, segurança no banco)
-- [ ] Fases 1 a 7: veja a Seção 14 do escopo
+- [x] Fase 1: CRM e funil (empresas, contatos, funil do Pipefy com SLA, rodízio, histórico, configurações, metas de 2026)
+- [x] Fase 2: atividades e rotina (agenda com R.I/R.G, tarefas, notificações com push, transferência de carteira, auditoria)
+- [ ] Fases 3 a 7: veja a Seção 14 do escopo
 
 ## Stack prevista
 

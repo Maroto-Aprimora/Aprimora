@@ -7,6 +7,74 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "14.18" };
   public: {
     Tables: {
+      atividade_participantes: {
+        Row: { atividade_id: string; membro_id: string };
+        Insert: { atividade_id: string; membro_id: string };
+        Update: { atividade_id?: string; membro_id?: string };
+        Relationships: [
+          { foreignKeyName: "atividade_participantes_atividade_id_fkey"; columns: ["atividade_id"]; isOneToOne: false; referencedRelation: "atividades"; referencedColumns: ["id"] },
+          { foreignKeyName: "atividade_participantes_membro_id_fkey"; columns: ["membro_id"]; isOneToOne: false; referencedRelation: "membros"; referencedColumns: ["id"] },
+        ];
+      };
+      atividades: {
+        Row: { confirmada_em: string | null; created_at: string; criado_por: string | null; dia_inteiro: boolean; diretoria: string | null; empresa_id: string | null; fim: string | null; id: string; inicio: string; link_reuniao: string | null; local: string | null; negocio_id: string | null; proximos_passos: string | null; realizada_em: string | null; responsavel_id: string | null; resumo: string | null; stakeholder: string | null; status: Database["public"]["Enums"]["status_atividade"]; tipo_id: string; titulo: string; updated_at: string };
+        Insert: { confirmada_em?: string | null; created_at?: string; criado_por?: string | null; dia_inteiro?: boolean; diretoria?: string | null; empresa_id?: string | null; fim?: string | null; id?: string; inicio: string; link_reuniao?: string | null; local?: string | null; negocio_id?: string | null; proximos_passos?: string | null; realizada_em?: string | null; responsavel_id?: string | null; resumo?: string | null; stakeholder?: string | null; status?: Database["public"]["Enums"]["status_atividade"]; tipo_id: string; titulo: string; updated_at?: string };
+        Update: { confirmada_em?: string | null; created_at?: string; criado_por?: string | null; dia_inteiro?: boolean; diretoria?: string | null; empresa_id?: string | null; fim?: string | null; id?: string; inicio?: string; link_reuniao?: string | null; local?: string | null; negocio_id?: string | null; proximos_passos?: string | null; realizada_em?: string | null; responsavel_id?: string | null; resumo?: string | null; stakeholder?: string | null; status?: Database["public"]["Enums"]["status_atividade"]; tipo_id?: string; titulo?: string; updated_at?: string };
+        Relationships: [
+          { foreignKeyName: "atividades_tipo_id_fkey"; columns: ["tipo_id"]; isOneToOne: false; referencedRelation: "tipos_atividade"; referencedColumns: ["id"] },
+          { foreignKeyName: "atividades_empresa_id_fkey"; columns: ["empresa_id"]; isOneToOne: false; referencedRelation: "empresas"; referencedColumns: ["id"] },
+          { foreignKeyName: "atividades_negocio_id_fkey"; columns: ["negocio_id"]; isOneToOne: false; referencedRelation: "negocios"; referencedColumns: ["id"] },
+        ];
+      };
+      notificacoes: {
+        Row: { chave: string | null; created_at: string; id: string; lida_em: string | null; link: string | null; membro_id: string; mensagem: string | null; tipo: string; titulo: string };
+        Insert: { chave?: string | null; created_at?: string; id?: string; lida_em?: string | null; link?: string | null; membro_id: string; mensagem?: string | null; tipo: string; titulo: string };
+        Update: { chave?: string | null; created_at?: string; id?: string; lida_em?: string | null; link?: string | null; membro_id?: string; mensagem?: string | null; tipo?: string; titulo?: string };
+        Relationships: [];
+      };
+      processos_seletivos: {
+        Row: { created_at: string; data: string; id: string; nome: string };
+        Insert: { created_at?: string; data: string; id?: string; nome: string };
+        Update: { created_at?: string; data?: string; id?: string; nome?: string };
+        Relationships: [];
+      };
+      push_assinaturas: {
+        Row: { auth: string; created_at: string; endpoint: string; id: string; membro_id: string; p256dh: string; user_agent: string | null };
+        Insert: { auth: string; created_at?: string; endpoint: string; id?: string; membro_id?: string; p256dh: string; user_agent?: string | null };
+        Update: { auth?: string; created_at?: string; endpoint?: string; id?: string; membro_id?: string; p256dh?: string; user_agent?: string | null };
+        Relationships: [];
+      };
+      reunioes_recorrentes: {
+        Row: { ativa: boolean; created_at: string; dia_semana: number; diretoria: string | null; hora_fim: string; hora_inicio: string; id: string; local: string | null; tipo_id: string; titulo: string; valida_ate: string | null; valida_de: string };
+        Insert: { ativa?: boolean; created_at?: string; dia_semana: number; diretoria?: string | null; hora_fim: string; hora_inicio: string; id?: string; local?: string | null; tipo_id: string; titulo: string; valida_ate?: string | null; valida_de?: string };
+        Update: { ativa?: boolean; created_at?: string; dia_semana?: number; diretoria?: string | null; hora_fim?: string; hora_inicio?: string; id?: string; local?: string | null; tipo_id?: string; titulo?: string; valida_ate?: string | null; valida_de?: string };
+        Relationships: [
+          { foreignKeyName: "reunioes_recorrentes_tipo_id_fkey"; columns: ["tipo_id"]; isOneToOne: false; referencedRelation: "tipos_atividade"; referencedColumns: ["id"] },
+        ];
+      };
+      tarefa_responsaveis: {
+        Row: { membro_id: string; tarefa_id: string };
+        Insert: { membro_id: string; tarefa_id: string };
+        Update: { membro_id?: string; tarefa_id?: string };
+        Relationships: [
+          { foreignKeyName: "tarefa_responsaveis_membro_id_fkey"; columns: ["membro_id"]; isOneToOne: false; referencedRelation: "membros"; referencedColumns: ["id"] },
+          { foreignKeyName: "tarefa_responsaveis_tarefa_id_fkey"; columns: ["tarefa_id"]; isOneToOne: false; referencedRelation: "tarefas"; referencedColumns: ["id"] },
+        ];
+      };
+      tarefas: {
+        Row: { concluida_em: string | null; created_at: string; criado_por: string | null; descricao: string | null; diretoria: string; id: string; negocio_id: string | null; prazo: string | null; prioridade: Database["public"]["Enums"]["prioridade"]; status: Database["public"]["Enums"]["status_tarefa"]; titulo: string; updated_at: string };
+        Insert: { concluida_em?: string | null; created_at?: string; criado_por?: string | null; descricao?: string | null; diretoria: string; id?: string; negocio_id?: string | null; prazo?: string | null; prioridade?: Database["public"]["Enums"]["prioridade"]; status?: Database["public"]["Enums"]["status_tarefa"]; titulo: string; updated_at?: string };
+        Update: { concluida_em?: string | null; created_at?: string; criado_por?: string | null; descricao?: string | null; diretoria?: string; id?: string; negocio_id?: string | null; prazo?: string | null; prioridade?: Database["public"]["Enums"]["prioridade"]; status?: Database["public"]["Enums"]["status_tarefa"]; titulo?: string; updated_at?: string };
+        Relationships: [
+          { foreignKeyName: "tarefas_negocio_id_fkey"; columns: ["negocio_id"]; isOneToOne: false; referencedRelation: "negocios"; referencedColumns: ["id"] },
+        ];
+      };
+      tipos_atividade: {
+        Row: { ativo: boolean; chave: string; cor: string; diretoria: string | null; exige_confirmacao: boolean; id: string; ligada_a_lead: boolean; nome: string; ordem: number };
+        Insert: { ativo?: boolean; chave: string; cor?: string; diretoria?: string | null; exige_confirmacao?: boolean; id?: string; ligada_a_lead?: boolean; nome: string; ordem?: number };
+        Update: { ativo?: boolean; chave?: string; cor?: string; diretoria?: string | null; exige_confirmacao?: boolean; id?: string; ligada_a_lead?: boolean; nome?: string; ordem?: number };
+        Relationships: [];
+      };
       auditoria: {
         Row: { acao: string; autor_id: string | null; created_at: string; dados: Json | null; entidade: string; entidade_id: string | null; id: number };
         Insert: { acao: string; autor_id?: string | null; created_at?: string; dados?: Json | null; entidade: string; entidade_id?: string | null; id?: never };
@@ -73,9 +141,9 @@ export type Database = {
         ];
       };
       membros: {
-        Row: { ativo: boolean; avatar_url: string | null; created_at: string; email: string; id: string; nome: string; telefone: string | null; updated_at: string };
-        Insert: { ativo?: boolean; avatar_url?: string | null; created_at?: string; email: string; id: string; nome: string; telefone?: string | null; updated_at?: string };
-        Update: { ativo?: boolean; avatar_url?: string | null; created_at?: string; email?: string; id?: string; nome?: string; telefone?: string | null; updated_at?: string };
+        Row: { ativo: boolean; avatar_url: string | null; created_at: string; data_entrada: string | null; email: string; id: string; nome: string; telefone: string | null; updated_at: string };
+        Insert: { ativo?: boolean; avatar_url?: string | null; created_at?: string; data_entrada?: string | null; email: string; id: string; nome: string; telefone?: string | null; updated_at?: string };
+        Update: { ativo?: boolean; avatar_url?: string | null; created_at?: string; data_entrada?: string | null; email?: string; id?: string; nome?: string; telefone?: string | null; updated_at?: string };
         Relationships: [];
       };
       metas: {
@@ -158,9 +226,9 @@ export type Database = {
         ];
       };
       pre_cadastros: {
-        Row: { aceito_em: string | null; convite_enviado_em: string | null; created_at: string; criado_por: string | null; email: string; id: string; nome: string };
-        Insert: { aceito_em?: string | null; convite_enviado_em?: string | null; created_at?: string; criado_por?: string | null; email: string; id?: string; nome: string };
-        Update: { aceito_em?: string | null; convite_enviado_em?: string | null; created_at?: string; criado_por?: string | null; email?: string; id?: string; nome?: string };
+        Row: { aceito_em: string | null; convite_enviado_em: string | null; created_at: string; criado_por: string | null; data_entrada: string | null; email: string; id: string; nome: string };
+        Insert: { aceito_em?: string | null; convite_enviado_em?: string | null; created_at?: string; criado_por?: string | null; data_entrada?: string | null; email: string; id?: string; nome: string };
+        Update: { aceito_em?: string | null; convite_enviado_em?: string | null; created_at?: string; criado_por?: string | null; data_entrada?: string | null; email?: string; id?: string; nome?: string };
         Relationships: [
           { foreignKeyName: "pre_cadastros_criado_por_fkey"; columns: ["criado_por"]; isOneToOne: false; referencedRelation: "membros"; referencedColumns: ["id"] },
         ];
@@ -203,6 +271,7 @@ export type Database = {
       };
       normalizar: { Args: { _t: string }; Returns: string };
       so_digitos: { Args: { _t: string }; Returns: string };
+      transferir_carteira: { Args: { _de: string; _para: string; _diretoria: string }; Returns: Json };
     };
     Enums: {
       acao_sla: "alertar" | "mover";
@@ -212,6 +281,9 @@ export type Database = {
       tipo_campo: "texto" | "texto_longo" | "data" | "numero" | "moeda" | "membros" | "selecao" | "booleano" | "link";
       tipo_fase: "aberta" | "ganho" | "perda" | "pausa";
       tipo_motivo: "perda" | "desqualificacao";
+      status_atividade: "pendente" | "confirmada" | "realizada" | "cancelada";
+      prioridade: "baixa" | "media" | "alta";
+      status_tarefa: "pendente" | "em_andamento" | "concluida";
     };
     CompositeTypes: { [_ in never]: never };
   };

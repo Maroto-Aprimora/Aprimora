@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_KEY, SUPABASE_URL } from "./env";
 
 /** Rotas acessíveis sem login. */
-const ROTAS_PUBLICAS = ["/entrar", "/primeiro-acesso", "/esqueci-senha", "/auth"];
+const ROTAS_PUBLICAS = ["/entrar", "/primeiro-acesso", "/esqueci-senha", "/auth", "/api/push"];
 
 /** Renova a sessão a cada requisição e manda para /entrar quem não está logado. */
 export async function atualizarSessao(request: NextRequest) {

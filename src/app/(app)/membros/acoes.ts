@@ -92,3 +92,24 @@ export async function definirAtivo(membroId: string, ativo: boolean): Promise<Re
   revalidatePath("/membros");
   return { ok: true };
 }
+
+export async function alterarDataEntrada(membroId: string, data: string | null): Promise<Resultado> {
+  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) return { ok: false, erro: "Data inválida." };
+  const supabase = await criarClienteServidor();
+  const { data: linhas, error } = await supabase.from("membros").update({ data_entrada: data }).eq("id", membroId).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!linhas?.length) return { ok: false, erro: "Você não tem permissão para alterar este membro." };
+  revalidatePath("/membros");
+  return { ok: true };
+}
+
+export async function transferirCarteira(de: string, para: string, diretoria: string): Promise<Resultado & { resumo?: string }> {
+  if (de === para) return { ok: false, erro: "Escolha outra pessoa como destino." };
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("transferir_carteira", { _de: de, _para: para, _diretoria: diretoria });
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  const r = (data ?? {}) as { negocios?: number; tarefas?: number; atividades?: number };
+  revalidatePath("/membros");
+  revalidatePath("/funil");
+  return { ok: true, resumo: `${r.negocios ?? 0} negócio(s), ${r.tarefas ?? 0} tarefa(s) e ${r.atividades ?? 0} atividade(s) transferidos.` };
+}

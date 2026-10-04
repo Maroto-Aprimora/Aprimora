@@ -4,7 +4,7 @@ import { Avatar, Selo } from "@/components/ui/selo";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { formatarData, iniciais, NOME_CARGO } from "@/lib/formatar";
 import { obterUsuario } from "@/lib/usuario";
-import { AcoesMembro, AcoesPreCadastro, NovoPreCadastro } from "./componentes";
+import { AcoesMembro, AcoesPreCadastro, DataEntrada, NovoPreCadastro, TransferirCarteira } from "./componentes";
 
 export const metadata: Metadata = { title: "Membros" };
 
@@ -13,7 +13,7 @@ export default async function PaginaMembros() {
   const supabase = await criarClienteServidor();
   const [{ data: diretorias }, { data: membros }, { data: cargos }, { data: pre }] = await Promise.all([
     supabase.from("diretorias").select("slug, nome").order("ordem"),
-    supabase.from("membros").select("id, nome, email, ativo").order("nome"),
+    supabase.from("membros").select("id, nome, email, ativo, data_entrada").order("nome"),
     supabase.from("membro_diretorias").select("membro_id, diretoria, cargo, participa_rodizio"),
     usuario.ehDiretor
       ? supabase.from("pre_cadastros").select("id, nome, email, convite_enviado_em, aceito_em, pre_cadastro_diretorias(diretoria, cargo)").is("aceito_em", null).order("nome")
@@ -90,6 +90,12 @@ export default async function PaginaMembros() {
                           <p className="truncate text-sm text-texto-suave">{c.membro!.email}</p>
                         </div>
                       </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                      <DataEntrada membroId={c.membro_id} valor={c.membro!.data_entrada} podeEditar={podeGerir} />
+                      {podeGerir && (
+                        <TransferirCarteira membroId={c.membro_id} nome={c.membro!.nome} diretoria={d.slug}
+                          destinos={daDiretoria.filter((x) => x.membro!.ativo).map((x) => ({ id: x.membro_id, nome: x.membro!.nome }))} />
+                      )}
                       {podeGerir ? (
                         <AcoesMembro
                           membroId={c.membro_id}
@@ -103,6 +109,7 @@ export default async function PaginaMembros() {
                       ) : (
                         <Selo tom={c.cargo === "diretor" ? "destaque" : "neutro"}>{NOME_CARGO[c.cargo]}</Selo>
                       )}
+                      </div>
                     </li>
                   ))}
                 </ul>
