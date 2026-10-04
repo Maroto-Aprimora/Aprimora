@@ -20,6 +20,7 @@
   --destaque: #e8833a;       /* laranja Aprimora */
   --destaque-suave: #fdf1e7;
   --azul-claro: #97b9c6;
+  --roxo: #7b5ea7;
   --sucesso: #2e8b57;
   --sucesso-suave: #e9f6ef;
   --perigo: #c0392b;
@@ -42,6 +43,7 @@
   --destaque: #f09a55;
   --destaque-suave: #3a2a1d;
   --azul-claro: #97b9c6;
+  --roxo: #9b7fc7;
   --sucesso: #4cbf82;
   --sucesso-suave: #17352a;
   --perigo: #ef6b5e;
@@ -64,6 +66,7 @@
   --color-destaque: var(--destaque);
   --color-destaque-suave: var(--destaque-suave);
   --color-azul-claro: var(--azul-claro);
+  --color-roxo: var(--roxo);
   --color-sucesso: var(--sucesso);
   --color-sucesso-suave: var(--sucesso-suave);
   --color-perigo: var(--perigo);

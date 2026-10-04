@@ -53,6 +53,11 @@ npm run build
 | Diretor de X | Gerir membros, cargos, configurações e todos os registros da diretoria X |
 | Assessor / trainee | Criar leads; editar os negócios em que é responsável ou participante |
 | Trainee | Não marca ganho e não exclui |
+| Agenda | Todos os membros veem; edita quem é responsável/participante ou o diretor; R.G só diretores criam |
+| Tarefas | Só o diretor cria, edita e exclui; o responsável só muda o andamento (gatilho `proteger_tarefa`) |
+| Notificações | Cada pessoa vê só as suas; só pode marcar como lida |
+| Data de entrada | Só o diretor altera (`proteger_membro`) |
+| Auditoria | Só diretores leem |
 
 ### Regras automáticas do funil (no banco)
 
@@ -65,6 +70,31 @@ npm run build
 | Trainee não marca ganho | gatilho `antes_de_salvar_negocio` |
 | Histórico de toda movimentação | tabela `negocio_historico` (só gatilhos escrevem) |
 | SLA (Oportunidade: 15 dias → volta para E-mail) e retorno da Reciclagem | `privado.aplicar_slas()` via pg_cron, todo dia às 8h05 (Brasília) |
+
+### Agenda, tarefas e notificações (Fase 2)
+
+| Regra | Onde |
+|---|---|
+| Reuniões fixas (R.I, R.G) | tabela `reunioes_recorrentes`; as datas são **calculadas** (`ocorrenciasRecorrentes` em `src/lib/agenda.ts`), então mudar o horário em Configurações vale para as próximas semanas |
+| Tipos de atividade (cor, exige confirmação, ligada a lead) | tabela `tipos_atividade`, editável em Configurações |
+| "Lead atribuído a você" | gatilho `notificar_responsavel_negocio` (dispara também quando o rodízio escolhe o responsável) |
+| SLA a 80% / estourado, tarefa vencendo hoje, R.I/R.G do dia, visita de amanhã sem confirmação (para o diretor) | `privado.gerar_notificacoes_diarias()` via pg_cron às 8h10 (Brasília) |
+| Notificação não se repete | `notificacoes (membro_id, chave)` único + `privado.notificar` |
+| Transferir carteira de quem sai | `public.transferir_carteira(de, para, diretoria)` (só diretor; registra na auditoria) |
+| Membros novos | `membros.data_entrada` ≥ data do último `processos_seletivos` |
+
+### Push no celular (Web Push)
+
+1. Cada notificação inserida dispara o gatilho `enviar_push`, que faz `net.http_post` para `push_url`
+   (guardado em `privado.config`) com o cabeçalho `x-push-segredo`.
+2. A rota `src/app/api/push/route.ts` confere o segredo (`PUSH_SEGREDO`) e envia para todos os aparelhos da pessoa
+   (`push_assinaturas`) usando as chaves VAPID.
+3. A pessoa ativa no sino → "Receber notificações neste aparelho". No iPhone é preciso instalar o portal na tela de
+   início antes.
+
+Para trocar o segredo ou o domínio: atualize `privado.config` (`push_url`, `push_segredo`) **e** a variável
+`PUSH_SEGREDO` na Vercel com o mesmo valor. Novas chaves VAPID: `npx web-push generate-vapid-keys` (quem já ativou
+precisa ativar de novo). As pré-visualizações têm proteção da Vercel, então o push só funciona em produção.
 
 ## Dados fictícios
 
@@ -79,7 +109,11 @@ Antes de importar os dados reais do Pipefy, rode `supabase/dados/remover_dados_f
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Vercel + `.env.local` | Pública (a segurança vem do RLS) |
 | `NEXT_PUBLIC_SITE_URL` | Vercel (produção) | Endereço usado nos links de e-mail |
 
-Nenhuma chave secreta (`service_role`) é usada pelo app até aqui.
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Vercel | Pública (chave do Web Push) |
+| `VAPID_PRIVATE_KEY` | Vercel (sensível) | Secreta — nunca no repositório |
+| `PUSH_SEGREDO` | Vercel (sensível) | Igual a `push_segredo` em `privado.config` |
+
+Nenhuma chave `service_role` é usada pelo app.
 
 ## Fluxo de trabalho
 

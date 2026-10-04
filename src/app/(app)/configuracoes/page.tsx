@@ -4,7 +4,9 @@ import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { NOME_AREA } from "@/lib/crm";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
+import { hojeBR } from "@/lib/datas";
 import { CamposDaFase, LinhaFase, ListaSimples } from "./componentes";
+import { ProcessosSeletivos, ReunioesRecorrentes, TiposAtividade } from "./agenda";
 
 export const metadata: Metadata = { title: "Configurações" };
 
@@ -13,13 +15,19 @@ export default async function PaginaConfiguracoes() {
   if (!usuario.ehDiretorDe("comercial")) redirect("/painel");
   const supabase = await criarClienteServidor();
   const { data: funil } = await supabase.from("funis").select("id").eq("diretoria", "comercial").eq("chave", "comercial").single();
-  const [{ data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos }] = await Promise.all([
+  const [
+    { data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos },
+    { data: tipos }, { data: reunioes }, { data: processos },
+  ] = await Promise.all([
     supabase.from("fases").select("*").eq("funil_id", funil!.id).order("ordem"),
     supabase.from("fase_campos").select("*").order("ordem"),
     supabase.from("motivos").select("*").eq("diretoria", "comercial").order("ordem"),
     supabase.from("origens").select("*").eq("diretoria", "comercial").order("ordem"),
     supabase.from("segmentos").select("*").eq("diretoria", "comercial").order("nome"),
     supabase.from("servicos").select("*").eq("diretoria", "comercial").order("ordem"),
+    supabase.from("tipos_atividade").select("*").or("diretoria.is.null,diretoria.eq.comercial").order("ordem"),
+    supabase.from("reunioes_recorrentes").select("*").or("diretoria.is.null,diretoria.eq.comercial").order("dia_semana"),
+    supabase.from("processos_seletivos").select("id, nome, data").order("data", { ascending: false }),
   ]);
   const listaFases = fases ?? [];
 
@@ -53,6 +61,13 @@ export default async function PaginaConfiguracoes() {
           ))}
         </div>
       </Cartao>
+
+      <ReunioesRecorrentes reunioes={reunioes ?? []} tipos={(tipos ?? []).filter((t) => !t.ligada_a_lead)} hoje={hojeBR()} />
+
+      <div className="mb-6 grid gap-6 lg:grid-cols-2">
+        <TiposAtividade tipos={tipos ?? []} />
+        <ProcessosSeletivos processos={processos ?? []} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <ListaSimples titulo="Motivos de perda" tabela="motivos" extra={{ tipo: "perda" }} itens={(motivos ?? []).filter((m) => m.tipo === "perda")} />

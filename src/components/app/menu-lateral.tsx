@@ -4,10 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Building2, KanbanSquare, LayoutDashboard, LogOut, Menu, Settings, Target, Users, X } from "lucide-react";
+import { Building2, CalendarDays, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, Settings, Target, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sair } from "@/app/acoes-sessao";
 import { AlternarTema } from "./alternar-tema";
+import { Sino } from "./sino";
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType<{ className?: string }>; soDiretor?: boolean };
 
@@ -15,8 +16,11 @@ const ITENS: Item[] = [
   { href: "/painel", rotulo: "Painel", icone: LayoutDashboard },
   { href: "/funil", rotulo: "Funil", icone: KanbanSquare },
   { href: "/empresas", rotulo: "Empresas e leads", icone: Building2 },
+  { href: "/agenda", rotulo: "Agenda", icone: CalendarDays },
+  { href: "/tarefas", rotulo: "Tarefas", icone: ListChecks },
   { href: "/metas", rotulo: "Metas", icone: Target },
   { href: "/membros", rotulo: "Membros", icone: Users },
+  { href: "/auditoria", rotulo: "Auditoria", icone: History, soDiretor: true },
   { href: "/configuracoes", rotulo: "Configurações", icone: Settings, soDiretor: true },
 ];
 
@@ -32,7 +36,7 @@ export function MenuLateral({ nome, descricaoCargo, ehDiretorComercial }: { nome
           <Menu className="h-6 w-6" />
         </button>
         <span className="font-titulo font-bold text-marca">Portal Aprimora</span>
-        <span className="w-8" />
+        <Sino />
       </header>
 
       {aberto && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setAberto(false)} />}
@@ -50,6 +54,7 @@ export function MenuLateral({ nome, descricaoCargo, ehDiretorComercial }: { nome
               Portal<br /><span className="tracking-[0.2em] text-[#f5a66a]">APRIMORA</span>
             </span>
           </Link>
+          <div className="hidden lg:block"><Sino claro /></div>
           <button className="lg:hidden" onClick={() => setAberto(false)} aria-label="Fechar menu">
             <X className="h-5 w-5" />
           </button>
