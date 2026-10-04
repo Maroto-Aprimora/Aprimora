@@ -1,0 +1,94 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { criarClienteServidor } from "@/lib/supabase/server";
+import { mensagemDeErro } from "@/lib/erros";
+import { obterUsuario } from "@/lib/usuario";
+
+export type Resultado = { ok: true } | { ok: false; erro: string };
+
+const esquemaPreCadastro = z.object({
+  nome: z.string().trim().min(2, "Informe o nome."),
+  email: z.string().trim().toLowerCase().email("E-mail inválido."),
+  diretoria: z.string().min(1),
+  cargo: z.enum(["diretor", "assessor", "trainee"]),
+});
+
+export async function criarPreCadastro(dados: z.input<typeof esquemaPreCadastro>): Promise<Resultado> {
+  const v = esquemaPreCadastro.safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const usuario = await obterUsuario();
+  if (!usuario.ehDiretorDe(v.data.diretoria)) return { ok: false, erro: "Você só pode cadastrar pessoas na sua diretoria." };
+
+  const supabase = await criarClienteServidor();
+  const { data: pre, error } = await supabase
+    .from("pre_cadastros")
+    .insert({ nome: v.data.nome, email: v.data.email, criado_por: usuario.id })
+    .select("id")
+    .single();
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+
+  const { error: erroVinculo } = await supabase
+    .from("pre_cadastro_diretorias")
+    .insert({ pre_cadastro_id: pre.id, diretoria: v.data.diretoria, cargo: v.data.cargo });
+  if (erroVinculo) {
+    await supabase.from("pre_cadastros").delete().eq("id", pre.id);
+    return { ok: false, erro: mensagemDeErro(erroVinculo) };
+  }
+  revalidatePath("/membros");
+  return { ok: true };
+}
+
+export async function removerPreCadastro(id: string): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("pre_cadastros").delete().eq("id", id);
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  revalidatePath("/membros");
+  return { ok: true };
+}
+
+export async function marcarConviteEnviado(id: string): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("pre_cadastros").update({ convite_enviado_em: new Date().toISOString() }).eq("id", id);
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  revalidatePath("/membros");
+  return { ok: true };
+}
+
+export async function alterarCargo(membroId: string, diretoria: string, cargo: "diretor" | "assessor" | "trainee"): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase
+    .from("membro_diretorias")
+    .update({ cargo })
+    .eq("membro_id", membroId)
+    .eq("diretoria", diretoria)
+    .select("membro_id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Você não tem permissão para alterar este cargo." };
+  revalidatePath("/membros");
+  return { ok: true };
+}
+
+export async function alterarRodizio(membroId: string, diretoria: string, participa: boolean): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("membro_diretorias")
+    .update({ participa_rodizio: participa })
+    .eq("membro_id", membroId)
+    .eq("diretoria", diretoria);
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  revalidatePath("/membros");
+  return { ok: true };
+}
+
+export async function definirAtivo(membroId: string, ativo: boolean): Promise<Resultado> {
+  const usuario = await obterUsuario();
+  if (membroId === usuario.id && !ativo) return { ok: false, erro: "Você não pode desativar a si mesmo." };
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("membros").update({ ativo }).eq("id", membroId).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Você não tem permissão para alterar este membro." };
+  revalidatePath("/membros");
+  return { ok: true };
+}

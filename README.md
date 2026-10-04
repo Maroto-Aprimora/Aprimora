@@ -17,9 +17,14 @@ O portal começa pelo **módulo Comercial** e centraliza leads, funil de vendas,
 ## Situação
 
 - [x] Levantamento e documento de escopo v1.0
-- [ ] Fase 0: fundação (stack, autenticação por convite, diretorias e cargos, CI)
+- [x] Fase 0: fundação (stack, login por pré-cadastro, diretorias e cargos, segurança no banco)
 - [ ] Fases 1 a 7: veja a Seção 14 do escopo
 
 ## Stack prevista
 
 Next.js + TypeScript + Tailwind/shadcn · Supabase (Postgres, Auth, RLS, Storage) · N8N · PWA. Os detalhes e as justificativas estão na Seção 11 do escopo.
+
+## Começando
+
+- Desenvolvimento: [`docs/DESENVOLVIMENTO.md`](docs/DESENVOLVIMENTO.md)
+- Configurar e-mail e login (uma vez, pelo diretor): [`docs/CONFIGURAR-EMAIL-E-LOGIN.md`](docs/CONFIGURAR-EMAIL-E-LOGIN.md)
