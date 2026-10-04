@@ -9,8 +9,7 @@ import { Cartao, CabecalhoCartao } from "@/components/ui/cartao";
 import { COR_TIPO, CORES_DISPONIVEIS, type ReuniaoRecorrente, type TipoAtividade } from "@/lib/agenda";
 import { NOMES_DIA } from "@/lib/datas";
 import { cn } from "@/lib/utils";
-import { salvarProcessoSeletivo, salvarReuniao, salvarTipoAtividade } from "./acoes-agenda";
-import type { Resultado } from "./acoes";
+import { salvarReuniao, salvarTipoAtividade, type Resultado } from "./acoes";
 
 function avisar(r: Resultado, sucesso: string) {
   if (r.ok) toast.success(sucesso);
@@ -136,31 +135,6 @@ export function TiposAtividade({ tipos }: { tipos: TipoAtividade[] }) {
     <Cartao>
       <CabecalhoCartao titulo="Tipos de atividade" descricao="“Confirmar”: o diretor é avisado na véspera se a visita ainda não foi confirmada com o cliente." />
       <div className="divide-y divide-borda">{tipos.map((t) => <LinhaTipo key={t.id} tipo={t} />)}</div>
-    </Cartao>
-  );
-}
-
-export function ProcessosSeletivos({ processos }: { processos: { id: string; nome: string; data: string }[] }) {
-  const [pendente, iniciar] = useTransition();
-  return (
-    <Cartao>
-      <CabecalhoCartao titulo="Processos seletivos" descricao="Quem entrou a partir da data do último processo conta como membro novo nos indicadores. A data de cada pessoa é ajustada em Membros." />
-      <div className="divide-y divide-borda">
-        {processos.map((p) => (
-          <form key={p.id} className="flex flex-wrap items-center gap-2 px-5 py-2.5"
-            action={(f) => iniciar(async () => avisar(await salvarProcessoSeletivo(p.id, { nome: String(f.get("nome")), data: String(f.get("data")) }), "Processo seletivo salvo."))}>
-            <Entrada name="nome" defaultValue={p.nome} className="h-9 min-w-0 flex-1" />
-            <Entrada name="data" type="date" defaultValue={p.data} className="h-9 w-40" required />
-            <Botao type="submit" tamanho="sm" variante="secundario" carregando={pendente}>Salvar</Botao>
-          </form>
-        ))}
-        <form className="flex flex-wrap items-center gap-2 px-5 py-2.5"
-          action={(f) => iniciar(async () => avisar(await salvarProcessoSeletivo(null, { nome: String(f.get("nome")), data: String(f.get("data")) }), "Processo seletivo cadastrado."))}>
-          <Entrada name="nome" placeholder="Ex.: Processo seletivo 2027/1" className="h-9 min-w-0 flex-1" required />
-          <Entrada name="data" type="date" className="h-9 w-40" required />
-          <Botao type="submit" tamanho="sm" carregando={pendente}><Plus className="h-3.5 w-3.5" /> Adicionar</Botao>
-        </form>
-      </div>
     </Cartao>
   );
 }

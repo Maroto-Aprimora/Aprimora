@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Settings } from "lucide-react";
+import { classeBotao } from "@/components/ui/botao";
 import { Cartao, CabecalhoCartao, TituloPagina, Vazio } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { formatarMoeda, formatarNumero } from "@/lib/formatar";
+import { obterUsuario } from "@/lib/usuario";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Metas" };
@@ -15,7 +18,7 @@ function trimestreAtual() {
 
 export default async function PaginaMetas({ searchParams }: PageProps<"/metas">) {
   const sp = await searchParams;
-  const supabase = await criarClienteServidor();
+  const [usuario, supabase] = await Promise.all([obterUsuario(), criarClienteServidor()]);
   const { data: metas } = await supabase.from("metas").select("*").eq("diretoria", "comercial").order("ordem");
   const trimestres = [...new Set((metas ?? []).map((m) => m.trimestre))].sort((a, b) => b.slice(2).localeCompare(a.slice(2)) || b.localeCompare(a));
   const pedido = typeof sp.t === "string" ? sp.t : "";
@@ -33,6 +36,11 @@ export default async function PaginaMetas({ searchParams }: PageProps<"/metas">)
       <TituloPagina
         titulo="Metas trimestrais"
         descricao="OKRs do Comercial. Por enquanto os valores realizados vêm da planilha de Planejamento Estratégico; o cálculo automático a partir do funil entra na Fase 3."
+        acoes={usuario.ehDiretorDe("comercial") && (
+          <Link href={atual ? `/metas/configuracoes?t=${atual}` : "/metas/configuracoes"} className={classeBotao("secundario")}>
+            <Settings className="h-4 w-4" /> Configurações
+          </Link>
+        )}
       />
       <div className="mb-4 flex flex-wrap gap-2">
         {trimestres.map((t) => (

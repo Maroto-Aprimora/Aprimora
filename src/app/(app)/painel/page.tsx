@@ -1,89 +1,71 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, ListChecks, Plus } from "lucide-react";
-import { classeBotao } from "@/components/ui/botao";
+import { Briefcase, Handshake, CalendarDays, ListChecks, Megaphone, Scale, Trophy, Users } from "lucide-react";
+import { MedidorPontos } from "@/components/app/medidor-pontos";
 import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
-import { NOME_MACROETAPA, situacaoSla } from "@/lib/crm";
-import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
-import { criarClienteServidor } from "@/lib/supabase/server";
-import { diasDesde, formatarMoeda } from "@/lib/formatar";
-import { obterUsuario } from "@/lib/usuario";
 import { COR_TIPO, ocorrenciasRecorrentes } from "@/lib/agenda";
-import { diaBR, hojeBR, horaBR, NOMES_DIA, diaDaSemana, somarDias } from "@/lib/datas";
+import { diaBR, diaDaSemana, hojeBR, horaBR, NOMES_DIA, somarDias } from "@/lib/datas";
+import { formatarData, formatarMoeda } from "@/lib/formatar";
+import { PONTOS_MARCO, totalPontos } from "@/lib/pontuacao";
+import { resumoComercial } from "@/lib/resumo-comercial";
+import { criarClienteServidor } from "@/lib/supabase/server";
+import { obterUsuario } from "@/lib/usuario";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Painel" };
 
 export default async function PaginaPainel() {
-  const [usuario, config, supabase] = await Promise.all([obterUsuario(), carregarConfiguracaoComercial(), criarClienteServidor()]);
-  const inicioTrimestre = new Date(new Date().getFullYear(), Math.floor(new Date().getMonth() / 3) * 3, 1).toISOString();
-
+  const [usuario, supabase] = await Promise.all([obterUsuario(), criarClienteServidor()]);
   const hoje = hojeBR();
   const inicioHoje = new Date(`${hoje}T00:00:00-03:00`).toISOString();
   const inicioAmanha = new Date(`${somarDias(hoje, 1)}T00:00:00-03:00`).toISOString();
+  const agoraIso = new Date().toISOString();
 
-  const [{ data: abertos }, { data: ganhos }, { count: novos }, { data: atividadesHoje }, { data: tarefas }, { data: reunioes }, { data: tipos }] = await Promise.all([
-    supabase.from("negocios").select("id, titulo, fase_id, responsavel_id, valor, entrou_na_fase_em").eq("funil_id", config.funil.id).is("encerrado_em", null),
-    supabase.from("negocios").select("valor").eq("funil_id", config.funil.id).gte("ganho_em", inicioTrimestre),
-    supabase.from("negocios").select("id", { count: "exact", head: true }).eq("funil_id", config.funil.id).gte("created_at", inicioTrimestre),
+  const [{ data: atividadesHoje }, { data: tarefas }, { data: reunioes }, { data: tipos }, { data: pontos }, { data: diretorias }, comercial] = await Promise.all([
     supabase.from("atividades").select("id, titulo, inicio, tipo_id, responsavel_id, negocio_id, status, atividade_participantes(membro_id)")
       .gte("inicio", inicioHoje).lt("inicio", inicioAmanha).neq("status", "cancelada").order("inicio"),
-    supabase.from("tarefas").select("id, titulo, prazo, tarefa_responsaveis!inner(membro_id)")
-      .eq("tarefa_responsaveis.membro_id", usuario.id).neq("status", "concluida").lte("prazo", hoje).order("prazo"),
+    supabase.from("tarefas").select("id, titulo, prazo, status, tarefa_responsaveis!inner(membro_id)")
+      .eq("tarefa_responsaveis.membro_id", usuario.id).neq("status", "concluida")
+      .order("prazo", { ascending: true, nullsFirst: false }).limit(20),
     supabase.from("reunioes_recorrentes").select("*").eq("ativa", true),
     supabase.from("tipos_atividade").select("id, nome, cor"),
+    // Diretores enxergam todos os lançamentos (RLS); os demais, só os próprios.
+    supabase.from("pontuacoes").select("membro_id, pontos, cancelado_em").is("cancelado_em", null),
+    supabase.from("diretorias").select("slug, nome").order("ordem"),
+    resumoComercial(usuario.id),
   ]);
 
-  const fases = new Map(config.fases.map((f) => [f.id, f]));
-  const lista = abertos ?? [];
-  const meus = lista.filter((n) => n.responsavel_id === usuario.id);
-  const estourados = lista
-    .map((n) => ({ ...n, fase: fases.get(n.fase_id)!, dias: diasDesde(n.entrou_na_fase_em) }))
-    .filter((n) => n.fase && situacaoSla(n.fase, n.dias) === "estourado");
-  const ponderado = lista.reduce((s, n) => s + (n.valor ?? 0) * (fases.get(n.fase_id)?.probabilidade ?? 0), 0);
-  const receita = (ganhos ?? []).reduce((s, n) => s + (n.valor ?? 0), 0);
-
-  const porMacro = config.fases
-    .filter((f) => f.tipo === "aberta")
-    .reduce<Record<string, number>>((acc, f) => {
-      acc[f.macroetapa] = (acc[f.macroetapa] ?? 0) + lista.filter((n) => n.fase_id === f.id).length;
-      return acc;
-    }, {});
-  const maiorMacro = Math.max(1, ...Object.values(porMacro));
-
-  // Agenda de hoje: minhas atividades + próxima R.I/R.G
+  // Agenda de hoje: minhas atividades + próximas reuniões fixas
   const minhasDiretorias = new Set(usuario.cargos.map((c) => c.diretoria));
   const minhasAtividades = (atividadesHoje ?? []).filter((a) =>
     a.responsavel_id === usuario.id || a.atividade_participantes.some((p) => p.membro_id === usuario.id));
+  const vistas = new Set<string>();
   const proximasReunioes = ocorrenciasRecorrentes(
     (reunioes ?? []).filter((r) => !r.diretoria || minhasDiretorias.has(r.diretoria)), hoje, somarDias(hoje, 7),
-  ).filter((r) => (r.fim ?? r.inicio) > new Date().toISOString()).sort((a, b) => a.inicio.localeCompare(b.inicio));
-  const vistas = new Set<string>();
-  const reunioesUnicas = proximasReunioes.filter((r) => (vistas.has(r.tipoId) ? false : (vistas.add(r.tipoId), true)));
+  )
+    .filter((r) => (r.fim ?? r.inicio) > agoraIso)
+    .sort((a, b) => a.inicio.localeCompare(b.inicio))
+    .filter((r) => (vistas.has(r.tipoId) ? false : (vistas.add(r.tipoId), true)));
   const tipoDe = (id: string) => (tipos ?? []).find((t) => t.id === id);
   const quando = (iso: string) => {
     const dia = diaBR(iso);
     return `${dia === hoje ? "Hoje" : dia === somarDias(hoje, 1) ? "Amanhã" : NOMES_DIA[diaDaSemana(dia)]} · ${horaBR(iso)}`;
   };
 
+  const minhaPontuacao = totalPontos((pontos ?? []).filter((p) => p.membro_id === usuario.id));
+  const porMembro = new Map<string, number>();
+  for (const p of pontos ?? []) porMembro.set(p.membro_id, (porMembro.get(p.membro_id) ?? 0) + p.pontos);
+  const noMarco = [...porMembro.values()].filter((v) => v >= PONTOS_MARCO).length;
+  const nomeDiretoria = (slug: string) => diretorias?.find((d) => d.slug === slug)?.nome ?? slug;
+
   return (
     <>
-      <TituloPagina
-        titulo={`Olá, ${usuario.nome.split(" ")[0]}!`}
-        descricao="Resumo do funil comercial. Indicadores completos (conversão, ciclo de venda, metas automáticas) chegam na Fase 3."
-        acoes={usuario.cargoEm("comercial") && <Link href="/empresas/novo" className={classeBotao("destaque")}><Plus className="h-4 w-4" /> Novo lead</Link>}
-      />
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Numero rotulo="Negócios ativos" valor={String(lista.length)} detalhe={`${meus.length} com você`} />
-        <Numero rotulo="Leads novos no trimestre" valor={String(novos ?? 0)} />
-        <Numero rotulo="Receita fechada no trimestre" valor={formatarMoeda(receita)} detalhe={`${(ganhos ?? []).length} projetos`} />
-        <Numero rotulo="Pipeline ponderado" valor={formatarMoeda(ponderado)} detalhe="valor × probabilidade da fase" />
-      </div>
+      <TituloPagina titulo={`Olá, ${usuario.nome.split(" ")[0]}!`} descricao="Seu dia na Aprimora e um resumo de todas as diretorias." />
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
-        <Cartao>
-          <CabecalhoCartao titulo="Hoje na agenda" acoes={<Link href="/agenda?pessoa=eu" className="text-sm font-semibold text-marca hover:text-destaque"><CalendarDays className="mr-1 inline h-4 w-4" />Agenda</Link>} />
+      <div className="mb-6 grid gap-6 lg:grid-cols-2 2xl:grid-cols-4">
+        <Cartao className="2xl:col-span-2">
+          <CabecalhoCartao titulo="Hoje na agenda" acoes={<LinkCartao href="/agenda?pessoa=eu" icone={CalendarDays}>Agenda</LinkCartao>} />
           <ul className="divide-y divide-borda">
             {minhasAtividades.map((a) => (
               <li key={a.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
@@ -95,7 +77,7 @@ export default async function PaginaPainel() {
               </li>
             ))}
             {minhasAtividades.length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhuma atividade sua hoje.</li>}
-            {reunioesUnicas.map((r) => (
+            {proximasReunioes.map((r) => (
               <li key={r.id} className="flex items-center gap-3 bg-superficie-2/50 px-5 py-2.5 text-sm">
                 <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", COR_TIPO[tipoDe(r.tipoId)?.cor ?? "cinza"])} />
                 <span className="min-w-0 flex-1 truncate font-semibold">{r.titulo}</span>
@@ -105,59 +87,112 @@ export default async function PaginaPainel() {
           </ul>
         </Cartao>
 
-        <Cartao>
-          <CabecalhoCartao titulo="Minhas tarefas para hoje" acoes={<Link href="/tarefas" className="text-sm font-semibold text-marca hover:text-destaque"><ListChecks className="mr-1 inline h-4 w-4" />Tarefas</Link>} />
+        <Cartao className="2xl:col-span-2">
+          <CabecalhoCartao titulo="Minhas tarefas" acoes={<LinkCartao href="/tarefas" icone={ListChecks}>Tarefas</LinkCartao>} />
           <ul className="divide-y divide-borda">
-            {(tarefas ?? []).slice(0, 8).map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-                <span className="min-w-0 truncate">{t.titulo}</span>
-                <Selo tom={t.prazo! < hoje ? "perigo" : "destaque"}>{t.prazo! < hoje ? "Atrasada" : "Vence hoje"}</Selo>
-              </li>
-            ))}
-            {(tarefas ?? []).length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nada vencendo hoje.</li>}
+            {(tarefas ?? []).slice(0, 6).map((t) => {
+              const atrasada = t.prazo && t.prazo < hoje;
+              return (
+                <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                  <span className="min-w-0 truncate">{t.titulo}</span>
+                  {t.prazo ? (
+                    <Selo tom={atrasada ? "perigo" : t.prazo === hoje ? "destaque" : "neutro"}>
+                      {atrasada ? "Atrasada" : t.prazo === hoje ? "Vence hoje" : formatarData(t.prazo)}
+                    </Selo>
+                  ) : <Selo>Sem prazo</Selo>}
+                </li>
+              );
+            })}
+            {(tarefas ?? []).length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhuma tarefa aberta com você.</li>}
           </ul>
+        </Cartao>
+
+        <Cartao>
+          <CabecalhoCartao titulo="Minha pontuação" acoes={<LinkCartao href="/vice-presidencia/pontuacao" icone={Trophy}>Detalhes</LinkCartao>} />
+          <div className="px-5 py-4"><MedidorPontos total={minhaPontuacao} compacto /></div>
+        </Cartao>
+
+        <Cartao>
+          <CabecalhoCartao titulo="Projetos ativos" descricao="Projetos rodando hoje na Aprimora." />
+          <p className="px-5 py-4 text-sm text-texto-suave">
+            Chega com a área de Projetos. Até lá, os contratos fechados aparecem no painel do Comercial
+            ({comercial.ganhos} {comercial.ganhos === 1 ? "fechado" : "fechados"} neste trimestre).
+          </p>
         </Cartao>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Cartao>
-          <CabecalhoCartao titulo="Funil por etapa" />
-          <ul className="space-y-3 px-5 py-4">
-            {Object.entries(porMacro).map(([macro, qtd]) => (
-              <li key={macro} className="grid grid-cols-[130px_1fr_40px] items-center gap-3 text-sm">
-                <span className="text-texto-suave">{NOME_MACROETAPA[macro as keyof typeof NOME_MACROETAPA]}</span>
-                <div className="h-2.5 overflow-hidden rounded-full bg-superficie-2">
-                  <div className="h-full rounded-full bg-marca" style={{ width: `${(qtd / maiorMacro) * 100}%` }} />
-                </div>
-                <span className="text-right font-semibold">{qtd}</span>
-              </li>
-            ))}
-          </ul>
-        </Cartao>
-
-        <Cartao>
-          <CabecalhoCartao titulo="SLA estourado" descricao="Negócios parados além do prazo da fase." />
-          <ul className="divide-y divide-borda">
-            {estourados.slice(0, 8).map((n) => (
-              <li key={n.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-                <Link href={`/negocios/${n.id}`} className="font-semibold hover:text-destaque">{n.titulo}</Link>
-                <Selo tom="destaque">{n.fase.nome} · {n.dias} dias</Selo>
-              </li>
-            ))}
-            {estourados.length === 0 && <li className="px-5 py-4 text-sm text-texto-suave">Nenhum negócio com SLA estourado. 🎉</li>}
-          </ul>
-        </Cartao>
+      <h2 className="mb-3 font-titulo text-lg font-bold">Diretorias</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        <CartaoDiretoria nome={nomeDiretoria("presidencia")} icone={Scale}>
+          <EmBreve>Jurídico-financeiro: contratos e caixa.</EmBreve>
+        </CartaoDiretoria>
+        <CartaoDiretoria nome={nomeDiretoria("rh")} icone={Users} href="/vice-presidencia/pontuacao">
+          {usuario.ehDiretor ? (
+            <Indicadores itens={[["Membros no marco (6+)", String(noMarco)], ["Com pontos", String([...porMembro.values()].filter((v) => v > 0).length)]]} />
+          ) : (
+            <p className="text-sm text-texto-suave">Pontuação e gestão de pessoas.</p>
+          )}
+        </CartaoDiretoria>
+        <CartaoDiretoria nome={nomeDiretoria("projetos")} icone={Briefcase}>
+          <EmBreve>Projetos em andamento e entregas.</EmBreve>
+        </CartaoDiretoria>
+        <CartaoDiretoria nome={nomeDiretoria("comercial")} icone={Handshake} href="/comercial">
+          <Indicadores itens={[
+            ["Negócios ativos", String(comercial.ativos)],
+            ["SLA estourado", String(comercial.estourados.length)],
+            ["Fechado no trimestre", formatarMoeda(comercial.receita)],
+          ]} />
+        </CartaoDiretoria>
+        <CartaoDiretoria nome={nomeDiretoria("marketing")} icone={Megaphone}>
+          <EmBreve>Campanhas e redes sociais.</EmBreve>
+        </CartaoDiretoria>
       </div>
     </>
   );
 }
 
-function Numero({ rotulo, valor, detalhe }: { rotulo: string; valor: string; detalhe?: string }) {
+function LinkCartao({ href, icone: Icone, children }: { href: string; icone: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
-    <Cartao className="px-4 py-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-texto-suave">{rotulo}</p>
-      <p className="mt-1 font-titulo text-2xl font-bold text-marca">{valor}</p>
-      {detalhe && <p className="text-xs text-texto-suave">{detalhe}</p>}
+    <Link href={href} className="inline-flex items-center gap-1 text-sm font-semibold text-marca hover:text-destaque">
+      <Icone className="h-4 w-4" />{children}
+    </Link>
+  );
+}
+
+function CartaoDiretoria({ nome, icone: Icone, href, children }: {
+  nome: string; icone: React.ComponentType<{ className?: string }>; href?: string; children: React.ReactNode;
+}) {
+  const titulo = (
+    <span className="flex items-center gap-2 font-bold">
+      <Icone className="h-4 w-4 text-destaque" /> {nome}
+    </span>
+  );
+  return (
+    <Cartao className="flex flex-col gap-3 p-4">
+      {href ? <Link href={href} className="hover:text-destaque">{titulo}</Link> : titulo}
+      {children}
     </Cartao>
+  );
+}
+
+function Indicadores({ itens }: { itens: [string, string][] }) {
+  return (
+    <dl className="space-y-1.5 text-sm">
+      {itens.map(([rotulo, valor]) => (
+        <div key={rotulo} className="flex items-baseline justify-between gap-2">
+          <dt className="text-texto-suave">{rotulo}</dt>
+          <dd className="font-titulo font-bold text-marca">{valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function EmBreve({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-sm text-texto-suave">
+      <Selo className="mb-1">Em breve</Selo>
+      <p>{children}</p>
+    </div>
   );
 }

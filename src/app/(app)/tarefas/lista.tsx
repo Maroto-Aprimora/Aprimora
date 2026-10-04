@@ -18,6 +18,7 @@ import { excluirTarefa, mudarStatusTarefa, salvarTarefa } from "./acoes";
 type Tarefa = {
   id: string; titulo: string; descricao: string | null; prazo: string | null; prioridade: "baixa" | "media" | "alta";
   status: "pendente" | "em_andamento" | "concluida"; negocioId: string | null; negocioTitulo: string | null; responsaveis: string[];
+  diretoria: string; podeGerir: boolean;
 };
 
 const NOME_PRIORIDADE = { alta: "Alta", media: "Média", baixa: "Baixa" } as const;
@@ -25,10 +26,10 @@ const NOME_STATUS = { pendente: "Pendente", em_andamento: "Em andamento", conclu
 const FILTROS = [["minhas", "Minhas"], ["abertas", "Todas abertas"], ["concluidas", "Concluídas"], ["todas", "Todas"]] as const;
 
 export function ListaTarefas({
-  tarefas, filtro, hoje, membros, negocios, ehDiretor, usuarioId,
+  tarefas, filtro, hoje, membros, negocios, ehDiretor, usuarioId, diretorias, nomesDiretorias,
 }: {
   tarefas: Tarefa[]; filtro: string; hoje: string; membros: MembroResumo[]; negocios: { id: string; titulo: string }[];
-  ehDiretor: boolean; usuarioId: string;
+  ehDiretor: boolean; usuarioId: string; diretorias: { slug: string; nome: string }[]; nomesDiretorias: Record<string, string>;
 }) {
   const router = useRouter();
   const caminho = usePathname();
@@ -58,7 +59,7 @@ export function ListaTarefas({
           <ul className="divide-y divide-borda">
             {tarefas.map((t) => {
               const atrasada = t.prazo && t.prazo < hoje && t.status !== "concluida";
-              const podeMudar = ehDiretor || t.responsaveis.includes(usuarioId);
+              const podeMudar = t.podeGerir || t.responsaveis.includes(usuarioId);
               return (
                 <li key={t.id} className="flex flex-wrap items-start gap-3 px-5 py-3">
                   <input type="checkbox" className="mt-1 h-4 w-4" checked={t.status === "concluida"} disabled={!podeMudar || pendente}
@@ -73,6 +74,7 @@ export function ListaTarefas({
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       {t.prazo && <Selo tom={atrasada ? "perigo" : t.prazo === hoje ? "destaque" : "neutro"}>{atrasada ? "Atrasada · " : t.prazo === hoje ? "Hoje · " : ""}{formatarData(t.prazo)}</Selo>}
                       <Selo tom={t.prioridade === "alta" ? "destaque" : "neutro"}>{NOME_PRIORIDADE[t.prioridade]}</Selo>
+                      <Selo>{nomesDiretorias[t.diretoria] ?? t.diretoria}</Selo>
                       {t.negocioId && <Link href={`/negocios/${t.negocioId}`}><Selo tom="marca">{t.negocioTitulo}</Selo></Link>}
                     </div>
                   </div>
@@ -89,7 +91,7 @@ export function ListaTarefas({
                         {Object.entries(NOME_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </Selecao>
                     )}
-                    {ehDiretor && (
+                    {t.podeGerir && (
                       <>
                         <Botao tamanho="icone" variante="fantasma" aria-label="Editar tarefa" onClick={() => setEditando(t)}><Pencil className="h-4 w-4" /></Botao>
                         <Botao tamanho="icone" variante="fantasma" aria-label="Excluir tarefa" disabled={pendente}
@@ -115,7 +117,8 @@ export function ListaTarefas({
           <form className="grid gap-4 sm:grid-cols-2" action={(form) => iniciar(async () => {
             const g = (k: string) => String(form.get(k) ?? "");
             const r = await salvarTarefa(editando === "nova" ? null : editando.id,
-              { titulo: g("titulo"), descricao: g("descricao"), prazo: g("prazo"), prioridade: g("prioridade"), negocio_id: g("negocio_id") },
+              { titulo: g("titulo"), descricao: g("descricao"), prazo: g("prazo"), prioridade: g("prioridade"), negocio_id: g("negocio_id"),
+                diretoria: g("diretoria") || (editando === "nova" ? diretorias[0]?.slug : editando.diretoria) || "" },
               form.getAll("responsaveis").map(String));
             if (!r.ok) return void toast.error(r.erro);
             toast.success("Tarefa salva.");
@@ -127,6 +130,13 @@ export function ListaTarefas({
                 <>
                   <Campo rotulo="Título" obrigatorio className="sm:col-span-2"><Entrada name="titulo" defaultValue={t?.titulo ?? ""} required /></Campo>
                   <Campo rotulo="Descrição" className="sm:col-span-2"><AreaTexto name="descricao" defaultValue={t?.descricao ?? ""} className="min-h-16" /></Campo>
+                  {!t && diretorias.length > 1 && (
+                    <Campo rotulo="Diretoria" className="sm:col-span-2">
+                      <Selecao name="diretoria" defaultValue={diretorias[0]?.slug}>
+                        {diretorias.map((d) => <option key={d.slug} value={d.slug}>{d.nome}</option>)}
+                      </Selecao>
+                    </Campo>
+                  )}
                   <Campo rotulo="Prazo"><Entrada type="date" name="prazo" defaultValue={t?.prazo ?? ""} /></Campo>
                   <Campo rotulo="Prioridade">
                     <Selecao name="prioridade" defaultValue={t?.prioridade ?? "media"}>

@@ -207,7 +207,7 @@ function DetalheItem({
         )}
         {item.recorrente && (
           <p className="text-texto-suave">
-            Reunião fixa. {ehDiretorComercial ? <>Mude o dia e o horário em <Link href="/configuracoes" className="font-semibold text-marca">Configurações</Link>.</> : "O diretor pode alterar o horário."}
+            Reunião fixa. {ehDiretorComercial ? <>Mude o dia e o horário em <Link href="/agenda/configuracoes" className="font-semibold text-marca">Config da agenda</Link>.</> : "O diretor pode alterar o horário."}
           </p>
         )}
       </div>

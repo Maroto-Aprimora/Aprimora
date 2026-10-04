@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Settings } from "lucide-react";
+import { classeBotao } from "@/components/ui/botao";
 import { TituloPagina } from "@/components/ui/cartao";
 import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
 import { ocorrenciasRecorrentes, type ItemAgenda } from "@/lib/agenda";
@@ -56,7 +59,11 @@ export default async function PaginaAgenda({ searchParams }: PageProps<"/agenda"
 
   return (
     <>
-      <TituloPagina titulo="Agenda" descricao="Visitas, diagnósticos, ligações, eventos e as reuniões fixas (R.I e R.G) da equipe." />
+      <TituloPagina
+        titulo="Agenda"
+        descricao="Visitas, diagnósticos, ligações, eventos e as reuniões fixas (R.I e R.G) de toda a Aprimora."
+        acoes={usuario.ehDiretor && <Link href="/agenda/configuracoes" className={classeBotao("secundario")}><Settings className="h-4 w-4" /> Config</Link>}
+      />
       <Agenda
         mes={mes}
         visao={visao}

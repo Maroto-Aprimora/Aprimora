@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemDeErro } from "@/lib/erros";
-import type { Resultado } from "./acoes";
+
+export type Resultado = { ok: true } | { ok: false; erro: string };
 
 function revalidar() {
-  revalidatePath("/configuracoes");
+  revalidatePath("/agenda/configuracoes");
   revalidatePath("/agenda");
   revalidatePath("/painel");
 }
@@ -60,24 +61,5 @@ export async function salvarTipoAtividade(id: string, dados: z.input<typeof esqu
   if (error) return { ok: false, erro: mensagemDeErro(error) };
   if (!data?.length) return { ok: false, erro: "Você não tem permissão para alterar este tipo." };
   revalidar();
-  return { ok: true };
-}
-
-const esquemaProcesso = z.object({
-  nome: z.string().trim().min(2, "Informe o nome."),
-  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
-});
-
-export async function salvarProcessoSeletivo(id: string | null, dados: z.input<typeof esquemaProcesso>): Promise<Resultado> {
-  const v = esquemaProcesso.safeParse(dados);
-  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
-  const supabase = await criarClienteServidor();
-  const { data, error } = id
-    ? await supabase.from("processos_seletivos").update(v.data).eq("id", id).select("id")
-    : await supabase.from("processos_seletivos").insert(v.data).select("id");
-  if (error) return { ok: false, erro: mensagemDeErro(error) };
-  if (!data?.length) return { ok: false, erro: "Só diretores alteram os processos seletivos." };
-  revalidatePath("/configuracoes");
-  revalidatePath("/membros");
   return { ok: true };
 }
