@@ -141,7 +141,6 @@ export function MenuLateral(dados: DadosMenu) {
             </span>
           </Link>
           <div className={cn("hidden items-center gap-1 lg:flex", so("lg:flex-col"))}>
-            <Sino claro />
             <button type="button" onClick={() => gravarRecolhido(!recolhido)} className="rounded-md p-1.5 hover:bg-white/10"
               aria-label={recolhido ? "Expandir menu" : "Recolher menu"} title={recolhido ? "Expandir menu" : "Recolher menu"}>
               {recolhido ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}

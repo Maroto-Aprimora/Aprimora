@@ -1,4 +1,5 @@
 import { MenuLateral } from "@/components/app/menu-lateral";
+import { Sino } from "@/components/app/sino";
 import { NOME_CARGO } from "@/lib/formatar";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
@@ -21,7 +22,13 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         ehDiretor={usuario.ehDiretor}
         diretorDe={usuario.cargos.filter((c) => c.cargo === "diretor").map((c) => c.diretoria)}
       />
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+      <div className="min-w-0 flex-1">
+        {/* No computador, o sino fica no canto superior direito; no celular ele está na barra do topo */}
+        <div className="hidden justify-end px-8 pt-4 lg:flex">
+          <Sino />
+        </div>
+        <main className="px-4 py-6 sm:px-6 lg:px-8 lg:pt-2">{children}</main>
+      </div>
     </div>
   );
 }
