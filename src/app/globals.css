@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* Tema escuro ativado pela classe .dark (next-themes) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Identidade visual da Aprimora (ver docs/escopo, Seção 13).
+ * Sempre use os tokens semânticos (bg-fundo, text-texto, bg-marca...), nunca cores soltas.
+ */
+:root {
+  --fundo: #f6f8fb;
+  --superficie: #ffffff;
+  --superficie-2: #f2f5f9;
+  --texto: #1a2433;
+  --texto-suave: #5b6573;
+  --borda: #dde3ea;
+  --marca: #24476f;          /* azul Aprimora */
+  --marca-forte: #1a3554;    /* azul profundo */
+  --marca-texto: #ffffff;
+  --destaque: #e8833a;       /* laranja Aprimora */
+  --destaque-suave: #fdf1e7;
+  --azul-claro: #97b9c6;
+  --sucesso: #2e8b57;
+  --sucesso-suave: #e9f6ef;
+  --perigo: #c0392b;
+  --perigo-suave: #fcebea;
+  --menu: #24476f;
+  --menu-texto: #e3ecf3;
+  --menu-ativo: #1a3554;
+}
+
+.dark {
+  --fundo: #0f1b2b;
+  --superficie: #16253a;
+  --superficie-2: #1c2e47;
+  --texto: #eef3f8;
+  --texto-suave: #9fb0c3;
+  --borda: #2a3f5c;
+  --marca: #4f7fb5;
+  --marca-forte: #6e98c7;
+  --marca-texto: #ffffff;
+  --destaque: #f09a55;
+  --destaque-suave: #3a2a1d;
+  --azul-claro: #97b9c6;
+  --sucesso: #4cbf82;
+  --sucesso-suave: #17352a;
+  --perigo: #ef6b5e;
+  --perigo-suave: #3d1d1b;
+  --menu: #0b1522;
+  --menu-texto: #c9d6e3;
+  --menu-ativo: #16253a;
+}
+
+@theme inline {
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-borda: var(--borda);
+  --color-marca: var(--marca);
+  --color-marca-forte: var(--marca-forte);
+  --color-marca-texto: var(--marca-texto);
+  --color-destaque: var(--destaque);
+  --color-destaque-suave: var(--destaque-suave);
+  --color-azul-claro: var(--azul-claro);
+  --color-sucesso: var(--sucesso);
+  --color-sucesso-suave: var(--sucesso-suave);
+  --color-perigo: var(--perigo);
+  --color-perigo-suave: var(--perigo-suave);
+  --color-menu: var(--menu);
+  --color-menu-texto: var(--menu-texto);
+  --color-menu-ativo: var(--menu-ativo);
+  --font-sans: var(--fonte-texto), ui-sans-serif, system-ui, sans-serif;
+  --font-titulo: var(--fonte-titulo), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-titulo);
+}
+
+dialog::backdrop {
+  background: rgb(10 20 35 / 0.45);
+}

@@ -1,5 +1,32 @@
+# dependências
 node_modules/
+.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# testes
+/coverage
+/test-results/
+/playwright-report/
+
+# variáveis de ambiente (nunca versionar segredos)
 .env
 .env.*
 !.env.example
+
+# vercel
+.vercel
+
+# diversos
 .DS_Store
+*.pem
+npm-debug.log*
+
+# planilhas com dados reais (não versionar dados de clientes)
+dados-reais/
