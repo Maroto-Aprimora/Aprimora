@@ -9,11 +9,12 @@ import { Campo, Entrada, Selecao } from "@/components/ui/campos";
 import { Cartao, CabecalhoCartao, Vazio } from "@/components/ui/cartao";
 import { Dialogo } from "@/components/ui/dialogo";
 import type { Tables } from "@/lib/supabase/database.types";
+import { CHAVES_INDICADOR, INDICADORES_META } from "@/lib/indicadores-catalogo";
 import { criarTrimestre, excluirMeta, salvarMeta } from "../acoes";
 
 type Meta = Tables<"metas">;
 const UNIDADES = [["un", "Quantidade"], ["R$", "R$"], ["%", "%"]] as const;
-const COLUNAS = "lg:grid-cols-[1.3fr_70px_1.6fr_110px_80px_110px_70px_auto]";
+const COLUNAS = "lg:grid-cols-[1.2fr_64px_1.5fr_1.2fr_100px_80px_100px_64px_auto]";
 
 function LinhaMeta({ meta, trimestre, objetivos, aoCriar }: { meta: Meta | null; trimestre: string; objetivos: string[]; aoCriar?: () => void }) {
   const [pendente, iniciar] = useTransition();
@@ -25,7 +26,7 @@ function LinhaMeta({ meta, trimestre, objetivos, aoCriar }: { meta: Meta | null;
         const g = (k: string) => String(f.get(k) ?? "");
         const r = await salvarMeta(meta?.id ?? null, {
           trimestre, objetivo: g("objetivo"), codigo: g("codigo"), titulo: g("titulo"), alvo: g("alvo"), unidade: g("unidade"),
-          realizado_manual: g("realizado_manual"), peso: g("peso"), ordem: meta?.ordem ?? 99,
+          realizado_manual: g("realizado_manual"), peso: g("peso"), ordem: meta?.ordem ?? 99, indicador: g("indicador"),
         });
         if (!r.ok) return void toast.error(r.erro);
         toast.success(meta ? "Meta salva." : "Meta adicionada.");
@@ -36,11 +37,15 @@ function LinhaMeta({ meta, trimestre, objetivos, aoCriar }: { meta: Meta | null;
       <datalist id={listaId}>{objetivos.map((o) => <option key={o} value={o} />)}</datalist>
       <Entrada name="codigo" defaultValue={meta?.codigo ?? ""} placeholder="KR" className="h-9" />
       <Entrada name="titulo" defaultValue={meta?.titulo ?? ""} placeholder="Resultado-chave" required className="h-9" />
+      <Selecao name="indicador" defaultValue={meta?.indicador ?? ""} className="h-9" title="Como o realizado é calculado">
+        <option value="">Manual</option>
+        {CHAVES_INDICADOR.map((c) => <option key={c} value={c} title={INDICADORES_META[c].regra}>Auto: {INDICADORES_META[c].nome}</option>)}
+      </Selecao>
       <Entrada name="alvo" type="number" step="any" min={0} defaultValue={meta?.alvo ?? ""} placeholder="Alvo" required className="h-9" />
       <Selecao name="unidade" defaultValue={meta?.unidade ?? "un"} className="h-9">
         {UNIDADES.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
       </Selecao>
-      <Entrada name="realizado_manual" type="number" step="any" defaultValue={meta?.realizado_manual ?? ""} placeholder="Realizado" className="h-9" />
+      <Entrada name="realizado_manual" type="number" step="any" defaultValue={meta?.realizado_manual ?? ""} placeholder={meta?.indicador ? "Ajuste" : "Realizado"} title={meta?.indicador ? "Somado ao cálculo automático (ex.: o que aconteceu antes do portal)" : "Valor realizado"} className="h-9" />
       <Entrada name="peso" type="number" step="any" min={0.01} defaultValue={meta?.peso ?? 1} title="Peso no alcance geral" className="h-9" />
       <div className="flex gap-1">
         <Botao type="submit" tamanho="sm" variante={meta ? "secundario" : "primario"} carregando={pendente}>{meta ? "Salvar" : "Adicionar"}</Botao>
@@ -66,11 +71,11 @@ export function EditorMetas({ trimestre, metas }: { trimestre: string; metas: Me
     <Cartao>
       <CabecalhoCartao
         titulo={`Metas do ${trimestre.replace("T", "º trimestre de ")}`}
-        descricao="O realizado é preenchido à mão por enquanto; o cálculo automático a partir do funil entra na Fase 3."
+        descricao="Cálculo automático: o portal conta pelo funil e pela agenda, e o campo de realizado vira um ajuste somado (útil para o que aconteceu antes do portal). Manual: o diretor preenche."
         acoes={<Botao tamanho="sm" variante="secundario" onClick={() => setNovas((n) => n + 1)}><Plus className="h-3.5 w-3.5" /> Nova meta</Botao>}
       />
       <div className={`hidden gap-2 bg-superficie-2 px-5 py-2 text-xs uppercase tracking-wide text-texto-suave lg:grid ${COLUNAS}`}>
-        <span>Objetivo</span><span>KR</span><span>Resultado-chave</span><span>Alvo</span><span>Unidade</span><span>Realizado</span><span>Peso</span><span />
+        <span>Objetivo</span><span>KR</span><span>Resultado-chave</span><span>Cálculo</span><span>Alvo</span><span>Unidade</span><span>Realizado / ajuste</span><span>Peso</span><span />
       </div>
       <div className="divide-y divide-borda">
         {metas.map((m) => <LinhaMeta key={m.id} meta={m} trimestre={trimestre} objetivos={objetivos} />)}

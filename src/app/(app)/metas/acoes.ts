@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemDeErro } from "@/lib/erros";
+import { CHAVES_INDICADOR, type ChaveIndicador } from "@/lib/indicadores-catalogo";
 
 export type Resultado = { ok: true } | { ok: false; erro: string };
 
@@ -21,6 +22,7 @@ const esquemaMeta = z.object({
   realizado_manual: numero,
   peso: z.preprocess((v) => Number(v), z.number().positive("O peso precisa ser maior que zero.").max(999)),
   ordem: z.preprocess((v) => Number(v ?? 0), z.number().int().min(0).max(32000)),
+  indicador: z.preprocess((v) => (v === "" || v == null ? null : v), z.enum(CHAVES_INDICADOR as [ChaveIndicador, ...ChaveIndicador[]]).nullable()),
 });
 
 function revalidar() {
