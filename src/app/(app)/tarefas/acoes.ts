@@ -14,6 +14,7 @@ const esquema = z.object({
   prazo: z.preprocess(nulo, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional()),
   prioridade: z.enum(["baixa", "media", "alta"]),
   negocio_id: z.preprocess(nulo, z.string().uuid().nullable().optional()),
+  diretoria: z.string().min(1),
 });
 
 function revalidar() {
@@ -21,7 +22,7 @@ function revalidar() {
   revalidatePath("/painel");
 }
 
-/** Só o diretor cria e edita tarefas (o banco garante). */
+/** Só o diretor cria e edita tarefas (o banco garante). A diretoria indica quem pode gerir a tarefa. */
 export async function salvarTarefa(id: string | null, dados: Record<string, unknown>, responsaveis: string[]): Promise<Resultado> {
   const v = esquema.safeParse(dados);
   if (!v.success) return { ok: false, erro: v.error.issues[0].message };
@@ -30,11 +31,13 @@ export async function salvarTarefa(id: string | null, dados: Record<string, unkn
 
   let tarefaId = id;
   if (id) {
-    const { data, error } = await supabase.from("tarefas").update(v.data).eq("id", id).select("id");
+    const { diretoria: _ignorada, ...campos } = v.data;
+    void _ignorada;
+    const { data, error } = await supabase.from("tarefas").update(campos).eq("id", id).select("id");
     if (error) return { ok: false, erro: mensagemDeErro(error) };
     if (!data?.length) return { ok: false, erro: "Só o diretor edita tarefas." };
   } else {
-    const { data, error } = await supabase.from("tarefas").insert({ ...v.data, diretoria: "comercial" }).select("id").single();
+    const { data, error } = await supabase.from("tarefas").insert(v.data).select("id").single();
     if (error) return { ok: false, erro: mensagemDeErro(error) };
     tarefaId = data.id;
   }

@@ -113,3 +113,21 @@ export async function transferirCarteira(de: string, para: string, diretoria: st
   revalidatePath("/funil");
   return { ok: true, resumo: `${r.negocios ?? 0} negócio(s), ${r.tarefas ?? 0} tarefa(s) e ${r.atividades ?? 0} atividade(s) transferidos.` };
 }
+
+const esquemaProcesso = z.object({
+  nome: z.string().trim().min(2, "Informe o nome."),
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
+});
+
+export async function salvarProcessoSeletivo(id: string | null, dados: z.input<typeof esquemaProcesso>): Promise<Resultado> {
+  const v = esquemaProcesso.safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { data, error } = id
+    ? await supabase.from("processos_seletivos").update(v.data).eq("id", id).select("id")
+    : await supabase.from("processos_seletivos").insert(v.data).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só diretores alteram os processos seletivos." };
+    revalidatePath("/membros");
+  return { ok: true };
+}

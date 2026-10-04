@@ -58,6 +58,8 @@ npm run build
 | Notificações | Cada pessoa vê só as suas; só pode marcar como lida |
 | Data de entrada | Só o diretor altera (`proteger_membro`) |
 | Auditoria | Só diretores leem |
+| Pontuação | Cada um vê a sua; diretores veem todas; só a Vice-Presidência (slug `rh`) lança e cancela |
+| Metas | Todos leem; o diretor da diretoria cria, edita e exclui (Metas → Configurações) |
 
 ### Regras automáticas do funil (no banco)
 
@@ -82,6 +84,17 @@ npm run build
 | Notificação não se repete | `notificacoes (membro_id, chave)` único + `privado.notificar` |
 | Transferir carteira de quem sai | `public.transferir_carteira(de, para, diretoria)` (só diretor; registra na auditoria) |
 | Membros novos | `membros.data_entrada` ≥ data do último `processos_seletivos` |
+
+### Navegação e configurações (Fase 2b)
+
+- Menu: **Painel, Agenda e Tarefas são gerais**; abaixo vêm seções retráteis por diretoria, na ordem
+  Presidência, Vice-Presidência (antigo RH, slug `rh`), Projetos, Comercial e Marketing.
+- Cada configuração fica na sua área: funil em `/funil/configuracoes` (botão **Config** ao lado de *Novo lead*),
+  agenda em `/agenda/configuracoes`, metas em `/metas/configuracoes`, processos seletivos em Membros.
+- `/painel` é o resumo geral (agenda, tarefas, pontuação, projetos e um cartão por diretoria);
+  `/comercial` é o painel do Comercial.
+- Pontuação (`pontuacoes`): soma dos lançamentos não cancelados, limitada a 0–12, marco em 6. Lançamentos não
+  são editados nem apagados (gatilho `proteger_pontuacao`); a pessoa é notificada a cada lançamento.
 
 ### Push no celular (Web Push)
 

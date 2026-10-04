@@ -4,20 +4,21 @@ import { Avatar, Selo } from "@/components/ui/selo";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { formatarData, iniciais, NOME_CARGO } from "@/lib/formatar";
 import { obterUsuario } from "@/lib/usuario";
-import { AcoesMembro, AcoesPreCadastro, DataEntrada, NovoPreCadastro, TransferirCarteira } from "./componentes";
+import { AcoesMembro, AcoesPreCadastro, DataEntrada, NovoPreCadastro, ProcessosSeletivos, TransferirCarteira } from "./componentes";
 
 export const metadata: Metadata = { title: "Membros" };
 
 export default async function PaginaMembros() {
   const usuario = await obterUsuario();
   const supabase = await criarClienteServidor();
-  const [{ data: diretorias }, { data: membros }, { data: cargos }, { data: pre }] = await Promise.all([
+  const [{ data: diretorias }, { data: membros }, { data: cargos }, { data: pre }, { data: processos }] = await Promise.all([
     supabase.from("diretorias").select("slug, nome").order("ordem"),
     supabase.from("membros").select("id, nome, email, ativo, data_entrada").order("nome"),
     supabase.from("membro_diretorias").select("membro_id, diretoria, cargo, participa_rodizio"),
     usuario.ehDiretor
       ? supabase.from("pre_cadastros").select("id, nome, email, convite_enviado_em, aceito_em, pre_cadastro_diretorias(diretoria, cargo)").is("aceito_em", null).order("nome")
       : Promise.resolve({ data: [] as never[] }),
+    supabase.from("processos_seletivos").select("id, nome, data").order("data", { ascending: false }),
   ]);
 
   const minhasDiretorias = (diretorias ?? []).filter((d) => usuario.ehDiretorDe(d.slug));
@@ -62,6 +63,8 @@ export default async function PaginaMembros() {
           </ul>
         </Cartao>
       )}
+
+      {usuario.ehDiretor && <div className="mb-6"><ProcessosSeletivos processos={processos ?? []} /></div>}
 
       <div className="grid gap-6 xl:grid-cols-2">
         {(diretorias ?? []).map((d) => {

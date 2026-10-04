@@ -16,6 +16,7 @@ const dataOpcional = z.preprocess(vazioParaNulo, z.string().regex(/^\d{4}-\d{2}-
 function revalidarCrm(negocioId?: string) {
   revalidatePath("/funil");
   revalidatePath("/painel");
+  revalidatePath("/comercial");
   revalidatePath("/empresas", "layout");
   if (negocioId) revalidatePath(`/negocios/${negocioId}`);
 }

@@ -8,7 +8,7 @@ import { mensagemDeErro } from "@/lib/erros";
 export type Resultado = { ok: true } | { ok: false; erro: string };
 
 function revalidar() {
-  revalidatePath("/configuracoes");
+  revalidatePath("/funil/configuracoes");
   revalidatePath("/funil");
 }
 

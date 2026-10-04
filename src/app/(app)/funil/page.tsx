@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { classeBotao } from "@/components/ui/botao";
 import { TituloPagina } from "@/components/ui/cartao";
 import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
@@ -57,7 +57,10 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
       <TituloPagina
         titulo="Funil comercial"
         descricao="Arraste os cards entre as fases. Negócios ganhos e perdidos aparecem por 90 dias."
-        acoes={<Link href="/empresas/novo" className={classeBotao("destaque")}><Plus className="h-4 w-4" /> Novo lead</Link>}
+        acoes={<>
+          {usuario.ehDiretorDe("comercial") && <Link href="/funil/configuracoes" className={classeBotao("secundario")}><Settings className="h-4 w-4" /> Config</Link>}
+          <Link href="/empresas/novo" className={classeBotao("destaque")}><Plus className="h-4 w-4" /> Novo lead</Link>
+        </>}
       />
       <FiltrosFunil membros={config.membrosComercial} origens={config.origens} />
       <Kanban fases={config.fases} motivos={config.motivos} cartoes={cartoes} />
