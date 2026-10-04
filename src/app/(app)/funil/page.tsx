@@ -23,6 +23,7 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
   const resp = typeof filtros.resp === "string" ? filtros.resp : "";
   const busca = typeof filtros.q === "string" ? filtros.q.trim() : "";
   const origem = typeof filtros.origem === "string" ? filtros.origem : "";
+  const segmento = typeof filtros.segmento === "string" ? filtros.segmento : "";
 
   const [usuario, config, supabase] = await Promise.all([obterUsuario(), carregarConfiguracaoComercial(), criarClienteServidor()]);
 
@@ -37,6 +38,7 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
   else if (resp === "sem") consulta = consulta.is("responsavel_id", null);
   else if (resp) consulta = consulta.eq("responsavel_id", resp);
   if (origem) consulta = consulta.eq("origem_id", origem);
+  if (segmento) consulta = consulta.eq("empresas.segmento_id", segmento);
   if (busca) consulta = consulta.ilike("empresas.nome_normalizado", `%${busca.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")}%`);
 
   const { data } = await consulta;
@@ -62,7 +64,7 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
           <Link href="/empresas/novo" className={classeBotao("destaque")}><Plus className="h-4 w-4" /> Novo lead</Link>
         </>}
       />
-      <FiltrosFunil membros={config.membrosComercial} origens={config.origens} />
+      <FiltrosFunil membros={config.membrosComercial} origens={config.origens} segmentos={config.segmentos} />
       <Kanban fases={config.fases} motivos={config.motivos} cartoes={cartoes} />
     </>
   );

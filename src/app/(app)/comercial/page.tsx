@@ -10,7 +10,9 @@ import { periodoDosParametros } from "@/lib/periodo";
 import { resumoComercial } from "@/lib/resumo-comercial";
 import { obterUsuario } from "@/lib/usuario";
 import { cn } from "@/lib/utils";
-import { Exportar, FiltrosPainel } from "./filtros";
+import { Exportar, FiltroAtividades, FiltrosPainel } from "./filtros";
+import { diaBR, horaBR } from "@/lib/datas";
+import { NOME_STATUS } from "@/lib/agenda";
 
 export const metadata: Metadata = { title: "Painel comercial" };
 
@@ -26,6 +28,19 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
   const ind = calcularIndicadores(dados, responsavel || null);
   const r = ind.resumo;
   const maiorEtapa = Math.max(1, ...ind.funil.map((e) => e.quantidade));
+
+  // Atividades da equipe (só o diretor): ligações, visitas, reuniões… do período
+  const ehDiretor = usuario.ehDiretorDe("comercial");
+  const filtroMembro = typeof sp.am === "string" ? sp.am : "";
+  const filtroTipo = typeof sp.at === "string" ? sp.at : "";
+  const nomeMembro = new Map(dados.membros.map((m) => [m.id, m.nome]));
+  const nomeTipo = new Map(dados.tipos.map((t) => [t.id, t.nome]));
+  const atividadesEquipe = ehDiretor
+    ? dados.atividades
+        .filter((a) => !filtroTipo || a.tipo_id === filtroTipo)
+        .filter((a) => !filtroMembro || a.responsavel_id === filtroMembro || a.atividade_participantes.some((p) => p.membro_id === filtroMembro))
+        .sort((a, b) => b.inicio.localeCompare(a.inicio))
+    : [];
 
   return (
     <>
@@ -138,8 +153,54 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
           </ul>
         </Cartao>
       </div>
+
+      {ehDiretor && (
+        <Cartao className="mt-6" id="atividades">
+          <CabecalhoCartao
+            titulo="Atividades da equipe"
+            descricao={`${atividadesEquipe.length} ${atividadesEquipe.length === 1 ? "atividade" : "atividades"} no período: ligações, visitas, diagnósticos, reuniões e eventos. Visível só para o diretor.`}
+            acoes={<FiltroAtividades membro={filtroMembro} tipo={filtroTipo} membros={dados.config.membrosComercial} tipos={dados.tipos.map((t) => ({ id: t.id, nome: t.nome }))} />}
+          />
+          {atividadesEquipe.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-texto-suave">Nenhuma atividade com esses filtros no período.</p>
+          ) : (
+            <div className="max-h-[560px] overflow-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="sticky top-0 bg-superficie-2 text-left text-xs uppercase tracking-wide text-texto-suave">
+                  <tr><th className="px-4 py-2">Quando</th><th className="px-4 py-2">Tipo</th><th className="px-4 py-2">Atividade</th><th className="px-4 py-2">Responsável</th><th className="px-4 py-2">Situação</th></tr>
+                </thead>
+                <tbody className="divide-y divide-borda">
+                  {atividadesEquipe.map((a) => (
+                    <tr key={a.id} className="align-top">
+                      <td className="whitespace-nowrap px-4 py-2">{diaBR(a.inicio).split("-").reverse().join("/")} {horaBR(a.inicio)}</td>
+                      <td className="px-4 py-2">{nomeTipo.get(a.tipo_id) ?? "—"}</td>
+                      <td className="px-4 py-2">
+                        {a.negocio_id ? <Link href={`/negocios/${a.negocio_id}`} className="font-semibold hover:text-destaque">{a.titulo}</Link> : <span className="font-semibold">{a.titulo}</span>}
+                        {(a.empresas?.nome || a.local) && <p className="text-xs text-texto-suave">{[a.empresas?.nome, a.local].filter(Boolean).join(" · ")}</p>}
+                        {a.resumo && <p className="mt-0.5 text-xs">{a.resumo}</p>}
+                      </td>
+                      <td className="px-4 py-2">
+                        {a.responsavel_id ? nomeMembro.get(a.responsavel_id) ?? "—" : "—"}
+                        {a.atividade_participantes.length > 0 && (
+                          <p className="text-xs text-texto-suave">+ {a.atividade_participantes.map((p) => nomeMembro.get(p.membro_id)?.split(" ")[0]).filter(Boolean).join(", ")}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-2"><SeloStatus status={a.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Cartao>
+      )}
     </>
   );
+}
+
+function SeloStatus({ status }: { status: keyof typeof NOME_STATUS }) {
+  const tom = status === "realizada" ? "sucesso" : status === "cancelada" ? "perigo" : status === "confirmada" ? "marca" : "neutro";
+  return <Selo tom={tom}>{NOME_STATUS[status]}</Selo>;
 }
 
 function Numero({ rotulo, valor, detalhe }: { rotulo: string; valor: string; detalhe?: string }) {
