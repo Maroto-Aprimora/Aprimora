@@ -54,6 +54,23 @@ npm run build
 | Assessor / trainee | Criar leads; editar os negócios em que é responsável ou participante |
 | Trainee | Não marca ganho e não exclui |
 
+### Regras automáticas do funil (no banco)
+
+| Regra | Onde |
+|---|---|
+| Entrada de leads → Enriquecimento automaticamente | `fases.auto_mover_para` + gatilho `depois_de_salvar_negocio` |
+| Rodízio de responsável ao entrar em E-mail | `fases.distribui_responsavel` + `privado.proximo_do_rodizio` |
+| Campos obrigatórios para avançar | `fase_campos.obrigatorio` + gatilho `antes_de_salvar_negocio` |
+| Motivo obrigatório nas perdas | `fases.exige_motivo` |
+| Trainee não marca ganho | gatilho `antes_de_salvar_negocio` |
+| Histórico de toda movimentação | tabela `negocio_historico` (só gatilhos escrevem) |
+| SLA (Oportunidade: 15 dias → volta para E-mail) e retorno da Reciclagem | `privado.aplicar_slas()` via pg_cron, todo dia às 8h05 (Brasília) |
+
+## Dados fictícios
+
+`supabase/dados/dados_ficticios.sql` cria 50 empresas e negócios de teste (marcados com `ficticio = true`).
+Antes de importar os dados reais do Pipefy, rode `supabase/dados/remover_dados_ficticios.sql`.
+
 ## Variáveis de ambiente
 
 | Nome | Onde | Observação |
