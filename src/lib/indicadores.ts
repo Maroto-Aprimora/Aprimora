@@ -35,7 +35,7 @@ export async function carregarDadosComerciais(periodo: Periodo) {
       .select("negocio_id, fase_destino_id, created_at, negocios!inner(funil_id)")
       .eq("negocios.funil_id", config.funil.id).order("negocio_id").order("created_at").range(a, b)),
     buscarTudo((a, b) => supabase.from("atividades")
-      .select("id, tipo_id, status, inicio, responsavel_id, negocio_id")
+      .select("id, tipo_id, titulo, status, inicio, responsavel_id, negocio_id, resumo, local, atividade_participantes(membro_id), negocios(titulo), empresas(nome)")
       .gte("inicio", inicio).lt("inicio", fim).order("inicio").range(a, b)),
     supabase.from("tipos_atividade").select("id, chave, nome"),
     supabase.from("membros").select("id, nome, data_entrada"),

@@ -80,3 +80,30 @@ export function Exportar() {
     </div>
   );
 }
+
+/** Filtro da lista de atividades (diretor): membro e tipo, guardados na URL. */
+export function FiltroAtividades({ membro, tipo, membros, tipos }: {
+  membro: string; tipo: string; membros: { id: string; nome: string }[]; tipos: { id: string; nome: string }[];
+}) {
+  const router = useRouter();
+  const caminho = usePathname();
+  const params = useSearchParams();
+  function ir(chave: string, valor: string) {
+    const novo = new URLSearchParams(params.toString());
+    if (valor) novo.set(chave, valor);
+    else novo.delete(chave);
+    router.replace(`${caminho}?${novo.toString()}#atividades`, { scroll: false });
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Selecao value={membro} onChange={(e) => ir("am", e.target.value)} className="h-9 w-52" aria-label="Membro">
+        <option value="">Todos os membros</option>
+        {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+      </Selecao>
+      <Selecao value={tipo} onChange={(e) => ir("at", e.target.value)} className="h-9 w-52" aria-label="Tipo de atividade">
+        <option value="">Todos os tipos</option>
+        {tipos.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+      </Selecao>
+    </div>
+  );
+}
