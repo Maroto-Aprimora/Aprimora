@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;font-family:'Open Sans',sans-serif;background:#fff;width:1600px}
+.wrap{padding:30px;display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:26px;align-items:start}
+.box{border:2px solid #24476F;border-radius:14px;padding:14px 16px;background:#F4F7FA}
+.box h3{margin:0 0 8px;font-family:Montserrat;font-weight:700;font-size:19px;color:#24476F}
+.box h3 em{font-style:normal;color:#E8833A}
+.box ul{margin:0;padding-left:20px;font-size:15px;color:#1f2937;line-height:1.5}
+.core{background:#24476F;border-color:#24476F}
+.core h3,.core ul{color:#fff}.core h3 em{color:#F5A66A}
+.col{display:flex;flex-direction:column;gap:18px}
+.lbl{font-family:Montserrat;font-weight:700;font-size:13px;letter-spacing:.12em;color:#9AA5B1;text-transform:uppercase;margin-bottom:-8px}
+.flow{font-size:13.5px;color:#B35A17;background:#FDF3EB;border:1.5px dashed #E8833A;border-radius:10px;padding:8px 12px}
+</style></head><body><div class="wrap">
+<div class="col"><div class="lbl">Usuários</div>
+ <div class="box"><h3>PWA <em>Portal Aprimora</em></h3><ul><li>Celular e computador</li><li>Instalável, sem lojas de apps</li><li>Notificações push</li></ul></div>
+ <div class="box"><h3>Perfis</h3><ul><li>Diretores (5, mesmo poder)</li><li>Assessores</li><li>Trainees</li></ul></div>
+ <div class="flow">HTTPS + sessão do Supabase Auth. Toda leitura e escrita passa pelas regras de acesso por linha (RLS).</div>
+</div>
+<div class="col"><div class="lbl">Núcleo</div>
+ <div class="box"><h3>Front-end <em>Next.js na Vercel</em></h3><ul><li>Telas, painéis e kanban</li><li>Rotas de API (server actions) para operações sensíveis</li><li>Webhooks de entrada (N8N → portal)</li></ul></div>
+ <div class="box core"><h3>Supabase <em>fonte da verdade</em></h3><ul><li>Auth: login por convite, sem cadastro aberto</li><li>Postgres + RLS por diretoria e cargo</li><li>Views de KPIs e histórico do funil</li><li>Storage: escopos, propostas, anexos</li><li>pg_cron: tarefas agendadas internas</li><li>pgvector: base de conhecimento da IA</li><li>Database Webhooks → N8N</li></ul></div>
+</div>
+<div class="col"><div class="lbl">Automação e serviços externos</div>
+ <div class="box"><h3>N8N <em>orquestrador</em></h3><ul><li>Cadência e follow-ups de e-mail</li><li>Lembretes e alertas de SLA</li><li>Resumo semanal por diretoria</li><li>Extração e enriquecimento de leads</li><li>Passagem do ganho para Projetos e Presidência</li></ul></div>
+ <div class="box"><h3>Google Workspace</h3><ul><li>Gmail API: envio e leitura da caixa</li><li>Google Agenda (opcional)</li></ul></div>
+ <div class="box"><h3>Provedor de IA</h3><ul><li>Plano gratuito no piloto</li><li>Camada que permite trocar de provedor</li></ul></div>
+ <div class="box"><h3>Fontes de leads</h3><ul><li>Site, eventos (CSV), indicações</li><li>Dados abertos de CNPJ, Google Maps</li></ul></div>
+</div>
+</div></body></html>

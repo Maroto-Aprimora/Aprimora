@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;font-family:'Open Sans',sans-serif;background:#fff;width:1600px}
+.wrap{padding:28px 28px 20px}
+.row{display:flex;gap:14px;align-items:stretch}
+.grp{border:2px solid #24476F;border-radius:14px;padding:12px 12px 14px;flex:1;background:#F4F7FA}
+.grp h3{margin:0 0 10px;font-family:Montserrat;font-weight:700;font-size:17px;color:#24476F;letter-spacing:.06em;text-transform:uppercase}
+.grp h3 span{color:#E8833A}
+.st{background:#24476F;color:#fff;border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:15px;font-weight:600}
+.st small{display:block;font-weight:400;opacity:.85;font-size:12.5px;margin-top:2px}
+.arrow{display:flex;align-items:center;color:#E8833A;font-size:34px;font-weight:700}
+.exits{display:flex;gap:14px;margin-top:22px}
+.ex{flex:1;border-radius:10px;padding:12px 14px;font-size:15px;font-weight:600;border:2px solid}
+.ex small{display:block;font-weight:400;font-size:12.5px;margin-top:3px;color:#333}
+.win{border-color:#2E8B57;background:#EEF8F2;color:#1F6B41}
+.rec{border-color:#E8833A;background:#FDF3EB;color:#B35A17}
+.lost{border-color:#9AA5B1;background:#F3F4F6;color:#4B5563}
+.note{margin-top:14px;font-size:13px;color:#4B5563}
+</style></head><body><div class="wrap">
+<div class="row">
+ <div class="grp"><h3><span>1</span> Prospecção</h3>
+  <div class="st">Formulário inicial<small>15 campos do lead</small></div>
+  <div class="st">Entrada de leads<small>auto → Enriquecimento</small></div>
+  <div class="st">Enriquecimento<small>dados de decisor e contatos</small></div>
+  <div class="st">Coleta de dados<small>validação final</small></div></div>
+ <div class="arrow">›</div>
+ <div class="grp"><h3><span>2</span> Cadência</h3>
+  <div class="st">E-mail<small>1º envio + follow-ups 1, 2 e 3</small></div>
+  <div class="st">Coldcall – semana 1</div>
+  <div class="st">Coldcall – semana 2</div>
+  <div class="st">Retornar futuro<small>data + decisor de retorno</small></div></div>
+ <div class="arrow">›</div>
+ <div class="grp"><h3><span>3</span> Oportunidade</h3>
+  <div class="st">Oportunidade<small>SLA 14 dias para agendar; sem agendamento → volta para cadência</small></div></div>
+ <div class="arrow">›</div>
+ <div class="grp"><h3><span>4</span> Venda consultiva</h3>
+  <div class="st">Diagnóstico<small>data, dores, decisor</small></div>
+  <div class="st">Elaboração de escopo<small>prazo, arquivo, responsáveis</small></div>
+  <div class="st">Apresentação de proposta<small>data, apresentador, decisores</small></div></div>
+</div>
+<div class="exits">
+ <div class="ex win">✔ Projetos Aprimora (ganho)<small>Gera projeto para a diretoria de Projetos e cobrança para a Presidência</small></div>
+ <div class="ex rec">↻ Reciclagem<small>SLA de reciclagem + etiqueta; o lead volta ao funil depois</small></div>
+ <div class="ex lost">✖ Projeto não vendido<small>Motivo da perda é obrigatório</small></div>
+ <div class="ex lost">⊘ Lead não qualificado<small>Fora do perfil de cliente ideal (ICP)</small></div>
+</div>
+<div class="note">Automações herdadas do Pipefy: card que entra em "Entrada de leads" vai para "Enriquecimento"; SLA estourado move o card para "Reciclagem" ou de volta para "Enriquecimento"; entrar em "E-mail" distribui um responsável.</div>
+</div></body></html>

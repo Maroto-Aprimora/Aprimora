@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;font-family:'Open Sans',sans-serif;background:#fff;width:1600px}
+.wrap{padding:28px}
+.row{display:flex;align-items:center;gap:10px}
+.s{flex:1;border-radius:12px;padding:12px 14px;background:#24476F;color:#fff;min-height:96px}
+.s b{font-family:Montserrat;font-size:16px;display:block;margin-bottom:4px}
+.s span{font-size:13px;opacity:.9}
+.s.h{background:#E8833A}
+.a{color:#E8833A;font-size:32px;font-weight:700}
+.br{display:flex;gap:14px;margin-top:20px}
+.c{flex:1;border:2px solid #24476F;border-radius:12px;padding:10px 14px;background:#F4F7FA;font-size:14px;color:#1f2937}
+.c b{font-family:Montserrat;color:#24476F;display:block;margin-bottom:4px;font-size:15px}
+.leg{margin-top:12px;font-size:13px;color:#4B5563}
+.leg i{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin:0 6px 0 14px}
+</style></head><body><div class="wrap">
+<div class="row">
+ <div class="s"><b>1. Rascunho</b><span>Modelo + dados do lead; a IA personaliza o texto</span></div><div class="a">›</div>
+ <div class="s h"><b>2. Aprovação</b><span>Uma pessoa revisa, edita e aprova no portal</span></div><div class="a">›</div>
+ <div class="s"><b>3. 1º envio</b><span>N8N envia pelo Gmail e registra a data do 1º envio</span></div><div class="a">›</div>
+ <div class="s"><b>4. Monitoramento</b><span>N8N lê as respostas da conversa a cada X minutos</span></div><div class="a">›</div>
+ <div class="s"><b>5. Follow-ups 1 a 3</b><span>Sem resposta em D+3, D+7 e D+14 (configurável)</span></div><div class="a">›</div>
+ <div class="s"><b>6. Coldcall</b><span>Cadência sem resposta → semana 1 de ligações</span></div>
+</div>
+<div class="br">
+ <div class="c"><b>Resposta positiva</b>Cadência pausa, o responsável é notificado e o portal sugere mover para Oportunidade.</div>
+ <div class="c"><b>Resposta neutra ou dúvida</b>Cadência pausa; a IA sugere uma resposta, que só sai com aprovação.</div>
+ <div class="c"><b>Sem interesse ou descadastro</b>Cadência encerra. O lead vai para Reciclagem ou não qualificado e entra na lista de bloqueio.</div>
+ <div class="c"><b>Resposta automática ou e-mail devolvido</b>Ausência: reagenda o envio. Endereço inválido: troca para o e-mail secundário ou terciário.</div>
+</div>
+<div class="leg"><i style="background:#E8833A"></i>Etapa com pessoa no controle <i style="background:#24476F"></i>Etapa automática (N8N)</div>
+</div></body></html>
