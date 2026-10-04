@@ -21,7 +21,8 @@ O portal começa pelo **módulo Comercial** e centraliza leads, funil de vendas,
 - [x] Fase 1: CRM e funil (empresas, contatos, funil do Pipefy com SLA, rodízio, histórico, configurações, metas de 2026)
 - [x] Fase 2: atividades e rotina (agenda com R.I/R.G, tarefas, notificações com push, transferência de carteira, auditoria)
 - [x] Fase 2b: menu por diretoria, painel geral, pontuação (Vice-Presidência) e configuração de metas
-- [ ] Fases 3 a 7: veja a Seção 14 do escopo
+- [x] Fase 3: indicadores do funil no painel comercial, metas automáticas, exportação (xlsx/csv) e anexos
+- [ ] Fases 4 a 7: veja a Seção 14 do escopo
 
 ## Stack prevista
 

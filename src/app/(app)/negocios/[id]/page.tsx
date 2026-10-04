@@ -10,6 +10,7 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { diasDesde, formatarData, formatarDataHora, formatarMoeda, iniciais } from "@/lib/formatar";
 import { obterUsuario } from "@/lib/usuario";
 import { AtividadesDoNegocio } from "@/components/agenda/atividades-negocio";
+import { AnexosDoNegocio } from "@/components/crm/anexos";
 import { AcoesTopoNegocio, FormCamposFase, FormNegocio } from "./componentes";
 
 export const metadata: Metadata = { title: "Negócio" };
@@ -29,12 +30,13 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
   ]);
   if (!negocio) notFound();
 
-  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }] = await Promise.all([
+  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }, { data: anexos }] = await Promise.all([
     supabase.from("contatos").select("id, nome, cargo, decisor").eq("empresa_id", negocio.empresa_id).order("decisor", { ascending: false }),
     supabase.from("negocio_historico").select("id, fase_origem_id, fase_destino_id, autor_id, automatico, comentario, created_at, motivos(nome)")
       .eq("negocio_id", id).order("created_at", { ascending: false }),
     supabase.from("atividades").select("*, atividade_participantes(membro_id)").eq("negocio_id", id).order("inicio", { ascending: false }),
     supabase.from("tipos_atividade").select("*").eq("ativo", true).order("ordem"),
+    supabase.from("anexos").select("id, nome, caminho, tamanho, enviado_por, created_at").eq("negocio_id", id).order("created_at", { ascending: false }),
   ]);
 
   const fase = config.fases.find((f) => f.id === negocio.fase_id);
@@ -138,6 +140,15 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
             membros={config.membrosComercial}
             podeEditar={podeEditar}
             usuarioId={usuario.id}
+          />
+
+          <AnexosDoNegocio
+            negocioId={negocio.id}
+            anexos={anexos ?? []}
+            nomes={Object.fromEntries(todosMembros.map((m) => [m.id, m.nome]))}
+            podeEnviar={podeEditar}
+            usuarioId={usuario.id}
+            ehDiretor={usuario.ehDiretorDe("comercial")}
           />
 
           <Cartao>

@@ -96,6 +96,19 @@ npm run build
 - Pontuação (`pontuacoes`): soma dos lançamentos não cancelados, limitada a 0–12, marco em 6. Lançamentos não
   são editados nem apagados (gatilho `proteger_pontuacao`); a pessoa é notificada a cada lançamento.
 
+### Indicadores, metas automáticas e anexos (Fase 3)
+
+- Cálculo em `src/lib/indicadores.ts` (servidor), a partir do `negocio_historico`: um negócio "chegou" a uma fase
+  no período quando há registro de entrada nela dentro do período (conta uma vez por fase).
+  Leads = negócios criados no período; contratos/faturamento = `ganho_em` no período.
+- Painel comercial (`/comercial`): filtro de período (`?periodo=mes|trimestre|30d|ano|personalizado&de=&ate=`)
+  e de responsável (`?resp=`). Exportação em `/comercial/exportar?conteudo=indicadores|negocios&formato=xlsx|csv`.
+- Metas: `metas.indicador` aponta para uma chave de `src/lib/indicadores-catalogo.ts`. Com indicador,
+  realizado = cálculo automático + `realizado_manual` (ajuste para o que aconteceu antes do portal).
+- Anexos: bucket privado `anexos` (até 10 MB por arquivo, 1 GB no plano gratuito), caminho
+  `negocios/<negocio_id>/<uuid>-<nome>`, metadados na tabela `anexos`. Download por link assinado de 60 s.
+- `supabase/dados/historico_ficticio.sql` gera histórico de teste para os negócios fictícios.
+
 ### Push no celular (Web Push)
 
 1. Cada notificação inserida dispara o gatilho `enviar_push`, que faz `net.http_post` para `push_url`

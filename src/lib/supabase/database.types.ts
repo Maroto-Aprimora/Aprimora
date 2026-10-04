@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      anexos: {
+        Row: {
+          caminho: string
+          created_at: string
+          enviado_por: string | null
+          id: string
+          negocio_id: string
+          nome: string
+          tamanho: number
+          tipo_mime: string | null
+        }
+        Insert: {
+          caminho: string
+          created_at?: string
+          enviado_por?: string | null
+          id?: string
+          negocio_id: string
+          nome: string
+          tamanho: number
+          tipo_mime?: string | null
+        }
+        Update: {
+          caminho?: string
+          created_at?: string
+          enviado_por?: string | null
+          id?: string
+          negocio_id?: string
+          nome?: string
+          tamanho?: number
+          tipo_mime?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anexos_enviado_por_fkey"
+            columns: ["enviado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anexos_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atividade_participantes: {
         Row: {
           atividade_id: string

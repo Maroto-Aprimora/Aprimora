@@ -6,6 +6,9 @@ import { Cartao, CabecalhoCartao, TituloPagina, Vazio } from "@/components/ui/ca
 import { Selo } from "@/components/ui/selo";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { formatarMoeda, formatarNumero } from "@/lib/formatar";
+import { carregarDadosComerciais, valorIndicadorMeta } from "@/lib/indicadores";
+import { ehIndicador, INDICADORES_META } from "@/lib/indicadores-catalogo";
+import { periodoDoTrimestre } from "@/lib/periodo";
 import { obterUsuario } from "@/lib/usuario";
 import { cn } from "@/lib/utils";
 
@@ -23,10 +26,16 @@ export default async function PaginaMetas({ searchParams }: PageProps<"/metas">)
   const trimestres = [...new Set((metas ?? []).map((m) => m.trimestre))].sort((a, b) => b.slice(2).localeCompare(a.slice(2)) || b.localeCompare(a));
   const pedido = typeof sp.t === "string" ? sp.t : "";
   const atual = trimestres.includes(pedido) ? pedido : trimestres.includes(trimestreAtual()) ? trimestreAtual() : trimestres[0];
-  const doTrimestre = (metas ?? []).filter((m) => m.trimestre === atual);
+  // Metas automáticas: realizado = cálculo do portal + ajuste manual (o que aconteceu antes do portal)
+  const dados = atual && (metas ?? []).some((m) => m.trimestre === atual && ehIndicador(m.indicador))
+    ? await carregarDadosComerciais(periodoDoTrimestre(atual)) : null;
+  const doTrimestre = (metas ?? []).filter((m) => m.trimestre === atual).map((m) => {
+    const automatico = dados && ehIndicador(m.indicador) ? valorIndicadorMeta(dados, m.indicador, m.membro_id) : null;
+    return { ...m, automatico, realizado: (automatico ?? 0) + (m.realizado_manual ?? 0) };
+  });
   const objetivos = [...new Set(doTrimestre.map((m) => m.objetivo))];
 
-  const progresso = (m: (typeof doTrimestre)[number]) => (m.alvo > 0 ? Math.min(1.5, (m.realizado_manual ?? 0) / m.alvo) : 0);
+  const progresso = (m: (typeof doTrimestre)[number]) => (m.alvo > 0 ? Math.min(1.5, m.realizado / m.alvo) : 0);
   const pesoTotal = doTrimestre.reduce((s, m) => s + m.peso, 0);
   const geral = pesoTotal ? doTrimestre.reduce((s, m) => s + Math.min(1, progresso(m)) * m.peso, 0) / pesoTotal : 0;
   const valor = (m: (typeof doTrimestre)[number], v: number | null) => (m.unidade === "R$" ? formatarMoeda(v ?? 0) : formatarNumero(v ?? 0));
@@ -35,7 +44,7 @@ export default async function PaginaMetas({ searchParams }: PageProps<"/metas">)
     <>
       <TituloPagina
         titulo="Metas trimestrais"
-        descricao="OKRs do Comercial. Por enquanto os valores realizados vêm da planilha de Planejamento Estratégico; o cálculo automático a partir do funil entra na Fase 3."
+        descricao="OKRs do Comercial. As metas marcadas como automáticas são calculadas pelo funil e pela agenda; as demais são preenchidas pelo diretor."
         acoes={usuario.ehDiretorDe("comercial") && (
           <Link href={atual ? `/metas/configuracoes?t=${atual}` : "/metas/configuracoes"} className={classeBotao("secundario")}>
             <Settings className="h-4 w-4" /> Configurações
@@ -74,7 +83,15 @@ export default async function PaginaMetas({ searchParams }: PageProps<"/metas">)
                       <li key={m.id} className="grid gap-2 px-5 py-3 sm:grid-cols-[1fr_220px_90px] sm:items-center">
                         <div>
                           <p className="font-semibold">{m.codigo && <span className="mr-2 text-xs text-texto-suave">{m.codigo}</span>}{m.titulo}</p>
-                          <p className="text-xs text-texto-suave">{valor(m, m.realizado_manual)} de {valor(m, m.alvo)} {m.indicador ? "" : "· preenchimento manual"}</p>
+                          <p className="text-xs text-texto-suave">
+                            {valor(m, m.realizado)} de {valor(m, m.alvo)}
+                            {m.automatico != null ? (
+                              <span title={ehIndicador(m.indicador) ? INDICADORES_META[m.indicador].regra : undefined}>
+                                {" "}· <Selo tom="marca" className="ml-1">automático</Selo>
+                                {m.realizado_manual ? ` ${valor(m, m.automatico)} no portal + ${valor(m, m.realizado_manual)} de ajuste` : ""}
+                              </span>
+                            ) : " · preenchimento manual"}
+                          </p>
                         </div>
                         <div className="h-2.5 overflow-hidden rounded-full bg-superficie-2">
                           <div className={cn("h-full rounded-full", p >= 1 ? "bg-sucesso" : "bg-marca")} style={{ width: `${Math.min(100, Math.round(p * 100))}%` }} />
