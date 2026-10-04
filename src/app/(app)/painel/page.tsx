@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { CalendarDays, ListChecks, Plus } from "lucide-react";
 import { classeBotao } from "@/components/ui/botao";
 import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
@@ -9,6 +9,9 @@ import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { diasDesde, formatarMoeda } from "@/lib/formatar";
 import { obterUsuario } from "@/lib/usuario";
+import { COR_TIPO, ocorrenciasRecorrentes } from "@/lib/agenda";
+import { diaBR, hojeBR, horaBR, NOMES_DIA, diaDaSemana, somarDias } from "@/lib/datas";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Painel" };
 
@@ -16,10 +19,20 @@ export default async function PaginaPainel() {
   const [usuario, config, supabase] = await Promise.all([obterUsuario(), carregarConfiguracaoComercial(), criarClienteServidor()]);
   const inicioTrimestre = new Date(new Date().getFullYear(), Math.floor(new Date().getMonth() / 3) * 3, 1).toISOString();
 
-  const [{ data: abertos }, { data: ganhos }, { count: novos }] = await Promise.all([
+  const hoje = hojeBR();
+  const inicioHoje = new Date(`${hoje}T00:00:00-03:00`).toISOString();
+  const inicioAmanha = new Date(`${somarDias(hoje, 1)}T00:00:00-03:00`).toISOString();
+
+  const [{ data: abertos }, { data: ganhos }, { count: novos }, { data: atividadesHoje }, { data: tarefas }, { data: reunioes }, { data: tipos }] = await Promise.all([
     supabase.from("negocios").select("id, titulo, fase_id, responsavel_id, valor, entrou_na_fase_em").eq("funil_id", config.funil.id).is("encerrado_em", null),
     supabase.from("negocios").select("valor").eq("funil_id", config.funil.id).gte("ganho_em", inicioTrimestre),
     supabase.from("negocios").select("id", { count: "exact", head: true }).eq("funil_id", config.funil.id).gte("created_at", inicioTrimestre),
+    supabase.from("atividades").select("id, titulo, inicio, tipo_id, responsavel_id, negocio_id, status, atividade_participantes(membro_id)")
+      .gte("inicio", inicioHoje).lt("inicio", inicioAmanha).neq("status", "cancelada").order("inicio"),
+    supabase.from("tarefas").select("id, titulo, prazo, tarefa_responsaveis!inner(membro_id)")
+      .eq("tarefa_responsaveis.membro_id", usuario.id).neq("status", "concluida").lte("prazo", hoje).order("prazo"),
+    supabase.from("reunioes_recorrentes").select("*").eq("ativa", true),
+    supabase.from("tipos_atividade").select("id, nome, cor"),
   ]);
 
   const fases = new Map(config.fases.map((f) => [f.id, f]));
@@ -39,6 +52,21 @@ export default async function PaginaPainel() {
     }, {});
   const maiorMacro = Math.max(1, ...Object.values(porMacro));
 
+  // Agenda de hoje: minhas atividades + próxima R.I/R.G
+  const minhasDiretorias = new Set(usuario.cargos.map((c) => c.diretoria));
+  const minhasAtividades = (atividadesHoje ?? []).filter((a) =>
+    a.responsavel_id === usuario.id || a.atividade_participantes.some((p) => p.membro_id === usuario.id));
+  const proximasReunioes = ocorrenciasRecorrentes(
+    (reunioes ?? []).filter((r) => !r.diretoria || minhasDiretorias.has(r.diretoria)), hoje, somarDias(hoje, 7),
+  ).filter((r) => (r.fim ?? r.inicio) > new Date().toISOString()).sort((a, b) => a.inicio.localeCompare(b.inicio));
+  const vistas = new Set<string>();
+  const reunioesUnicas = proximasReunioes.filter((r) => (vistas.has(r.tipoId) ? false : (vistas.add(r.tipoId), true)));
+  const tipoDe = (id: string) => (tipos ?? []).find((t) => t.id === id);
+  const quando = (iso: string) => {
+    const dia = diaBR(iso);
+    return `${dia === hoje ? "Hoje" : dia === somarDias(hoje, 1) ? "Amanhã" : NOMES_DIA[diaDaSemana(dia)]} · ${horaBR(iso)}`;
+  };
+
   return (
     <>
       <TituloPagina
@@ -51,6 +79,44 @@ export default async function PaginaPainel() {
         <Numero rotulo="Leads novos no trimestre" valor={String(novos ?? 0)} />
         <Numero rotulo="Receita fechada no trimestre" valor={formatarMoeda(receita)} detalhe={`${(ganhos ?? []).length} projetos`} />
         <Numero rotulo="Pipeline ponderado" valor={formatarMoeda(ponderado)} detalhe="valor × probabilidade da fase" />
+      </div>
+
+      <div className="mb-6 grid gap-6 lg:grid-cols-2">
+        <Cartao>
+          <CabecalhoCartao titulo="Hoje na agenda" acoes={<Link href="/agenda?pessoa=eu" className="text-sm font-semibold text-marca hover:text-destaque"><CalendarDays className="mr-1 inline h-4 w-4" />Agenda</Link>} />
+          <ul className="divide-y divide-borda">
+            {minhasAtividades.map((a) => (
+              <li key={a.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", COR_TIPO[tipoDe(a.tipo_id)?.cor ?? "marca"])} />
+                <span className="w-12 shrink-0 font-semibold">{horaBR(a.inicio)}</span>
+                {a.negocio_id ? <Link href={`/negocios/${a.negocio_id}`} className="min-w-0 flex-1 truncate hover:text-destaque">{a.titulo}</Link>
+                  : <span className="min-w-0 flex-1 truncate">{a.titulo}</span>}
+                {a.status === "pendente" && <Selo>a confirmar</Selo>}
+              </li>
+            ))}
+            {minhasAtividades.length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhuma atividade sua hoje.</li>}
+            {reunioesUnicas.map((r) => (
+              <li key={r.id} className="flex items-center gap-3 bg-superficie-2/50 px-5 py-2.5 text-sm">
+                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", COR_TIPO[tipoDe(r.tipoId)?.cor ?? "cinza"])} />
+                <span className="min-w-0 flex-1 truncate font-semibold">{r.titulo}</span>
+                <span className="text-xs text-texto-suave">{quando(r.inicio)}{r.local ? ` · ${r.local}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        </Cartao>
+
+        <Cartao>
+          <CabecalhoCartao titulo="Minhas tarefas para hoje" acoes={<Link href="/tarefas" className="text-sm font-semibold text-marca hover:text-destaque"><ListChecks className="mr-1 inline h-4 w-4" />Tarefas</Link>} />
+          <ul className="divide-y divide-borda">
+            {(tarefas ?? []).slice(0, 8).map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                <span className="min-w-0 truncate">{t.titulo}</span>
+                <Selo tom={t.prazo! < hoje ? "perigo" : "destaque"}>{t.prazo! < hoje ? "Atrasada" : "Vence hoje"}</Selo>
+              </li>
+            ))}
+            {(tarefas ?? []).length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nada vencendo hoje.</li>}
+          </ul>
+        </Cartao>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

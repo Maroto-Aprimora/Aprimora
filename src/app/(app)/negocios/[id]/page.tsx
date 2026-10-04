@@ -9,6 +9,7 @@ import { carregarConfiguracaoComercial, carregarTodosMembros } from "@/lib/crm-s
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { diasDesde, formatarData, formatarDataHora, formatarMoeda, iniciais } from "@/lib/formatar";
 import { obterUsuario } from "@/lib/usuario";
+import { AtividadesDoNegocio } from "@/components/agenda/atividades-negocio";
 import { AcoesTopoNegocio, FormCamposFase, FormNegocio } from "./componentes";
 
 export const metadata: Metadata = { title: "Negócio" };
@@ -28,10 +29,12 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
   ]);
   if (!negocio) notFound();
 
-  const [{ data: contatos }, { data: historico }] = await Promise.all([
+  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }] = await Promise.all([
     supabase.from("contatos").select("id, nome, cargo, decisor").eq("empresa_id", negocio.empresa_id).order("decisor", { ascending: false }),
     supabase.from("negocio_historico").select("id, fase_origem_id, fase_destino_id, autor_id, automatico, comentario, created_at, motivos(nome)")
       .eq("negocio_id", id).order("created_at", { ascending: false }),
+    supabase.from("atividades").select("*, atividade_participantes(membro_id)").eq("negocio_id", id).order("inicio", { ascending: false }),
+    supabase.from("tipos_atividade").select("*").eq("ativo", true).order("ordem"),
   ]);
 
   const fase = config.fases.find((f) => f.id === negocio.fase_id);
@@ -123,6 +126,20 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
         </div>
 
         <aside className="space-y-6">
+          <AtividadesDoNegocio
+            negocioId={negocio.id}
+            titulo={`${negocio.titulo}`}
+            atividades={(atividades ?? []).map((a) => ({
+              id: a.id, tipo_id: a.tipo_id, titulo: a.titulo, inicio: a.inicio, fim: a.fim, local: a.local, link_reuniao: a.link_reuniao,
+              negocio_id: a.negocio_id, responsavel_id: a.responsavel_id, stakeholder: a.stakeholder, resumo: a.resumo,
+              proximos_passos: a.proximos_passos, participantes: a.atividade_participantes.map((p) => p.membro_id), status: a.status,
+            }))}
+            tipos={tipos ?? []}
+            membros={config.membrosComercial}
+            podeEditar={podeEditar}
+            usuarioId={usuario.id}
+          />
+
           <Cartao>
             <CabecalhoCartao titulo="Contatos da empresa" />
             <ul className="divide-y divide-borda">

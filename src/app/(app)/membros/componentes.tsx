@@ -2,14 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Mail, Trash2, UserPlus } from "lucide-react";
+import { ArrowRightLeft, Mail, Trash2, UserPlus } from "lucide-react";
 import { Botao } from "@/components/ui/botao";
 import { Campo, Entrada, Selecao } from "@/components/ui/campos";
 import { Dialogo } from "@/components/ui/dialogo";
 import { criarClienteConvite } from "@/lib/supabase/client";
 import { mensagemDeErro } from "@/lib/erros";
 import { urlDoSite } from "@/lib/url";
-import { alterarCargo, alterarRodizio, criarPreCadastro, definirAtivo, marcarConviteEnviado, removerPreCadastro, type Resultado } from "./acoes";
+import {
+  alterarCargo, alterarDataEntrada, alterarRodizio, criarPreCadastro, definirAtivo, marcarConviteEnviado, removerPreCadastro,
+  transferirCarteira, type Resultado,
+} from "./acoes";
 
 function avisar(r: Resultado, sucesso: string) {
   if (r.ok) toast.success(sucesso);
@@ -135,5 +138,69 @@ export function AcoesMembro({
         </Botao>
       )}
     </div>
+  );
+}
+
+/** Data em que a pessoa entrou na EJ (processo seletivo). Só o diretor edita. */
+export function DataEntrada({ membroId, valor, podeEditar }: { membroId: string; valor: string | null; podeEditar: boolean }) {
+  const [pendente, iniciar] = useTransition();
+  if (!podeEditar) {
+    return valor ? <span className="text-xs text-texto-suave">Entrou em {valor.split("-").reverse().join("/")}</span> : null;
+  }
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-texto-suave" title="Data de entrada na Aprimora">
+      Entrada
+      <Entrada type="date" className="h-8 w-36 text-xs" defaultValue={valor ?? ""} disabled={pendente}
+        onChange={(e) => {
+          const nova = e.target.value || null;
+          iniciar(async () => avisar(await alterarDataEntrada(membroId, nova), "Data de entrada atualizada."));
+        }} />
+    </label>
+  );
+}
+
+/** Passa negócios abertos, tarefas abertas e atividades futuras de uma pessoa para outra. */
+export function TransferirCarteira({
+  membroId, nome, diretoria, destinos,
+}: {
+  membroId: string; nome: string; diretoria: string; destinos: { id: string; nome: string }[];
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [pendente, iniciar] = useTransition();
+  const opcoes = destinos.filter((d) => d.id !== membroId);
+
+  function enviar(form: FormData) {
+    const para = String(form.get("para"));
+    const destino = opcoes.find((o) => o.id === para)?.nome;
+    if (!confirm(`Transferir a carteira de ${nome} para ${destino}?`)) return;
+    iniciar(async () => {
+      const r = await transferirCarteira(membroId, para, diretoria);
+      if (!r.ok) return void toast.error(r.erro);
+      toast.success(r.resumo ?? "Carteira transferida.");
+      setAberto(false);
+    });
+  }
+
+  return (
+    <>
+      <Botao tamanho="sm" variante="fantasma" onClick={() => setAberto(true)} title="Transferir carteira">
+        <ArrowRightLeft className="h-3.5 w-3.5" /> Carteira
+      </Botao>
+      <Dialogo aberto={aberto} aoFechar={() => setAberto(false)} titulo={`Transferir carteira de ${nome}`}
+        descricao="Negócios em aberto, tarefas não concluídas e atividades futuras passam para a pessoa escolhida. Fica registrado na auditoria.">
+        <form action={enviar} className="space-y-4">
+          <Campo rotulo="Transferir para" obrigatorio>
+            <Selecao name="para" required defaultValue="">
+              <option value="" disabled>Escolha…</option>
+              {opcoes.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+            </Selecao>
+          </Campo>
+          <div className="flex justify-end gap-2 pt-2">
+            <Botao type="button" variante="secundario" onClick={() => setAberto(false)}>Cancelar</Botao>
+            <Botao type="submit" carregando={pendente}>Transferir</Botao>
+          </div>
+        </form>
+      </Dialogo>
+    </>
   );
 }
