@@ -103,3 +103,12 @@ export async function salvarItem(
   revalidar();
   return { ok: true };
 }
+
+/** Exclui uma fase do funil (move os negócios dela antes). O histórico continua mostrando a fase. */
+export async function excluirFase(id: string, destino: string | null): Promise<Resultado & { movidos?: number }> {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("excluir_fase", { _fase: id, ...(destino ? { _destino: destino } : {}) });
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  revalidar();
+  return { ok: true, movidos: (data as { movidos?: number } | null)?.movidos ?? 0 };
+}

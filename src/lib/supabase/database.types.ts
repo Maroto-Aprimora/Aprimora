@@ -463,6 +463,7 @@ export type Database = {
           chave: string
           descricao: string | null
           distribui_responsavel: boolean
+          excluida_em: string | null
           exige_motivo: Database["public"]["Enums"]["tipo_motivo"] | null
           fase_destino_sla: string | null
           funil_id: string
@@ -481,6 +482,7 @@ export type Database = {
           chave: string
           descricao?: string | null
           distribui_responsavel?: boolean
+          excluida_em?: string | null
           exige_motivo?: Database["public"]["Enums"]["tipo_motivo"] | null
           fase_destino_sla?: string | null
           funil_id: string
@@ -499,6 +501,7 @@ export type Database = {
           chave?: string
           descricao?: string | null
           distribui_responsavel?: boolean
+          excluida_em?: string | null
           exige_motivo?: Database["public"]["Enums"]["tipo_motivo"] | null
           fase_destino_sla?: string | null
           funil_id?: string
@@ -1600,6 +1603,10 @@ export type Database = {
           nome: string
           semelhanca: number
         }[]
+      }
+      excluir_fase: {
+        Args: { _destino?: string; _fase: string }
+        Returns: Json
       }
       mover_negocio: {
         Args: {

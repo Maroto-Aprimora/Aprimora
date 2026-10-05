@@ -16,7 +16,7 @@ export default async function PaginaConfiguracoes() {
   const supabase = await criarClienteServidor();
   const { data: funil } = await supabase.from("funis").select("id").eq("diretoria", "comercial").eq("chave", "comercial").single();
   const [{ data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos }] = await Promise.all([
-    supabase.from("fases").select("*").eq("funil_id", funil!.id).order("ordem"),
+    supabase.from("fases").select("*").eq("funil_id", funil!.id).is("excluida_em", null).order("ordem"),
     supabase.from("fase_campos").select("*").order("ordem"),
     supabase.from("motivos").select("*").eq("diretoria", "comercial").order("ordem"),
     supabase.from("origens").select("*").eq("diretoria", "comercial").order("ordem"),
@@ -24,6 +24,10 @@ export default async function PaginaConfiguracoes() {
     supabase.from("servicos").select("*").eq("diretoria", "comercial").order("ordem"),
   ]);
   const listaFases = fases ?? [];
+  // Quantos negócios estão em cada fase (para pedir o destino ao excluir)
+  const { data: emFases } = await supabase.from("negocios").select("fase_id").eq("funil_id", funil!.id);
+  const porFase = new Map<string, number>();
+  for (const n of emFases ?? []) porFase.set(n.fase_id, (porFase.get(n.fase_id) ?? 0) + 1);
 
   return (
     <>
@@ -44,7 +48,15 @@ export default async function PaginaConfiguracoes() {
               </tr>
             </thead>
             <tbody className="divide-y divide-borda">
-              {listaFases.map((f) => <LinhaFase key={f.id} fase={f} fases={listaFases.map((x) => ({ id: x.id, nome: x.nome }))} />)}
+              {listaFases.map((f) => (
+                <LinhaFase
+                  key={f.id}
+                  fase={f}
+                  fases={listaFases.map((x) => ({ id: x.id, nome: x.nome }))}
+                  negociosNaFase={porFase.get(f.id) ?? 0}
+                  destinosPossiveis={listaFases.filter((x) => x.id !== f.id && (x.tipo === "aberta" || x.tipo === "pausa")).map((x) => ({ id: x.id, nome: x.nome }))}
+                />
+              ))}
             </tbody>
           </table>
         </div>
