@@ -2,18 +2,22 @@
 # Tem banco, pasta de dados, chave de criptografia, usuários e credenciais próprios.
 # Limites de CPU/memória: se a Aprimora estourar, só este container sente.
 #
-# Subir:   docker compose -p n8n-aprimora --env-file .env up -d
-# Logs:    docker compose -p n8n-aprimora logs -f n8n-aprimora
-# Migrar para o VPS próprio da Aprimora: copie esta pasta (com o volume n8n_aprimora_dados) e suba lá.
+# No VPS da agência (Hostinger, projeto Docker "valkz"): este projeto entra na rede "valkz_default"
+# para o Caddy da agência publicar o subdomínio da Aprimora com HTTPS. Passo a passo no README.
+#
+# Subir:   docker compose -p n8n-aprimora --env-file .env up -d   (ou pelo Docker Manager do hPanel)
+# Logs:    docker logs -f n8n-aprimora
+# Migrar para o VPS próprio da Aprimora: copie o volume n8n_aprimora_dados e suba este arquivo lá
+# (com um proxy próprio no lugar da rede "valkz_default").
 
 services:
   n8n-aprimora:
     image: docker.n8n.io/n8nio/n8n:${N8N_VERSAO:-stable}
     container_name: n8n-aprimora
     restart: unless-stopped
-    # Só escuta localmente: o proxy reverso do VPS (Nginx, Caddy ou Traefik) publica o subdomínio.
-    ports:
-      - "127.0.0.1:5679:5678"
+    # Sem porta pública: o Caddy da agência alcança este container pela rede "valkz_default".
+    networks:
+      - valkz
     environment:
       # --- Identificação e acesso ---
       - N8N_HOST=${N8N_DOMINIO}
@@ -68,3 +72,8 @@ services:
 
 volumes:
   n8n_aprimora_dados:
+
+networks:
+  valkz:
+    external: true
+    name: valkz_default
