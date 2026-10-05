@@ -1,0 +1,333 @@
+{
+  "name": "APRIMORA | E-mail | Monitorar respostas",
+  "nodes": [
+    {
+      "id": "fe48111d-3ecb-5b75-8cb4-5e9303a7281f",
+      "name": "Nota 0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -320
+      ],
+      "parameters": {
+        "content": "## APRIMORA | E-mail | Monitorar respostas\nA cada 5 min olha a caixa de entrada. Para cada e-mail novo, pergunta ao portal se é resposta de um lead (pela conversa do Gmail). Se for, o Gemini classifica (positiva, negativa, neutra, descadastro, ausência) e o portal atualiza o card, pausa a cadência e avisa o responsável. E-mails que não são de leads são ignorados.",
+        "width": 600,
+        "height": 200,
+        "color": 4
+      }
+    },
+    {
+      "id": "a318d898-6eb6-5e07-ad46-45d6f3166f21",
+      "name": "Novos e-mails (a cada 5 min)",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "simple": true,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ],
+          "readStatus": "unread"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9cac31ce-1de0-5459-99a3-c813b1ff26a2",
+      "name": "É resposta de um lead?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/emails/resposta",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message_id: $json.id, thread_id: $json.threadId, de: $json.From, assunto: $json.Subject, trecho: $json.snippet, recebido_em: $json.internalDate }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "cc52dbc5-8e7c-5245-8185-deec109c88fb",
+      "name": "Lead encontrado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a25371c1-1961-5f09-8d93-1273aca0ec7f",
+              "leftValue": "={{ $json.lead }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "42b40c99-a620-54f5-8c01-910b38503eb5",
+      "name": "Montar pedido ao Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "// Um pedido por e-mail; o portal manda o texto da resposta e o último e-mail enviado ao lead.\nreturn $input.all().map((item) => {\n  const e = item.json;\n  const prompt = `Classifique a resposta de um lead a um e-mail comercial da Aprimora (consultoria júnior de Engenharia de Produção).\nÚltimo e-mail enviado pela Aprimora:\n<<<${e.ultimo_enviado || ''}>>>\n\nResposta do lead:\n<<<${e.texto_resposta || ''}>>>\n\nCategorias: positiva (quer conversar, pediu reunião ou proposta), negativa (sem interesse), neutra (dúvida, pediu mais informação),\ndescadastro (pediu para não receber mais e-mails), ausencia (resposta automática de férias ou fora do escritório), outro.`;\n  return { json: { email_id: e.email_id, pedido: {\n    contents: [{ role: 'user', parts: [{ text: prompt }] }],\n    generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: {\n      type: 'OBJECT',\n      properties: {\n        classificacao: { type: 'STRING', enum: ['positiva', 'negativa', 'neutra', 'descadastro', 'ausencia', 'outro'] },\n        resumo: { type: 'STRING' },\n        proximo_passo: { type: 'STRING' },\n        retorno_em: { type: 'STRING', description: 'Data AAAA-MM-DD se o lead pediu para retornar em uma data; senão vazio' },\n      },\n      required: ['classificacao', 'resumo', 'proximo_passo'],\n    } },\n  } } };\n});"
+      }
+    },
+    {
+      "id": "0d249950-2823-52a1-aab4-c5e9411b550a",
+      "name": "Classificar (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.GEMINI_MODELO }}:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.pedido) }}",
+        "options": {
+          "timeout": 300000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 5000
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 30000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "07b3f8f3-3a55-5977-8744-8e821a951e37",
+      "name": "Ler classificação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map((item, i) => {\n  const texto = item.json.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '{}';\n  const pedido = $('Montar pedido ao Gemini').all()[i].json;\n  return { json: { email_id: pedido.email_id, ...JSON.parse(texto) } };\n});"
+      }
+    },
+    {
+      "id": "a4717dd1-f626-5245-aabc-279c061054e5",
+      "name": "Atualizar o card no portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/emails/{{ $json.email_id }}/classificacao",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "4679934e-9c63-5bd2-97c6-4775f69b027b",
+      "name": "Classificação manual (falha do Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/emails/{{ $('Montar pedido ao Gemini').item.json.email_id }}/classificacao",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ classificacao: 'pendente_revisao', resumo: 'O Gemini não conseguiu classificar; revise manualmente.' }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Novos e-mails (a cada 5 min)": {
+      "main": [
+        [
+          {
+            "node": "É resposta de um lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É resposta de um lead?": {
+      "main": [
+        [
+          {
+            "node": "Lead encontrado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead encontrado?": {
+      "main": [
+        [
+          {
+            "node": "Montar pedido ao Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar pedido ao Gemini": {
+      "main": [
+        [
+          {
+            "node": "Classificar (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classificar (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Ler classificação",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Classificação manual (falha do Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler classificação": {
+      "main": [
+        [
+          {
+            "node": "Atualizar o card no portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "America/Sao_Paulo",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

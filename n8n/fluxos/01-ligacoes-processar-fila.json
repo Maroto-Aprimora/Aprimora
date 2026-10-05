@@ -1,0 +1,706 @@
+{
+  "name": "APRIMORA | Ligações | Processar fila",
+  "nodes": [
+    {
+      "id": "a5e6a55b-de4d-5e83-8c88-a7c0d883ebc8",
+      "name": "Nota 0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -360
+      ],
+      "parameters": {
+        "content": "## APRIMORA | Ligações | Processar fila\nFila de espera: a API4COM avisa o **portal**, que guarda cada ligação como *pendente*. A cada 2 min este fluxo **reserva no máximo 3** e processa **uma por vez**, com **pausa de 20 s** entre elas (respeita o limite do Gemini gratuito). Se chegarem 50 ligações juntas, elas esperam no portal e saem aos poucos; nada se perde.\n\nLigações não atendidas ou muito curtas nem entram na fila (o portal filtra).",
+        "width": 620,
+        "height": 220,
+        "color": 4
+      }
+    },
+    {
+      "id": "b3cedd49-9ae6-5cba-bb6b-30dfb7ee8027",
+      "name": "A cada 2 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5cccc319-4ce7-5726-b85f-55cec1850aee",
+      "name": "Reservar ligações na fila",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/ligacoes/reservar",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limite: 3 }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "97025d9b-d82a-53f7-8d5c-9093ef548444",
+      "name": "Separar ligações",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "ligacoes",
+        "options": {}
+      }
+    },
+    {
+      "id": "b857da2b-2111-5789-aade-9d209763a77b",
+      "name": "Uma por vez",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "23270fc4-29d4-5f6e-ba89-0861f288b691",
+      "name": "Lead já tem pasta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c2fbf043-ba65-5723-adfb-dba4a60c35bf",
+              "leftValue": "={{ $json.drive_pasta_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "daa201f5-1000-593c-8e94-88b30d5b15b8",
+      "name": "Criar pasta do lead",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        220
+      ],
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $json.nome_pasta }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.DRIVE_PASTA_LIGACOES }}"
+        },
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "f3784773-6a90-52fd-b474-e6fe269429e4",
+      "name": "Guardar pasta no portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/negocios/{{ $('Uma por vez').item.json.negocio_id }}/pasta-drive",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pasta_id: $json.id }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "3f97d402-3708-55b6-8bd3-2b2e6b49ad36",
+      "name": "Pasta definida",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1540,
+        100
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f321be1b-6144-5f08-af5f-1384d9efa33e",
+              "name": "pasta_id",
+              "type": "string",
+              "value": "={{ $json.pasta_id || $json.drive_pasta_id }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "254c8714-38b3-5afe-8f69-b1f5caf6b54a",
+      "name": "Baixar gravação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        100
+      ],
+      "parameters": {
+        "url": "={{ $('Uma por vez').item.json.gravacao_url }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "audio"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "7f352943-5a64-5b86-af88-cc855020b824",
+      "name": "Preparar áudio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Mantém o arquivo (para o Drive) e cria a versão em base64 (para o Gemini).\nconst ligacao = $('Uma por vez').item.json;\nconst binario = $input.item.binary.audio;\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'audio');\nif (buffer.length > 18 * 1024 * 1024) {\n  throw new Error(`Gravação de ${(buffer.length / 1024 / 1024).toFixed(1)} MB passa do limite de envio direto ao Gemini (18 MB).`);\n}\nbinario.fileName = ligacao.nome_arquivo;\nreturn {\n  json: { audio_base64: buffer.toString('base64'), mime: binario.mimeType || 'audio/mpeg' },\n  binary: { audio: binario },\n};"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "3e029ebd-fd47-5f3e-add5-1a097868f4a8",
+      "name": "Salvar no Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2200,
+        100
+      ],
+      "parameters": {
+        "name": "={{ $('Uma por vez').item.json.nome_arquivo }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Pasta definida').item.json.pasta_id }}"
+        },
+        "inputDataFieldName": "audio",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "6a939755-9a37-5120-b4ee-f143346e2bf7",
+      "name": "Montar pedido ao Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Pede transcrição + avaliação em JSON, com os critérios definidos pelo diretor no portal.\nconst l = $('Uma por vez').item.json;\nconst audio = $('Preparar áudio').item.json;\nconst criterios = (l.criterios || []).map((c, i) => `${i + 1}. ${c}`).join('\\n');\nconst prompt = `Você é um avaliador de ligações comerciais da Aprimora, Empresa Júnior de Engenharia de Produção da UTFPR Londrina.\nTranscreva a ligação em português, identificando as falas como \"Assessor\" e \"Cliente\", e avalie o assessor.\n\nContexto:\n- Empresa (lead): ${l.empresa}\n- Assessor: ${l.membro}\n- Fase do funil: ${l.fase}\n- Objetivo da ligação: ${l.objetivo || 'qualificar o lead e marcar um diagnóstico'}\n\nCritérios de avaliação (nota de 0 a 10 em cada um):\n${criterios}\n\nSeja específico e construtivo: cite trechos da conversa. A nota geral é de 0 a 10.`;\nconst schema = {\n  type: 'OBJECT',\n  properties: {\n    transcricao: { type: 'STRING' },\n    resumo: { type: 'STRING' },\n    nota: { type: 'NUMBER' },\n    criterios: { type: 'ARRAY', items: { type: 'OBJECT', properties: {\n      criterio: { type: 'STRING' }, nota: { type: 'NUMBER' }, comentario: { type: 'STRING' } },\n      required: ['criterio', 'nota', 'comentario'] } },\n    pontos_fortes: { type: 'ARRAY', items: { type: 'STRING' } },\n    melhorias: { type: 'ARRAY', items: { type: 'STRING' } },\n    objecoes: { type: 'ARRAY', items: { type: 'STRING' } },\n    falou_com_decisor: { type: 'BOOLEAN' },\n    interesse_cliente: { type: 'STRING', enum: ['alto', 'medio', 'baixo', 'nenhum'] },\n    proximo_passo: { type: 'STRING' },\n  },\n  required: ['transcricao', 'resumo', 'nota', 'criterios', 'pontos_fortes', 'melhorias', 'falou_com_decisor', 'interesse_cliente', 'proximo_passo'],\n};\nreturn [{ json: { pedido: {\n  contents: [{ role: 'user', parts: [{ text: prompt }, { inline_data: { mime_type: audio.mime, data: audio.audio_base64 } }] }],\n  generationConfig: { temperature: 0.2, maxOutputTokens: 16000, responseMimeType: 'application/json', responseSchema: schema },\n} } }];"
+      }
+    },
+    {
+      "id": "4f9b46cc-e70f-5a9f-9cdc-e1b5b55f16a3",
+      "name": "Transcrever e avaliar (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.GEMINI_MODELO }}:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.pedido) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 30000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "9ca1a025-1868-55a8-9b84-4b3ad61ff1ea",
+      "name": "Ler avaliação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        100
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nconst texto = r.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';\nlet avaliacao;\ntry { avaliacao = JSON.parse(texto); } catch (e) { throw new Error('O Gemini não devolveu um JSON válido: ' + texto.slice(0, 300)); }\nconst arquivo = $('Salvar no Google Drive').item.json;\nreturn [{ json: {\n  drive_arquivo_id: arquivo.id,\n  drive_link: `https://drive.google.com/file/d/${arquivo.id}/view`,\n  modelo: r.modelVersion || $env.GEMINI_MODELO,\n  tokens: r.usageMetadata?.totalTokenCount ?? null,\n  ...avaliacao,\n} }];"
+      }
+    },
+    {
+      "id": "dc131f85-c360-5c6f-8ad4-be250b87ecab",
+      "name": "Enviar resultado ao portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/ligacoes/{{ $('Uma por vez').item.json.id }}/resultado",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "a71b5f90-aed7-551a-8210-a788cea77e88",
+      "name": "Pausa de 20 s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3300,
+        100
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "da36d004-b70a-53fc-a0c0-07a2c436056f"
+    },
+    {
+      "id": "4bac22c6-7f38-55e9-baac-17742a7bc56b",
+      "name": "Avisar falha ao portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        420
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/ligacoes/{{ $('Uma por vez').item.json.id }}/falha",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ etapa: $prevNode.name, mensagem: ($json.error && ($json.error.message || $json.error.description)) || JSON.stringify($json).slice(0, 500) }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "dcedec91-f6f7-506e-9858-b9840dc701ab",
+      "name": "Pausa após falha",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2860,
+        420
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "9a0953e0-ff9d-5129-bfea-538ca622985f"
+    },
+    {
+      "id": "19df4c78-8dd5-5bc0-805d-db0b16b9a87a",
+      "name": "Nota 19",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2560,
+        600
+      ],
+      "parameters": {
+        "content": "**Falhas** (gravação indisponível, Drive fora do ar, limite do Gemini…): o portal registra a tentativa. Depois de 3 tentativas a ligação fica marcada com erro no card e o diretor é avisado. Cada nó já tenta de novo sozinho antes de desistir.",
+        "width": 520,
+        "height": 140,
+        "color": 3
+      }
+    }
+  ],
+  "connections": {
+    "A cada 2 minutos": {
+      "main": [
+        [
+          {
+            "node": "Reservar ligações na fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservar ligações na fila": {
+      "main": [
+        [
+          {
+            "node": "Separar ligações",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar ligações": {
+      "main": [
+        [
+          {
+            "node": "Uma por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uma por vez": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Lead já tem pasta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead já tem pasta?": {
+      "main": [
+        [
+          {
+            "node": "Pasta definida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar pasta do lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar pasta do lead": {
+      "main": [
+        [
+          {
+            "node": "Guardar pasta no portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar pasta no portal": {
+      "main": [
+        [
+          {
+            "node": "Pasta definida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pasta definida": {
+      "main": [
+        [
+          {
+            "node": "Baixar gravação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar gravação": {
+      "main": [
+        [
+          {
+            "node": "Preparar áudio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar falha ao portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar áudio": {
+      "main": [
+        [
+          {
+            "node": "Salvar no Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar falha ao portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar no Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Montar pedido ao Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar falha ao portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar pedido ao Gemini": {
+      "main": [
+        [
+          {
+            "node": "Transcrever e avaliar (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcrever e avaliar (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Ler avaliação",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar falha ao portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler avaliação": {
+      "main": [
+        [
+          {
+            "node": "Enviar resultado ao portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar resultado ao portal": {
+      "main": [
+        [
+          {
+            "node": "Pausa de 20 s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausa de 20 s": {
+      "main": [
+        [
+          {
+            "node": "Uma por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avisar falha ao portal": {
+      "main": [
+        [
+          {
+            "node": "Pausa após falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausa após falha": {
+      "main": [
+        [
+          {
+            "node": "Uma por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "America/Sao_Paulo",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

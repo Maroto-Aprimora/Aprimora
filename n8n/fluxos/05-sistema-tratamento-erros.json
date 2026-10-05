@@ -1,0 +1,88 @@
+{
+  "name": "APRIMORA | Sistema | Tratamento de erros",
+  "nodes": [
+    {
+      "id": "45d55e52-2f32-525d-8d02-d1a11b7d19f3",
+      "name": "Nota 0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -260
+      ],
+      "parameters": {
+        "content": "## APRIMORA | Sistema | Tratamento de erros\nDefina este fluxo como **Error workflow** nas configurações de todos os outros fluxos da Aprimora. Quando algum fluxo quebrar, o portal registra na auditoria e avisa os diretores com o link da execução.",
+        "width": 560,
+        "height": 160,
+        "color": 4
+      }
+    },
+    {
+      "id": "ac736e33-c641-559a-94c6-0180ef5846a7",
+      "name": "Quando um fluxo falhar",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9dc37511-d8ca-59bf-a184-4951655a8f12",
+      "name": "Avisar o portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/erro",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ fluxo: $json.workflow.name, execucao_id: $json.execution.id, execucao_url: $json.execution.url, no: $json.execution.lastNodeExecuted, mensagem: $json.execution.error && $json.execution.error.message }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Quando um fluxo falhar": {
+      "main": [
+        [
+          {
+            "node": "Avisar o portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "America/Sao_Paulo"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,70 @@
+# n8n da Aprimora — instância SEPARADA do n8n da agência, no mesmo VPS.
+# Tem banco, pasta de dados, chave de criptografia, usuários e credenciais próprios.
+# Limites de CPU/memória: se a Aprimora estourar, só este container sente.
+#
+# Subir:   docker compose -p n8n-aprimora --env-file .env up -d
+# Logs:    docker compose -p n8n-aprimora logs -f n8n-aprimora
+# Migrar para o VPS próprio da Aprimora: copie esta pasta (com o volume n8n_aprimora_dados) e suba lá.
+
+services:
+  n8n-aprimora:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSAO:-stable}
+    container_name: n8n-aprimora
+    restart: unless-stopped
+    # Só escuta localmente: o proxy reverso do VPS (Nginx, Caddy ou Traefik) publica o subdomínio.
+    ports:
+      - "127.0.0.1:5679:5678"
+    environment:
+      # --- Identificação e acesso ---
+      - N8N_HOST=${N8N_DOMINIO}
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://${N8N_DOMINIO}/
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - TZ=America/Sao_Paulo
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+
+      # --- Limpeza automática das execuções ---
+      # Apaga execuções com mais de 7 dias (168 h) e mantém no máximo 5.000 registradas.
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=5000
+      # Não guarda execuções bem-sucedidas (só as com erro, para investigar). Cada fluxo pode mudar isso.
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=false
+      # Banco SQLite (leve): recupera o espaço apagado a cada reinício.
+      - DB_SQLITE_VACUUM_ON_STARTUP=true
+
+      # --- Memória: áudios vão para o disco, não ficam na RAM ---
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+      - N8N_PAYLOAD_SIZE_MAX=32
+
+      # --- Fila: no máximo 2 execuções de produção ao mesmo tempo; as demais esperam a vez ---
+      - N8N_CONCURRENCY_PRODUCTION_LIMIT=2
+
+      # --- Variáveis usadas pelos fluxos (ver .env.example) ---
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - PORTAL_URL=${PORTAL_URL}
+      - PORTAL_N8N_SEGREDO=${PORTAL_N8N_SEGREDO}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODELO=${GEMINI_MODELO:-gemini-2.5-flash}
+      - DRIVE_PASTA_LIGACOES=${DRIVE_PASTA_LIGACOES}
+    volumes:
+      - n8n_aprimora_dados:/home/node/.n8n
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+        reservations:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  n8n_aprimora_dados:
