@@ -1,0 +1,29 @@
+# Trecho para o projeto Docker "valkz" (n8n da agência) — substitui SÓ o serviço "caddy".
+# Antes o Caddy publicava um site só (comando "caddy reverse-proxy"). Agora ele lê um Caddyfile
+# com dois sites: o n8n da agência (igual a antes) e o n8n da Aprimora.
+#
+# No ambiente (environment) do projeto "valkz", acrescente:
+#   N8N_APRIMORA_HOST=n8n.aprimoraej.com      (o subdomínio escolhido para a Aprimora)
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - caddy_data:/data
+
+# No fim do arquivo (mesmo nível de "services" e "volumes"):
+configs:
+  caddyfile:
+    content: |
+      ${N8N_HOST} {
+        reverse_proxy n8n:5678
+      }
+      ${N8N_APRIMORA_HOST} {
+        reverse_proxy n8n-aprimora:5678
+      }
