@@ -4,25 +4,29 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { Botao } from "@/components/ui/botao";
-import { Entrada, Selecao } from "@/components/ui/campos";
+import { Campo, Entrada, Selecao } from "@/components/ui/campos";
+import { Dialogo } from "@/components/ui/dialogo";
 import { Cartao, CabecalhoCartao } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
 import type { Tables } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
-import { excluirCampo, salvarCampo, salvarFase, salvarItem } from "./acoes";
+import { excluirCampo, excluirFase, salvarCampo, salvarFase, salvarItem } from "./acoes";
 
 const NOME_TIPO: Record<string, string> = {
   texto: "Texto", texto_longo: "Texto longo", data: "Data", numero: "Número", moeda: "Moeda", membros: "Membros",
   selecao: "Seleção", booleano: "Sim/Não", link: "Link",
 };
 
-export function LinhaFase({ fase, fases }: { fase: Tables<"fases">; fases: { id: string; nome: string }[] }) {
+export function LinhaFase({ fase, fases, negociosNaFase, destinosPossiveis }: {
+  fase: Tables<"fases">; fases: { id: string; nome: string }[]; negociosNaFase: number; destinosPossiveis: { id: string; nome: string }[];
+}) {
   const [pendente, iniciar] = useTransition();
+  const [excluindo, setExcluindo] = useState(false);
   return (
     <tr>
       <td className="px-3 py-2" colSpan={8}>
         <form
-          className="grid grid-cols-[minmax(180px,1.4fr)_90px_120px_minmax(160px,1fr)_80px_70px_60px_90px] items-center gap-2"
+          className="grid grid-cols-[minmax(180px,1.4fr)_90px_120px_minmax(160px,1fr)_80px_70px_60px_120px] items-center gap-2"
           action={(form) => iniciar(async () => {
             const sla = String(form.get("sla_dias") ?? "");
             const acao = String(form.get("acao_sla") ?? "");
@@ -59,8 +63,40 @@ export function LinhaFase({ fase, fases }: { fase: Tables<"fases">; fases: { id:
           <Entrada name="probabilidade" type="number" min={0} max={100} defaultValue={Math.round(fase.probabilidade * 100)} className="h-9" />
           <input type="checkbox" name="distribui" defaultChecked={fase.distribui_responsavel} className="mx-auto h-4 w-4" title="Distribui responsável por rodízio" />
           <input type="checkbox" name="ativa" defaultChecked={fase.ativa} className="mx-auto h-4 w-4" />
-          <Botao type="submit" tamanho="sm" variante="secundario" carregando={pendente}>Salvar</Botao>
+          <div className="flex items-center gap-1">
+            <Botao type="submit" tamanho="sm" variante="secundario" carregando={pendente}>Salvar</Botao>
+            <Botao type="button" tamanho="icone" variante="fantasma" aria-label={`Excluir a fase ${fase.nome}`} title="Excluir fase"
+              onClick={() => setExcluindo(true)}>
+              <Trash2 className="h-4 w-4" />
+            </Botao>
+          </div>
         </form>
+        {excluindo && (
+          <Dialogo aberto aoFechar={() => setExcluindo(false)} titulo={`Excluir a fase "${fase.nome}"`}
+            descricao="A coluna some do funil e das configurações. O histórico dos negócios que passaram por ela é mantido.">
+            <form className="space-y-4" action={(f) => iniciar(async () => {
+              const r = await excluirFase(fase.id, String(f.get("destino") ?? "") || null);
+              if (!r.ok) return void toast.error(r.erro);
+              toast.success(r.movidos ? `Fase excluída. ${r.movidos} negócio(s) movido(s).` : "Fase excluída.");
+              setExcluindo(false);
+            })}>
+              {negociosNaFase > 0 ? (
+                <Campo rotulo={`${negociosNaFase} negócio(s) estão nesta fase. Mover para`} obrigatorio>
+                  <Selecao name="destino" required defaultValue="">
+                    <option value="" disabled>Escolha a fase…</option>
+                    {destinosPossiveis.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                  </Selecao>
+                </Campo>
+              ) : (
+                <p className="text-sm text-texto-suave">Nenhum negócio está nesta fase agora.</p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Botao type="button" variante="secundario" onClick={() => setExcluindo(false)}>Cancelar</Botao>
+                <Botao type="submit" variante="perigo" carregando={pendente}>Excluir fase</Botao>
+              </div>
+            </form>
+          </Dialogo>
+        )}
       </td>
     </tr>
   );

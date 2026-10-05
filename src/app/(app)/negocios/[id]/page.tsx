@@ -43,7 +43,7 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
   const participantes = negocio.negocio_participantes.map((p) => p.membro_id);
   const podeEditar = usuario.ehDiretorDe("comercial") || negocio.responsavel_id === usuario.id || participantes.includes(usuario.id);
   const nomeMembro = (mid: string | null) => todosMembros.find((m) => m.id === mid)?.nome ?? "—";
-  const nomeFase = (fid: string | null) => config.fases.find((f) => f.id === fid)?.nome ?? "—";
+  const nomeFase = (fid: string | null) => config.todasFases.find((f) => f.id === fid)?.nome ?? "—";
   const dias = diasDesde(negocio.entrou_na_fase_em);
   const sla = fase ? situacaoSla(fase, dias) : "sem";
 

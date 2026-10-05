@@ -17,6 +17,7 @@ const NOME_ACAO: Record<string, string> = {
   cargo_update: "Cargo alterado",
   cargo_delete: "Cargo removido",
   carteira_transferida: "Carteira transferida",
+  fase_excluida: "Fase do funil excluída",
 };
 
 const FILTROS = [

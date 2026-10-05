@@ -27,7 +27,9 @@ export async function carregarConfiguracaoComercial() {
 
   return {
     funil,
-    fases: (fases.data ?? []).filter((f) => f.ativa),
+    fases: (fases.data ?? []).filter((f) => f.ativa && !f.excluida_em),
+    /** Inclui fases desativadas e excluídas: serve para mostrar nomes no histórico. */
+    todasFases: fases.data ?? [],
     campos: (campos.data ?? []).filter((c) => idsFases.has(c.fase_id)),
     motivos: (motivos.data ?? []).filter((m) => m.ativo),
     origens: (origens.data ?? []).filter((o) => o.ativo),
