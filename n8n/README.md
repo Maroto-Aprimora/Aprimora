@@ -23,7 +23,7 @@ Regras de desenho:
   quando puder. Se o n8n cair por um dia, as ligações esperam e são processadas depois.
 - **O n8n nunca fala direto com o banco.** Só com a API do portal (`/api/n8n/*`), autenticada pelo cabeçalho
   `x-n8n-segredo`. Assim as regras de acesso continuam num lugar só.
-- **Trocar de VPS = trocar um endereço** (`N8N_URL` na Vercel). A API4COM continua apontando para o portal.
+- **Trocar de VPS não mexe no portal nem na API4COM**: é o n8n que busca trabalho no portal, então basta subir a mesma pasta no VPS novo com o mesmo `.env`.
 
 ## Os fluxos (`fluxos/`)
 
