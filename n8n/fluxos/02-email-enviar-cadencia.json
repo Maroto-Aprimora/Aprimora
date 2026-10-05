@@ -1,0 +1,315 @@
+{
+  "name": "APRIMORA | E-mail | Enviar cadência",
+  "nodes": [
+    {
+      "id": "d7b40919-1a8c-507d-b0de-a2591bc36e1b",
+      "name": "Nota 0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -320
+      ],
+      "parameters": {
+        "content": "## APRIMORA | E-mail | Enviar cadência\nDias úteis, das 8h às 18h, a cada 10 min: pega no portal até **10 e-mails aprovados e com envio vencido** e envia **um a cada 30 s** pelo Gmail da Aprimora. O portal só libera o que passou pela fila de aprovação e respeita a lista de bloqueio. O resultado (enviado ou falha) volta para o card do lead.",
+        "width": 600,
+        "height": 200,
+        "color": 4
+      }
+    },
+    {
+      "id": "baa8cb48-4320-5f7e-b8f8-c2f4b48d8cb5",
+      "name": "Dias úteis, a cada 10 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/10 8-17 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f53364b2-e91c-5a07-9a80-476d4a19af29",
+      "name": "Reservar e-mails",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/emails/reservar",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limite: 10 }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "7f75510f-e243-5484-82b6-e75e1e01878f",
+      "name": "Separar e-mails",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "emails",
+        "options": {}
+      }
+    },
+    {
+      "id": "e93e9948-0980-58ca-bdbd-a1bae9e9341a",
+      "name": "Um por vez",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "9a405afd-6a75-5ad2-bfa3-b73be3c7824b",
+      "name": "Enviar pelo Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "sendTo": "={{ $json.para }}",
+        "subject": "={{ $json.assunto }}",
+        "emailType": "html",
+        "message": "={{ $json.corpo_html }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "={{ $json.remetente_nome }}",
+          "replyTo": "={{ $json.responder_para }}"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 15000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "9b0d2883-af87-5656-adf9-b47dc84553d6",
+      "name": "Registrar envio no portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/emails/{{ $('Um por vez').item.json.id }}/enviado",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ gmail_id: $json.id, thread_id: $json.threadId }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "063b6812-8e1e-5000-9c11-b1d0667be73b",
+      "name": "Registrar falha no portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/emails/{{ $('Um por vez').item.json.id }}/falha",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ mensagem: ($json.error && $json.error.message) || 'Falha no envio pelo Gmail' }) }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "43e393db-6248-5543-a628-95509b0b7406",
+      "name": "Pausa de 30 s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        100
+      ],
+      "parameters": {
+        "amount": 30
+      },
+      "webhookId": "cc0b28c5-01da-5e87-aea4-9aa8503249db"
+    }
+  ],
+  "connections": {
+    "Dias úteis, a cada 10 min": {
+      "main": [
+        [
+          {
+            "node": "Reservar e-mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservar e-mails": {
+      "main": [
+        [
+          {
+            "node": "Separar e-mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar e-mails": {
+      "main": [
+        [
+          {
+            "node": "Um por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Um por vez": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Enviar pelo Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar pelo Gmail": {
+      "main": [
+        [
+          {
+            "node": "Registrar envio no portal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar falha no portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar envio no portal": {
+      "main": [
+        [
+          {
+            "node": "Pausa de 30 s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar falha no portal": {
+      "main": [
+        [
+          {
+            "node": "Pausa de 30 s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausa de 30 s": {
+      "main": [
+        [
+          {
+            "node": "Um por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "America/Sao_Paulo",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
