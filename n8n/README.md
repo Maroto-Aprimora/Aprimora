@@ -69,20 +69,37 @@ Ajuste em `deploy.resources.limits` conforme a folga do VPS.
 
 ## Instalar no VPS (uma vez)
 
-1. **DNS**: crie o subdomínio (ex.: `n8n-aprimora.seudominio.com.br`) apontando para o IP do VPS.
-2. **Pasta**: copie esta pasta `n8n/` para o VPS (ex.: `/opt/n8n-aprimora`) e crie o `.env` a partir do `.env.example`.
-   - `N8N_ENCRYPTION_KEY`: `openssl rand -hex 32`. **Guarde em lugar seguro**: sem ela as credenciais salvas não abrem.
-   - `PORTAL_N8N_SEGREDO`: `openssl rand -hex 32`, o mesmo valor que vai na Vercel como `N8N_SEGREDO`.
-3. **Subir**: `docker compose -p n8n-aprimora --env-file .env up -d`.
-4. **Proxy reverso**: publique `https://n8n-aprimora.seudominio` → `127.0.0.1:5679` no Nginx/Caddy/Traefik que já
-   atende o n8n da agência (é só mais um site/rota, com HTTPS).
-5. **Conta**: abra o subdomínio e crie o usuário dono com o e-mail institucional da Aprimora (não o da agência).
-6. **Credenciais** (Settings → Credentials):
-   - *Google Drive OAuth2* e *Gmail OAuth2*, conectadas na conta Google da Aprimora;
-   - o Gemini e o portal usam as variáveis do `.env`, sem credencial no n8n.
+O VPS atual é da Hostinger (projeto Docker `valkz`, da agência, com um **Caddy** na frente cuidando do HTTPS).
+A Aprimora entra como um **segundo projeto Docker** (`n8n-aprimora`), e o Caddy da agência passa a publicar
+os dois subdomínios.
+
+1. **DNS**: crie um registro **A** do subdomínio da Aprimora (sugestão: `n8n.aprimoraej.com`) apontando para o IP
+   do VPS. Espere propagar (`nslookup n8n.aprimoraej.com` deve mostrar o IP).
+2. **Projeto da Aprimora** (hPanel → VPS → *Docker Manager* → *Criar projeto*, ou por SSH):
+   - nome `n8n-aprimora`;
+   - conteúdo: o `docker-compose.yml` desta pasta;
+   - ambiente: as variáveis do `.env.example`, preenchidas. `N8N_ENCRYPTION_KEY` e `PORTAL_N8N_SEGREDO`:
+     gere cada uma com `openssl rand -hex 32` e **guarde a primeira em lugar seguro** (sem ela as credenciais salvas
+     no n8n não abrem). `PORTAL_N8N_SEGREDO` é o mesmo valor que vai na Vercel como `N8N_SEGREDO`.
+   - Ele entra na rede `valkz_default` (do projeto da agência), por isso o projeto `valkz` precisa estar no ar.
+3. **Caddy da agência** (projeto `valkz` → editar):
+   - troque **só o serviço `caddy`** pelo de `caddy-agencia.yml` e acrescente o bloco `configs:` no fim do arquivo;
+   - no ambiente do projeto, acrescente `N8N_APRIMORA_HOST=n8n.aprimoraej.com`;
+   - salve/reimplante. O n8n da agência fica fora do ar só pelos segundos em que o Caddy reinicia; o HTTPS
+     do subdomínio novo é emitido sozinho.
+4. **Conferir**: `https://n8n.agenciavalkz.com.br` continua abrindo e `https://n8n.aprimoraej.com` mostra a tela de
+   criação de conta do n8n.
+5. **Conta**: crie o usuário dono com o e-mail institucional da Aprimora (não o da agência).
+6. **Credenciais** (Settings → Credentials): *Google Drive OAuth2* e *Gmail OAuth2*, conectadas na conta Google da
+   Aprimora. O Gemini e o portal usam as variáveis do ambiente.
 7. **Importar** os 5 arquivos de `fluxos/` (Workflows → Import from file), escolher as credenciais do Google nos nós
    do Drive e do Gmail e definir **Sistema · Tratamento de erros** como *Error workflow* dos outros quatro.
 8. **Ativar** os fluxos só depois que as rotas `/api/n8n/*` do portal estiverem publicadas.
+
+Se algo der errado no passo 3, volte o serviço `caddy` do projeto `valkz` para o original (comando
+`caddy reverse-proxy --from ${N8N_HOST} --to n8n:5678`) e a agência fica exatamente como antes.
+
+Folga do VPS (KVM 2: 2 vCPU, 8 GB, 100 GB): o limite da Aprimora (1 vCPU, 1,5 GB) deixa a maior parte para a agência.
 
 ## Contrato com o portal (rotas a implementar no portal)
 
