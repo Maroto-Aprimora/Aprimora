@@ -170,6 +170,7 @@ Antes de importar os dados reais do Pipefy, rode `supabase/dados/remover_dados_f
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Vercel | Pública (chave do Web Push) |
 | `VAPID_PRIVATE_KEY` | Vercel (sensível) | Secreta — nunca no repositório |
 | `PUSH_SEGREDO` | Vercel (sensível) | Igual a `push_segredo` em `privado.config` |
+| `N8N_SEGREDO` | Vercel (sensível) | Igual a `PORTAL_N8N_SEGREDO` no n8n da VPS (rotas `/api/n8n/*`) |
 
 Nenhuma chave `service_role` é usada pelo app.
 

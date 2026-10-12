@@ -569,6 +569,7 @@ trabalho, então trocar o n8n de servidor não exige mudar o portal.
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | pública | Inscrição no push |
 | `VAPID_PRIVATE_KEY` | sensível | Envio do push |
 | `PUSH_SEGREDO` | sensível | Igual a `privado.config.push_segredo` |
+| `N8N_SEGREDO` | sensível | Igual a `PORTAL_N8N_SEGREDO` no projeto n8n-aprimora da VPS; protege as rotas `/api/n8n/*` |
 
 ## 14.2 Fluxo de trabalho
 
