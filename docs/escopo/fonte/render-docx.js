@@ -151,7 +151,7 @@ const capa = [
     ["Data", DATA],
     ["Responsável", "Diretoria Comercial da Aprimora"],
     ["Público", "Todos os membros da Aprimora, atuais e futuros"],
-    ["Repositório", "github.com/AgenciaValkz/Aprimora (privado)"],
+    ["Repositório", "github.com/Maroto-Aprimora/PortalAprimora (privado)"],
   ].map(([k, v]) => new Paragraph({ spacing: { after: 40 }, children: [
     new TextRun({ text: `${k}:  `, bold: true, color: NAVY, font: HFONT, size: 19 }),
     new TextRun({ text: v, size: 19, color: "333333" }),

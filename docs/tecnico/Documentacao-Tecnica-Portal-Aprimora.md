@@ -1,0 +1,655 @@
+# Documentação Técnica do Portal Aprimora
+
+**Descrição do sistema na versão atual (estado "como construído")**
+
+| Campo | Valor |
+|---|---|
+| Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
+| Versão do documento | 1.1 |
+| Data | 09/10/2026 |
+| Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
+| Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
+| Produção | https://aprimora.vercel.app |
+| Banco de dados | Supabase, projeto `boxweeufsyaknialzedc` (região São Paulo, plano gratuito) |
+| Responsável pela diretoria | Diretoria Comercial da Aprimora Jr. |
+| Classificação | Uso interno da Aprimora |
+
+> **Como ler este documento.** Ele descreve o que **existe e funciona hoje**, não o que está planejado. Cada
+> funcionalidade tem um código (`F-…`) e um status. Use a **Seção 18 (Matriz de rastreabilidade)** para comparar este
+> documento com o Planejamento Estratégico de Escopo. Nomes de tabelas, funções, rotas e arquivos são citados
+> exatamente como estão no código, para que pessoas e IAs consigam localizá-los.
+
+## Sumário
+
+1. Objetivo, público e convenções
+2. Visão geral do produto
+3. Arquitetura
+4. Tecnologias e versões
+5. Estrutura do repositório
+6. Autenticação, sessão e autorização
+7. Modelo de dados
+8. Regras de negócio no banco de dados
+9. Módulos funcionais
+10. Indicadores e metas automáticas
+11. Notificações, push e PWA
+12. Integrações
+13. Segurança
+14. Configuração, implantação e operação
+15. Dados
+16. Limitações conhecidas e dívida técnica
+17. Glossário
+18. Matriz de rastreabilidade
+19. Histórico do documento
+
+---
+
+# 1. Objetivo, público e convenções
+
+## 1.1 Objetivo
+
+Registrar, com detalhes técnicos, como o Portal Aprimora está construído na versão atual: arquitetura, banco de dados,
+regras de negócio, permissões, telas, integrações e limitações. O documento serve de base para:
+
+- novos desenvolvedores (membros da EJ ou terceiros) assumirem o sistema;
+- assistentes de IA lerem o contexto antes de propor ou fazer mudanças;
+- comparação com o Planejamento Estratégico de Escopo, para priorizar melhorias.
+
+## 1.2 Público
+
+Técnicos (desenvolvimento, dados, infraestrutura) e assistentes de IA. Diretores podem usar as Seções 2, 9 e 18.
+
+## 1.3 Convenções
+
+- **Idioma do sistema:** todo o código de domínio, tabelas, colunas, mensagens e interface estão em **português do
+  Brasil** (ex.: `negocios`, `responsavel_id`, `salvarNegocio`). Termos técnicos de bibliotecas ficam em inglês.
+- **Status das funcionalidades:**
+  - `EM PRODUÇÃO` — publicado em https://aprimora.vercel.app e em uso;
+  - `PRONTO, NÃO INSTALADO` — código existe no repositório, mas depende de infraestrutura ou credenciais ainda não
+    configuradas;
+  - `PARCIAL` — funciona, com lacunas descritas;
+  - `NÃO IMPLEMENTADO` — previsto no escopo, sem código.
+- **Fuso horário:** o banco grava `timestamptz` (UTC). A interface trabalha em America/São_Paulo, tratado como
+  **UTC−3 fixo** (o Brasil não tem horário de verão desde 2019).
+- **Referências a arquivos** são relativas à raiz do repositório.
+
+---
+
+# 2. Visão geral do produto
+
+## 2.1 O que é
+
+O Portal Aprimora é um **aplicativo web instalável (PWA)** de gestão interna da Aprimora — Empresa Júnior de
+Engenharia de Produção da UTFPR Londrina. Começou pela **Diretoria Comercial** (CRM e funil de vendas, que substitui o
+Pipefy) e foi estruturado para receber as demais diretorias.
+
+## 2.2 Usuários e papéis
+
+- **Diretorias** (tabela `diretorias`, campo `slug`): `presidencia` (Presidência, jurídico-financeiro), `rh`
+  (exibida como **Vice-Presidência**), `projetos`, `comercial`, `marketing`.
+- **Cargos por diretoria** (enum `cargo`): `diretor`, `assessor`, `trainee`. Uma pessoa pode ter cargo em mais de uma
+  diretoria (tabela `membro_diretorias`).
+- Não há auto-cadastro: só entra quem foi **pré-cadastrado** por um diretor (Seção 6.1).
+
+## 2.3 Módulos e status
+
+| Área | Módulo | Status |
+|---|---|---|
+| Geral | Painel geral, Agenda, Tarefas, Notificações (sino + push), PWA | EM PRODUÇÃO |
+| Presidência | Auditoria (só diretores) | EM PRODUÇÃO |
+| Vice-Presidência | Membros (pré-cadastro, cargos, data de entrada, processos seletivos, transferência de carteira) | EM PRODUÇÃO |
+| Vice-Presidência | Pontuação (0 a 12, marco em 6) | EM PRODUÇÃO |
+| Comercial | Funil (kanban), Empresas e leads, Negócio, Anexos | EM PRODUÇÃO |
+| Comercial | Painel comercial (indicadores), Exportação xlsx/csv, Metas (automáticas e manuais) | EM PRODUÇÃO |
+| Comercial | Configurações do funil (fases, SLA, campos, cadastros auxiliares) | EM PRODUÇÃO |
+| Projetos, Marketing | Telas próprias | NÃO IMPLEMENTADO (aparecem como "Em breve") |
+| Integrações | n8n (ligações API4COM + Gemini + Drive; cadência de e-mail Gmail) | PRONTO, NÃO INSTALADO |
+| Integrações | Importação de dados do Pipefy | NÃO IMPLEMENTADO |
+
+---
+
+# 3. Arquitetura
+
+## 3.1 Visão de componentes
+
+```
+                 Navegador / PWA (celular e computador)
+                               │  HTTPS
+                               ▼
+        ┌────────────────────────────────────────────────┐
+        │ VERCEL — Next.js 16 (App Router)               │
+        │  • src/proxy.ts: renova sessão e protege rotas  │
+        │  • Server Components: leitura de dados          │
+        │  • Server Actions (acoes.ts): gravações         │
+        │  • Route Handlers: /api/push, /comercial/exportar│
+        └───────────────┬────────────────────────────────┘
+                        │ supabase-js / @supabase/ssr (chave publicável + JWT do usuário)
+                        ▼
+        ┌────────────────────────────────────────────────┐
+        │ SUPABASE                                       │
+        │  • Auth (e-mail e senha; links por e-mail)      │
+        │  • Postgres + RLS (regras de acesso no banco)   │
+        │  • Schema "privado": funções auxiliares         │
+        │  • Gatilhos (regras do funil, histórico, avisos)│
+        │  • pg_cron: SLA 08h05 e notificações 08h10      │
+        │  • pg_net: chama /api/push da Vercel            │
+        │  • Storage: bucket privado "anexos"             │
+        └───────────────┬────────────────────────────────┘
+                        │ pg_net (HTTP) com segredo compartilhado
+                        ▼
+              /api/push (Vercel) ──▶ Web Push (VAPID) ──▶ aparelhos
+
+   (PRONTO, NÃO INSTALADO) n8n da Aprimora ──▶ /api/n8n/* do portal (rotas ainda não criadas)
+                                          ├─▶ Google Drive, Gemini, Gmail
+```
+
+## 3.2 Princípios de projeto
+
+1. **Segurança no banco.** Toda tabela tem RLS. A interface esconde botões por conveniência, mas quem garante a
+   permissão é o Postgres. O app usa apenas a **chave publicável** e age sempre como o usuário logado; **nenhuma chave
+   `service_role` é usada pelo app**.
+2. **Regras de negócio críticas em gatilhos.** Movimentação de fase, campos obrigatórios, rodízio, histórico, SLA,
+   notificações e proteções de campos rodam no banco, valendo para qualquer cliente (tela, script ou integração).
+3. **Funções auxiliares fora da API.** As funções usadas nas políticas RLS ficam no schema `privado`, que não é
+   exposto pela API REST do Supabase.
+4. **Servidor primeiro.** As páginas são Server Components que leem do Supabase com a sessão do usuário; gravações
+   passam por Server Actions validadas com Zod.
+5. **Configuração em vez de código.** Fases, SLA, campos por fase, motivos, origens, segmentos, serviços, tipos de
+   atividade, reuniões recorrentes, metas e processos seletivos são editados pelos diretores na própria interface.
+
+---
+
+# 4. Tecnologias e versões
+
+| Camada | Tecnologia | Versão (package.json) | Observação |
+|---|---|---|---|
+| Framework | Next.js (App Router) | 16.3.8 | Usa `src/proxy.ts` (antigo *middleware*), `params`/`searchParams` assíncronos e `PageProps<"/rota">` gerado por `next typegen` |
+| UI | React | 19.2.8 | Server Components + Server Actions |
+| Linguagem | TypeScript | ^5 | `tsc --noEmit` no CI |
+| Estilo | Tailwind CSS | ^4 | Tokens semânticos em `src/app/globals.css` (`bg-marca`, `text-texto-suave`, `bg-destaque`…) |
+| Banco/Auth/Storage | Supabase (`@supabase/supabase-js`, `@supabase/ssr`) | ^2.117 / ^0.12 | Postgres com `pg_cron`, `pg_net`, `pg_trgm`, `unaccent` |
+| Validação | Zod | ^4.6 | Em todas as Server Actions |
+| Ícones | lucide-react | ^1.52 | — |
+| Tema | next-themes | ^0.4 | Claro (padrão) e escuro |
+| Avisos na tela | sonner | ^2.0 | *Toasts* |
+| Push | web-push | ^3.6 | Chaves VAPID |
+| Planilhas | write-excel-file | ^4.1 | Exportação .xlsx |
+| Hospedagem | Vercel | — | Equipe "Aprimora", projeto `aprimora` |
+| CI | GitHub Actions | — | `.github/workflows/ci.yml`: lint, tipos e build |
+
+Componentes visuais são próprios (`src/components/ui/*`); não há biblioteca de componentes de terceiros.
+Tamanho aproximado: ~9.000 linhas de TypeScript em `src/` e ~2.000 linhas de SQL em `supabase/migrations/`.
+
+---
+
+# 5. Estrutura do repositório
+
+```
+.github/workflows/ci.yml        CI (lint, typegen + tsc, build)
+docs/
+  DESENVOLVIMENTO.md            Guia do desenvolvedor (convenções, regras, variáveis)
+  CONFIGURAR-EMAIL-E-LOGIN.md   SMTP, URLs de redirecionamento e modelos de e-mail
+  PENDENCIAS.md                 Pendências fora do código
+  escopo/                       Documento de Escopo v1.0 (PDF/DOCX) e seu gerador
+  tecnico/                      Este documento
+n8n/                            Instância n8n da Aprimora e fluxos (PRONTO, NÃO INSTALADO)
+public/                         Ícones do PWA, logos, sw.js (service worker)
+src/
+  proxy.ts                      Sessão e proteção de rotas
+  app/
+    (auth)/                     entrar, primeiro-acesso, esqueci-senha
+    auth/confirmar/             Recebe links de e-mail (hash, token_hash ou code)
+    (app)/                      Área logada (layout com menu lateral)
+      painel, agenda, tarefas, auditoria, membros, vice-presidencia/pontuacao,
+      comercial (+ exportar), funil (+ configuracoes), empresas, negocios/[id],
+      metas (+ configuracoes), definir-senha, configuracoes (redireciona)
+    api/push/route.ts           Entrega das notificações push
+    manifest.ts                 Manifesto do PWA
+  components/
+    ui/                         Botão, campos, cartão, diálogo, selo
+    app/                        Menu lateral, sino, tema, medidor de pontos
+    crm/                        Anexos, campos de empresa, mover negócio
+    agenda/                     Formulário de atividade, atividades do negócio
+  lib/
+    supabase/                   Clientes (navegador, servidor, convite), sessão, tipos gerados
+    usuario.ts                  Usuário logado e cargos (cache por requisição)
+    crm.ts / crm-servidor.ts    Regras puras do CRM / carga da configuração comercial
+    indicadores*.ts, periodo.ts Indicadores do funil e catálogo das metas automáticas
+    resumo-comercial.ts         Números resumidos do funil
+    agenda.ts, datas.ts         Agenda, ocorrências recorrentes e fuso
+    pontuacao.ts, exportar.ts   Pontuação; geração de xlsx/csv
+supabase/
+  migrations/                   9 migrações SQL (fonte da verdade do banco)
+  dados/                        Scripts de dados fictícios (já removidos do banco)
+```
+
+Convenção de pastas por tela: `page.tsx` (Server Component), `acoes.ts` (Server Actions com `"use server"`),
+`componentes.tsx` (Client Components).
+
+---
+
+# 6. Autenticação, sessão e autorização
+
+## 6.1 Cadastro fechado (pré-cadastro)
+
+1. Um diretor cria o pré-cadastro em **Membros** (`pre_cadastros` + `pre_cadastro_diretorias`, com cargo e diretoria).
+2. O convite é um link mágico do Supabase Auth (`signInWithOtp`), disparado com o cliente `criarClienteConvite()`
+   (fluxo *implicit*, porque o link é aberto no navegador do convidado). A pessoa também pode pedir em **Primeiro
+   acesso**.
+3. Quando a conta é criada em `auth.users`, o gatilho **`ao_criar_usuario`** procura o e-mail em `pre_cadastros`:
+   - não encontrou → a criação é **recusada** (exceção);
+   - encontrou → cria `membros` (nome e data de entrada do pré-cadastro), cria os cargos em `membro_diretorias` e
+     marca `aceito_em`.
+4. A pessoa define a senha em `/definir-senha`. Daí em diante entra com e-mail e senha.
+
+O cargo nunca vem do navegador: só do pré-cadastro feito por um diretor.
+
+## 6.2 Sessão
+
+- Cookies gerenciados por `@supabase/ssr`. `src/proxy.ts` chama `atualizarSessao()` (`src/lib/supabase/sessao.ts`) em
+  toda requisição, valida com `auth.getClaims()` e redireciona para `/entrar?voltar=…` quem não está logado.
+- Rotas públicas: `/entrar`, `/primeiro-acesso`, `/esqueci-senha`, `/auth/*`, `/api/push`.
+- `/auth/confirmar` trata os três formatos de link do Supabase (fragmento `#access_token`, `token_hash` e `code`).
+- `obterUsuario()` (`src/lib/usuario.ts`) carrega o membro e seus cargos uma vez por requisição e expõe `cargoEm()`,
+  `ehDiretorDe()` e `ehDiretor`. Membro desativado é mandado de volta ao login.
+
+## 6.3 Autorização (RLS)
+
+Funções auxiliares no schema `privado`, todas `security definer` com `search_path = ''`:
+
+| Função | Retorna verdadeiro quando |
+|---|---|
+| `membro_ativo()` | o usuário é membro ativo |
+| `cargo_em(d)` | (retorna o cargo do usuário na diretoria `d`) |
+| `eh_diretor_de(d)` / `eh_diretor()` | é diretor da diretoria `d` / de alguma diretoria |
+| `pertence_a(d)` | tem qualquer cargo em `d` |
+| `diretoria_do_funil(f)` / `diretoria_da_fase(f)` | (retornam a diretoria dona) |
+| `participa_do_negocio(n)` | é responsável ou participante do negócio |
+| `pode_editar_negocio(n)` / `pode_editar_empresa(e)` | diretor da diretoria do funil, responsável/participante, ou quem criou a empresa |
+| `participa_da_atividade(a)` / `pode_gerir_atividade(a)` | responsável/participante da atividade; ou diretor da diretoria dela |
+| `responsavel_da_tarefa(t)` | é um dos responsáveis da tarefa |
+
+Resumo das regras:
+
+| Recurso | Ler | Criar | Editar | Excluir |
+|---|---|---|---|---|
+| Membros, cargos, diretorias | membros ativos | diretor (pré-cadastro, cargos) | diretor da diretoria; o próprio membro edita dados básicos | diretor |
+| Empresas e contatos | membros ativos | membros da diretoria | `pode_editar_empresa` | diretor |
+| Negócios | membros ativos | membros da diretoria do funil | `pode_editar_negocio` (assessor/trainee: só os seus) | diretor |
+| Histórico de negócio | membros ativos | só gatilhos | — | — |
+| Configurações (fases, campos, motivos, origens, segmentos, serviços, metas, tipos de atividade, reuniões) | membros ativos | diretor da diretoria | diretor da diretoria | diretor da diretoria |
+| Atividades | membros ativos | membros da diretoria do tipo (R.G: só diretores) | participante ou diretor | idem, exceto trainee |
+| Tarefas | diretoria, diretores e responsáveis | diretor | diretor (tudo) ou responsável (só `status`) | diretor |
+| Notificações | só as próprias | só gatilhos | só `lida_em` | só as próprias |
+| Pontuação | o próprio; diretores veem todas | diretor da Vice-Presidência (`rh`) | só cancelamento, pela Vice-Presidência | não existe exclusão |
+| Auditoria | diretores | só funções internas | — | — |
+| Anexos (tabela e Storage) | membros ativos | quem pode editar o negócio | — | quem enviou ou o diretor |
+
+Regras extras por gatilho: trainee não marca ganho; só diretor muda `ativo`, `email` e `data_entrada` de um membro;
+uma diretoria nunca fica sem diretor ativo (`garantir_diretor`).
+
+---
+
+# 7. Modelo de dados
+
+Fonte da verdade: `supabase/migrations/*.sql`. Tipos TypeScript gerados em `src/lib/supabase/database.types.ts`.
+Todas as tabelas de domínio usam `uuid` (`gen_random_uuid()`), exceto `auditoria` e `negocio_historico` (`bigint`
+identity). Colunas `created_at`/`updated_at` em `timestamptz`.
+
+## 7.1 Enums
+
+| Enum | Valores |
+|---|---|
+| `cargo` | diretor, assessor, trainee |
+| `tipo_fase` | aberta, ganho, perda, pausa |
+| `macroetapa` | prospeccao, cadencia, oportunidade, venda, ganho, pausa, perda |
+| `acao_sla` | alertar, mover |
+| `tipo_campo` | texto, texto_longo, data, numero, moeda, membros, selecao, booleano, link |
+| `tipo_motivo` | perda, desqualificacao |
+| `area_servico` | negocios, producao, qualidade |
+| `status_atividade` | pendente, confirmada, realizada, cancelada |
+| `prioridade` | baixa, media, alta |
+| `status_tarefa` | pendente, em_andamento, concluida |
+
+## 7.2 Pessoas e organização
+
+| Tabela | Colunas principais | Função |
+|---|---|---|
+| `diretorias` | `slug` (PK), nome, ordem, ativa | As 5 diretorias. `rh` é exibida como "Vice-Presidência" |
+| `membros` | id (= `auth.users.id`), nome, email, telefone, ativo, data_entrada | Pessoas com acesso |
+| `membro_diretorias` | membro_id, diretoria, cargo, participa_rodizio | Cargo por diretoria; rodízio de leads |
+| `pre_cadastros` / `pre_cadastro_diretorias` | email, nome, data_entrada, convite_enviado_em, aceito_em / cargo por diretoria | Lista de quem pode criar conta |
+| `processos_seletivos` | nome, data | Define quem é "membro novo" (entrou a partir do último processo) |
+| `auditoria` | autor_id, acao, entidade, entidade_id, dados (jsonb) | Ações sensíveis (cargos, ativação, carteira, exclusão de fase) |
+| `pontuacoes` | membro_id, pontos (−12 a 12, ≠ 0), motivo, data, cancelado_em/por, criado_por | Lançamentos de pontos; total = soma dos não cancelados, limitado a 0..12 |
+
+## 7.3 CRM (Comercial)
+
+| Tabela | Colunas principais | Função |
+|---|---|---|
+| `funis` | diretoria, chave, nome | Funil por diretoria (hoje só `comercial`) |
+| `fases` | funil_id, chave, nome, ordem, macroetapa, tipo, probabilidade, sla_dias, acao_sla, fase_destino_sla, auto_mover_para, distribui_responsavel, exige_motivo, ativa, excluida_em | Colunas do kanban e suas regras |
+| `fase_campos` | fase_id, chave, rotulo, tipo, opcoes, obrigatorio, ordem | Campos dinâmicos por fase (valores em `negocios.campos`, jsonb) |
+| `empresas` | nome, razao_social, cnpj, segmento_id, telefone, e-mails, site, rede_social, endereco, cidade, uf, ficticio; colunas derivadas `nome_normalizado`, `cnpj_digitos`, `telefone_digitos` | Leads/clientes. Colunas derivadas para busca e duplicidade |
+| `contatos` | empresa_id, nome, cargo, decisor, email, telefone, linkedin, nao_contatar | Pessoas da empresa |
+| `negocios` | funil_id, empresa_id, contato_id, titulo, fase_id, responsavel_id, valor, origem_id, campos (jsonb), motivo_id, retorno_em, entrou_na_fase_em, ganho_em, encerrado_em, ficticio | O card do funil |
+| `negocio_historico` | negocio_id, fase_origem_id, fase_destino_id, autor_id, automatico, motivo_id, comentario | Toda movimentação de fase (base dos indicadores) |
+| `negocio_servicos`, `negocio_participantes` | — | Serviços da Carta de Serviços e pessoas envolvidas |
+| `rodizio_estado` | funil_id, ultimo_membro_id | Ponteiro do rodízio |
+| `segmentos`, `origens`, `servicos`, `motivos` | diretoria, nome, ativo (+ tipo/área/ordem) | Cadastros auxiliares configuráveis |
+| `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
+| `anexos` | negocio_id, nome, caminho, tamanho (≤ 10 MB), tipo_mime, enviado_por | Metadados dos arquivos do bucket `anexos` |
+
+Fases do funil Comercial (dados iniciais, configuráveis): Entrada de leads → Enriquecimento → Coleta de dados
+concluída → E-mail → Coldcall (semana 1) → Coldcall (semana 2) → Retornar futuro → Oportunidade → Diagnóstico agendado →
+Elaboração de escopo → Apresentação de proposta → **Projetos Aprimora** (ganho); Reciclagem (pausa); Projeto não
+vendido e Lead não qualificado (perdas, exigem motivo).
+
+## 7.4 Rotina
+
+| Tabela | Colunas principais | Função |
+|---|---|---|
+| `tipos_atividade` | diretoria (nula = geral), chave, nome, cor, ligada_a_lead, exige_confirmacao, ativo | Diagnóstico, Pré-escopo, Apresentação de proposta, Coldcall, Prospecção de campo, ProspectDay, Evento MEJ, R.I, R.G |
+| `atividades` | tipo_id, diretoria, titulo, inicio, fim, local, link_reuniao, empresa_id, negocio_id, responsavel_id, status, resumo, proximos_passos | Compromissos da agenda |
+| `atividade_participantes` | atividade_id, membro_id | — |
+| `reunioes_recorrentes` | tipo_id, diretoria, titulo, dia_semana, hora_inicio, hora_fim, local, valida_de, valida_ate, ativa | R.I (Comercial, seg 15:30–16:40) e R.G (todos, sex 15:30–16:40). **As ocorrências não são gravadas:** são calculadas na leitura (`ocorrenciasRecorrentes()`), então mudar o horário vale para as datas futuras |
+| `tarefas`, `tarefa_responsaveis` | diretoria, titulo, descricao, prazo, prioridade, status, negocio_id, concluida_em | Tarefas distribuídas por diretores |
+| `notificacoes` | membro_id, tipo, titulo, mensagem, link, chave (única por membro), lida_em | Avisos do sino; `chave` impede duplicidade |
+| `push_assinaturas` | membro_id, endpoint, p256dh, auth, user_agent | Aparelhos inscritos no Web Push |
+| `privado.config` | chave, valor | `push_url` e `push_segredo` (fora da API) |
+
+---
+
+# 8. Regras de negócio no banco de dados
+
+## 8.1 Gatilhos
+
+| Gatilho (tabela) | Quando | O que faz |
+|---|---|---|
+| `ao_criar_usuario` (`auth.users`) | após inserir | Aceita só e-mails pré-cadastrados; cria membro e cargos |
+| `proteger_membro` (`membros`) | antes de atualizar | Só diretor muda `ativo`, `email`, `data_entrada`; audita ativação |
+| `garantir_diretor` (`membro_diretorias`) | após inserir/atualizar/excluir | Impede diretoria sem diretor ativo; audita mudança de cargo |
+| `antes_de_salvar_negocio` (`negocios`) | antes de inserir/atualizar | Valida a fase; bloqueia ganho por trainee; exige motivo nas perdas; exige campos obrigatórios da fase de origem ao **avançar**; atualiza `entrou_na_fase_em`, `ganho_em`, `encerrado_em`; aplica o **rodízio** quando a fase distribui responsável |
+| `depois_de_salvar_negocio` (`negocios`) | após inserir ou mudar `fase_id` | Grava `negocio_historico`; executa `auto_mover_para` (ex.: Entrada → Enriquecimento) |
+| `notificar_responsavel_negocio` (`negocios`) | após inserir/atualizar | Notifica "Novo lead para você" quando o responsável muda (inclusive pelo rodízio) |
+| `antes_de_salvar_atividade` (`atividades`) | antes de inserir/atualizar | Herda a diretoria do tipo; completa a empresa pelo negócio; carimba confirmação/realização |
+| `proteger_tarefa` (`tarefas`) | antes de atualizar | Não diretor só altera `status`; carimba `concluida_em` |
+| `enviar_push` (`notificacoes`) | após inserir | Chama `/api/push` via `pg_net` com as assinaturas do membro |
+| `proteger_pontuacao` / `notificar_pontuacao` (`pontuacoes`) | antes de atualizar / após inserir | Lançamento só pode ser cancelado, nunca editado; avisa a pessoa com o total atual |
+| `*_updated_at` | antes de atualizar | Atualiza `updated_at` |
+
+## 8.2 Funções chamáveis pelo app (RPC)
+
+| Função | Segurança | Uso |
+|---|---|---|
+| `mover_negocio(...)` | invoker (respeita RLS) | Move um negócio com motivo, comentário e data de retorno |
+| `empresas_semelhantes(...)` | — | Aviso de empresa duplicada (CNPJ, telefone, domínio ou nome parecido, via `pg_trgm`) |
+| `transferir_carteira(de, para, diretoria)` | definer, exige diretor | Passa negócios abertos, tarefas abertas e atividades futuras; audita |
+| `excluir_fase(fase, destino)` | definer, exige diretor | Move os negócios e marca a fase como excluída (`excluida_em`), preservando o histórico; bloqueia a primeira fase e a última de ganho |
+
+## 8.3 Tarefas agendadas (pg_cron, horário UTC)
+
+| Job | Horário | Função | O que faz |
+|---|---|---|---|
+| `aplicar-slas-diario` | 11:05 UTC (08:05 Brasília) | `privado.aplicar_slas()` | Move negócios com SLA estourado em fases com ação "mover" (Oportunidade: 15 dias → E-mail); devolve ao funil os da Reciclagem com data de retorno vencida |
+| `notificacoes-diarias` | 11:10 UTC (08:10 Brasília) | `privado.gerar_notificacoes_diarias()` | SLA a 80% (`sla_proximo`) e estourado (`sla_estourado`); tarefa vencendo hoje (`tarefa_hoje`); R.I/R.G do dia (`reuniao_hoje`); atividade de amanhã ainda não confirmada, para os diretores (`atividade_sem_confirmacao`) |
+
+---
+
+# 9. Módulos funcionais
+
+Menu lateral (`src/components/app/menu-lateral.tsx`): **Painel, Agenda, Tarefas** (gerais) e seções retráteis por
+diretoria (Presidência, Vice-Presidência, Projetos, Comercial, Marketing). O menu recolhe para uma barra de ícones
+(preferência no `localStorage`). O sino de notificações fica no canto superior direito.
+
+| Código | Rota | Quem acessa | Funcionalidade | Status |
+|---|---|---|---|---|
+| F-GER-01 | `/painel` | todos | Painel geral: hoje na agenda, próximas R.I/R.G, minhas tarefas, minha pontuação, projetos ativos (aguarda Projetos) e um cartão por diretoria | EM PRODUÇÃO |
+| F-GER-02 | `/agenda` | todos | Visão mês/lista, filtro por pessoa, criar/editar atividades, confirmar/realizar/cancelar; reuniões recorrentes somente leitura | EM PRODUÇÃO |
+| F-GER-03 | `/agenda/configuracoes` | diretores | Reuniões recorrentes (dia, horário, local, vigência) e tipos de atividade (cor, exige confirmação, ligada a lead) | EM PRODUÇÃO |
+| F-GER-04 | `/tarefas` | todos | Tarefas de todas as diretorias; diretor cria/edita/exclui; responsável muda o andamento; filtros | EM PRODUÇÃO |
+| F-GER-05 | sino + `/api/push` | todos | Notificações no app e push no aparelho | EM PRODUÇÃO (push só em produção) |
+| F-PRE-01 | `/auditoria` | diretores | Últimas 200 ações sensíveis com filtro por tipo | EM PRODUÇÃO |
+| F-VP-01 | `/membros` | todos (gestão: diretores) | Pré-cadastro e convite, cargos, rodízio, ativação, data de entrada, transferência de carteira, processos seletivos | EM PRODUÇÃO |
+| F-VP-02 | `/vice-presidencia/pontuacao` | todos (lançar: diretoria `rh`) | Medidor 0–12 com marco em 6; ranking (diretores); lançar/abonar/cancelar; histórico | EM PRODUÇÃO |
+| F-COM-01 | `/comercial` | todos | Painel comercial com indicadores do período (Seção 10), SLA estourado e, só para o diretor, lista das atividades da equipe com filtro por membro e tipo | EM PRODUÇÃO |
+| F-COM-02 | `/comercial/exportar` | todos | Exporta indicadores (várias abas) ou lista de negócios em .xlsx/.csv, com os filtros da tela | EM PRODUÇÃO |
+| F-COM-03 | `/funil` | todos | Kanban com arrastar e soltar; filtros retráteis (busca, responsável, origem, segmento); destaque de SLA; diálogo de motivo nas perdas | EM PRODUÇÃO |
+| F-COM-04 | `/funil/configuracoes` | diretor comercial | Fases (nome, SLA, ação, destino, probabilidade, rodízio, ativa, **excluir**), campos por fase, motivos, origens, segmentos, serviços | EM PRODUÇÃO |
+| F-COM-05 | `/empresas`, `/empresas/novo`, `/empresas/[id]` | todos | Busca por nome/CNPJ/telefone; novo lead com aviso de duplicidade; contatos | EM PRODUÇÃO |
+| F-COM-06 | `/negocios/[id]` | todos (edição conforme RLS) | Dados do negócio, campos de cada fase, serviços, participantes, histórico, atividades do negócio, **anexos** | EM PRODUÇÃO |
+| F-COM-07 | `/metas`, `/metas/configuracoes` | todos (configurar: diretor) | OKRs por trimestre; metas automáticas ou manuais; criar trimestre copiando outro | EM PRODUÇÃO |
+| F-AUT-01 | `/entrar`, `/primeiro-acesso`, `/esqueci-senha`, `/definir-senha`, `/auth/confirmar` | público | Login e links por e-mail | EM PRODUÇÃO (ver limitação de SMTP, Seção 16) |
+
+`/configuracoes` existe só para redirecionar endereços antigos para `/funil/configuracoes`.
+
+---
+
+# 10. Indicadores e metas automáticas
+
+Implementação: `src/lib/indicadores.ts` (servidor), `src/lib/indicadores-catalogo.ts`, `src/lib/periodo.ts`.
+
+## 10.1 Como os dados são lidos
+
+`carregarDadosComerciais(periodo)` busca, com paginação de 1.000 linhas (limite da API), todos os negócios do funil
+Comercial, todo o `negocio_historico` desse funil e as atividades do período. O cálculo é feito **em memória no
+servidor da Vercel** a cada carregamento de página (não há tabela de agregados).
+
+## 10.2 Definições
+
+- **Período:** dias de Brasília, inclusive (`?periodo=mes|trimestre|30d|ano|personalizado&de=&ate=`; padrão =
+  trimestre atual). Filtro opcional por responsável (`?resp=`).
+- **Chegou à fase X no período:** existe registro em `negocio_historico` com destino X dentro do período. Cada negócio
+  conta uma vez por fase.
+- **Leads novos:** negócios com `created_at` no período.
+- **Contratos e faturamento:** negócios com `ganho_em` no período; faturamento = soma de `valor`.
+- **Ticket médio:** faturamento ÷ contratos. **Taxa de ganho:** ganhos ÷ (ganhos + "Projeto não vendido").
+- **Ciclo de venda:** média de (`ganho_em` − `created_at`) dos ganhos.
+- **Funil de conversão:** Leads → Em cadência (E-mail ou Coldcall 1) → Oportunidade → Diagnóstico → Proposta →
+  Contrato; % sobre a etapa anterior. Como é um funil de **fluxo** (não de coorte), uma etapa pode passar de 100%.
+- **Tempo médio por fase:** intervalo entre a entrada na fase e a próxima movimentação do mesmo negócio, para saídas
+  dentro do período.
+- **Por responsável:** usa o **responsável atual** do negócio, não o da época da movimentação.
+
+## 10.3 Metas automáticas
+
+`metas.indicador` aponta para uma chave do catálogo. Com indicador, **realizado = cálculo automático +
+`realizado_manual`** (o manual vira ajuste, para registrar o que aconteceu antes do portal). Sem indicador, a meta é
+manual.
+
+| Chave | Regra |
+|---|---|
+| `faturamento` | Soma do valor dos ganhos no trimestre |
+| `contratos` | Negócios ganhos no trimestre |
+| `propostas` | Entradas em Apresentação de proposta |
+| `diagnosticos` | Entradas em Diagnóstico agendado |
+| `diagnosticos_fora_londrina` | Diagnósticos de empresas com cidade ≠ Londrina |
+| `diagnosticos_pos_venda` | Diagnósticos com origem "Pós-vendas" |
+| `diagnosticos_membros_novos` | Diagnósticos cujo responsável entrou a partir do último processo seletivo |
+| `oportunidades` | Entradas em Oportunidade |
+| `leads_novos` | Negócios criados |
+| `prospectday` | Atividades ProspectDay não canceladas |
+| `coldcalls` | Atividades Coldcall realizadas |
+
+---
+
+# 11. Notificações, push e PWA
+
+1. Algo gera uma linha em `notificacoes` (gatilho de negócio, job diário ou lançamento de pontuação) via
+   `privado.notificar()`, que ignora duplicatas pela `chave`.
+2. O gatilho `enviar_push` lê `push_url` e `push_segredo` de `privado.config` e faz `net.http_post` para
+   `https://aprimora.vercel.app/api/push` com o cabeçalho `x-push-segredo` e as assinaturas do membro.
+3. `src/app/api/push/route.ts` confere o segredo (comparação em tempo constante com `PUSH_SEGREDO`) e envia com
+   `web-push` (VAPID).
+4. `public/sw.js` mostra a notificação e abre o link ao tocar.
+5. O sino (`src/components/app/sino.tsx`) consulta a tabela a cada 60 s e ao focar a janela; o usuário ativa o push no
+   próprio sino ("Receber notificações neste aparelho"). No iPhone é preciso instalar o PWA na tela de início.
+
+Manifesto: `src/app/manifest.ts` (`start_url` `/painel`, ícones 192 e 512). As pré-visualizações da Vercel exigem login
+da Vercel, então o push só funciona em produção.
+
+---
+
+# 12. Integrações
+
+| Integração | Situação | Detalhes |
+|---|---|---|
+| Supabase (Auth, Postgres, Storage, cron, net) | EM PRODUÇÃO | Projeto `boxweeufsyaknialzedc` |
+| Vercel | EM PRODUÇÃO | Implanta a `main` em produção e cada branch como pré-visualização |
+| Web Push | EM PRODUÇÃO | Chaves VAPID nas variáveis da Vercel |
+| E-mail transacional (convite, senha) | PARCIAL | Usa o envio padrão do Supabase (limitado). SMTP próprio pendente (Seção 16) |
+| n8n da Aprimora | PRONTO, NÃO INSTALADO | `n8n/docker-compose.yml` (instância separada, 1 vCPU / 1,5 GB, limpeza automática de execuções, áudios em disco, 2 execuções simultâneas) e 5 fluxos em `n8n/fluxos/` |
+| API4COM (ligações) | NÃO IMPLEMENTADO no portal | Previsto: webhook → portal (fila) → n8n → Google Drive + Gemini → card do negócio |
+| Gmail (cadência e respostas) | NÃO IMPLEMENTADO no portal | Previsto: e-mails aprovados no portal enviados pelo n8n; respostas classificadas pelo Gemini |
+| Google Drive, Gemini | NÃO IMPLEMENTADO no portal | Usados pelos fluxos do n8n |
+
+**Contrato previsto entre n8n e portal** (descrito em `n8n/README.md`; **as rotas `/api/n8n/*` ainda não existem no
+portal**): reservar ligações/e-mails, devolver resultado ou falha, registrar pasta do Drive, classificar resposta,
+saúde da fila, alerta e erro. Autenticação por cabeçalho `x-n8n-segredo`. O portal funciona como fila: o n8n busca
+trabalho, então trocar o n8n de servidor não exige mudar o portal.
+
+---
+
+# 13. Segurança
+
+- **RLS em todas as tabelas** de `public`; `anon` sem permissões de escrita.
+- **Schema `privado`** fora da API REST; funções de permissão e `privado.config` só executáveis/legíveis internamente.
+- **Funções `security definer`** sempre com `set search_path = ''` e verificação explícita de cargo quando expostas
+  (`transferir_carteira`, `excluir_fase`). O Security Advisor do Supabase aponta essas duas como "executáveis por
+  usuários autenticados": é intencional e documentado.
+- **Segredos:** nenhum segredo no repositório (`.env*` no `.gitignore`, exceto `.env.example`). Segredos na Vercel
+  (`VAPID_PRIVATE_KEY`, `PUSH_SEGREDO` como *sensitive*) e em `privado.config` (`push_segredo`).
+- **Storage:** bucket `anexos` privado; download por link assinado de 60 s; políticas por pasta
+  `negocios/<negocio_id>/`.
+- **Pendências de segurança:** proteção contra senhas vazadas desativada (exige plano pago do Supabase); SMTP próprio
+  não configurado.
+- **Dados de clientes:** planilhas reais do Pipefy não são versionadas (pasta `dados-reais/` no `.gitignore`).
+
+---
+
+# 14. Configuração, implantação e operação
+
+## 14.1 Variáveis de ambiente (Vercel)
+
+| Variável | Tipo | Uso |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | pública | URL do Supabase |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | pública | Chave publicável (a segurança vem do RLS) |
+| `NEXT_PUBLIC_SITE_URL` | pública (produção) | Base dos links de e-mail |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | pública | Inscrição no push |
+| `VAPID_PRIVATE_KEY` | sensível | Envio do push |
+| `PUSH_SEGREDO` | sensível | Igual a `privado.config.push_segredo` |
+
+## 14.2 Fluxo de trabalho
+
+- Uma branch por fase ou ajuste → Pull Request para `main` → revisão do Diretor Comercial → mescla. A Vercel publica a
+  `main` em produção automaticamente e cada branch como pré-visualização.
+- **CI** (`.github/workflows/ci.yml`) em todo PR e push na `main`: `npm ci`, `npm run lint`,
+  `npx next typegen && npx tsc --noEmit`, `npm run build`.
+- **Banco:** toda mudança é uma nova migração em `supabase/migrations/` (nome com data) aplicada ao projeto, seguida
+  da regeneração de `src/lib/supabase/database.types.ts`.
+- **Rodar localmente:** `npm install`, `.env.local` a partir de `.env.example`, `npm run dev`.
+
+## 14.3 Operação
+
+- Jobs diários às 08h05 e 08h10 (Brasília) no `pg_cron` do Supabase.
+- Configuração de URL do Supabase Auth: Site URL `https://aprimora.vercel.app`; redirecionamentos
+  `https://aprimora.vercel.app/**` e `https://aprimora-*-aprimora1.vercel.app/**`.
+
+---
+
+# 15. Dados
+
+- **Dados reais:** ainda não importados. Os dados fictícios de teste (50 empresas/negócios) **foram removidos**; o
+  funil está vazio aguardando a migração do Pipefy.
+- **Exportação do Pipefy disponível:** 805 cards com 32 colunas (empresa, CNPJ, telefone, e-mail, segmento, decisor,
+  endereço, responsável, datas de cadência). Lacunas conhecidas: sem origem do lead, sem valor dos projetos vendidos,
+  sem motivo de perda, 330 segmentos em texto livre, responsáveis que já saíram da EJ, 50 CNPJs repetidos. A
+  importação foi deixada para a etapa final do projeto.
+- **Metas de 2026** (1T a 3T) cadastradas a partir do Planejamento Estratégico, com os valores realizados como ajuste
+  manual.
+- **Membros pré-cadastrados:** Comercial (diretor e assessores) e os demais diretores; processo seletivo 2026/1 com
+  data de 31/05/2026.
+
+---
+
+# 16. Limitações conhecidas e dívida técnica
+
+| # | Limitação | Impacto | Caminho sugerido |
+|---|---|---|---|
+| L1 | Sem testes automatizados (unitários ou de ponta a ponta); o CI só verifica lint, tipos e build | Regressões só aparecem no uso | Testes das funções de `src/lib` (indicadores, período) e testes de RLS em SQL |
+| L2 | Envio de e-mail padrão do Supabase | Convites e recuperação de senha podem não chegar a quem não é da equipe do projeto no Supabase | SMTP próprio (Google Workspace com senha de app, ou Brevo) |
+| L3 | Indicadores calculados em memória a cada acesso | Adequado para milhares de negócios; fica lento com dezenas de milhares | *Views* materializadas ou agregados no banco |
+| L4 | Indicador "por responsável" usa o responsável atual | Transferências de carteira mudam números passados | Registrar o responsável no `negocio_historico` |
+| L5 | Histórico confiável só a partir do uso do portal | Períodos antigos ficam incompletos nos indicadores | Ajuste manual nas metas (já existe) ou importação de histórico |
+| L6 | Push só em produção | Não dá para testar push nas pré-visualizações | Aceitável |
+| L7 | Fuso fixo UTC−3 | Erra se o Brasil voltar a ter horário de verão | Usar `Intl` com `America/Sao_Paulo` em todo cálculo |
+| L8 | Integrações (n8n, API4COM, Gmail, Drive, Gemini) sem as rotas `/api/n8n/*` no portal | Ligações e cadência de e-mail ainda manuais | Implementar o contrato da Seção 12 |
+| L9 | Áreas de Projetos e Marketing sem telas | Painel geral mostra "Em breve" | Escopo de cada diretoria |
+| L10 | Slug da Vice-Presidência continua `rh` | Só cosmético no código | Manter (trocar exige migrar referências) |
+| L11 | Proteção contra senhas vazadas desativada | Senhas fracas conhecidas são aceitas | Plano pago do Supabase |
+| L12 | Regras da pontuação incompletas (zerar por semestre, ações ao atingir 6 e 12) | Total acumula indefinidamente | Definir com a Vice-Presidência |
+| L13 | Conector usado na manutenção não executa `delete` direto no banco | Exclusões em massa precisam do SQL Editor do Supabase | Operacional |
+
+---
+
+# 17. Glossário
+
+| Termo | Significado |
+|---|---|
+| EJ | Empresa Júnior (Aprimora Jr.) |
+| Lead / negócio / card | Oportunidade comercial no funil (`negocios`), ligada a uma empresa |
+| Fase / macroetapa | Coluna do kanban / agrupamento de fases (prospecção, cadência, oportunidade, venda…) |
+| SLA | Prazo máximo, em dias, que um negócio pode ficar numa fase |
+| Rodízio | Distribuição automática do responsável entre os membros com `participa_rodizio` |
+| Reciclagem | Fase de pausa com data de retorno |
+| R.I / R.G | Reunião Interna (Comercial) / Reunião Geral (todas as diretorias) |
+| ProspectDay, Evento MEJ | Tipos de atividade da agenda |
+| Trimestre `nTAAAA` | Formato das metas, ex.: `3T2026` |
+| Pontuação | Pontos de punição por atividades não realizadas (0 a 12, marco em 6) |
+| RLS | *Row Level Security*: regras de acesso por linha no Postgres |
+| PWA | Aplicativo web instalável |
+
+---
+
+# 18. Matriz de rastreabilidade
+
+Use esta tabela para cruzar com o Planejamento Estratégico de Escopo. A coluna "Fase do escopo" segue o Documento de
+Escopo v1.0 (Seção 14).
+
+| Código | Funcionalidade | Fase do escopo | Status | Onde está |
+|---|---|---|---|---|
+| F-AUT-01 | Cadastro fechado por pré-cadastro, login, convite, senha | 0 | EM PRODUÇÃO | `src/app/(auth)`, `ao_criar_usuario` |
+| F-VP-01 | Diretorias, cargos, membros, rodízio, data de entrada, processos seletivos | 0/2 | EM PRODUÇÃO | `/membros` |
+| F-PRE-01 | Auditoria | 2 | EM PRODUÇÃO | `/auditoria`, `auditoria` |
+| F-COM-03 | Funil kanban com fases do Pipefy, SLA, rodízio, campos obrigatórios, motivos | 1 | EM PRODUÇÃO | `/funil`, gatilhos de `negocios` |
+| F-COM-04 | Configurações do funil, incluindo excluir fase | 1 | EM PRODUÇÃO | `/funil/configuracoes` |
+| F-COM-05 | Empresas, contatos, detecção de duplicidade | 1 | EM PRODUÇÃO | `/empresas` |
+| F-COM-06 | Negócio com campos por fase, histórico e anexos | 1/3 | EM PRODUÇÃO | `/negocios/[id]` |
+| F-COM-08 | Importação CSV e migração do Pipefy | 1 | NÃO IMPLEMENTADO | — |
+| F-GER-02/03 | Agenda, atividades, R.I/R.G configuráveis | 2 | EM PRODUÇÃO | `/agenda` |
+| F-GER-04 | Tarefas | 2 | EM PRODUÇÃO | `/tarefas` |
+| F-GER-05 | Notificações no app e push | 2 | EM PRODUÇÃO | sino, `/api/push` |
+| F-VP-03 | Transferência de carteira | 2 | EM PRODUÇÃO | `transferir_carteira` |
+| F-GER-01 | Painel geral por diretoria | 2b | EM PRODUÇÃO | `/painel` |
+| F-VP-02 | Pontuação | 2b | EM PRODUÇÃO (regras L12 pendentes) | `/vice-presidencia/pontuacao` |
+| F-COM-01 | Indicadores do funil e atividades da equipe | 3 | EM PRODUÇÃO | `/comercial` |
+| F-COM-02 | Exportação xlsx/csv | 3 | EM PRODUÇÃO | `/comercial/exportar` |
+| F-COM-07 | Metas automáticas e configuráveis | 3 | EM PRODUÇÃO | `/metas` |
+| F-INT-01 | n8n: instância e fluxos | 4 | PRONTO, NÃO INSTALADO | `n8n/` |
+| F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
+| F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
+| F-INT-04 | Resumo semanal e passagem do ganho para Projetos/Presidência | 4 | NÃO IMPLEMENTADO | — |
+| F-INT-05 | Extração de leads e base de conhecimento com IA | 6 | NÃO IMPLEMENTADO | — |
+| F-EXP-01 | Módulos de Projetos (incl. Histórico de Projetos), Presidência, Marketing | 8+ | NÃO IMPLEMENTADO | — |
+
+---
+
+# 19. Histórico do documento
+
+| Versão | Data | Descrição |
+|---|---|---|
+| 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
+| 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
+
+**Manutenção:** ao mesclar mudanças relevantes, atualize as seções afetadas, a matriz (Seção 18) e este histórico.
+A fonte deste documento é `docs/tecnico/Documentacao-Tecnica-Portal-Aprimora.md`.

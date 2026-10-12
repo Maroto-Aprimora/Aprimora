@@ -1,5 +1,11 @@
 # Guia de desenvolvimento
 
+> **Antes de mudar qualquer coisa, leia:**
+> - [`docs/tecnico/Documentacao-Tecnica-Portal-Aprimora.md`](tecnico/Documentacao-Tecnica-Portal-Aprimora.md)
+>   (DT-PA-001): como o sistema é hoje. Atualize as seções afetadas, a matriz (Seção 18) e o histórico a cada entrega.
+> - [`docs/escopo/Planejamento-Estrategico-Comercial-v2.md`](escopo/Planejamento-Estrategico-Comercial-v2.md)
+>   (PE-PA-002): o que construir na v2 (portal exclusivo do Comercial) e em que ordem (roadmap da Seção 9).
+
 ## Rodar localmente
 
 ```bash
@@ -143,7 +149,7 @@ Nenhuma chave `service_role` é usada pelo app.
 
 ## Fluxo de trabalho
 
-- Uma branch por fase (`fase-0-fundacao`, `fase-1-crm`, …) com Pull Request revisado pelo Diretor Comercial
-  antes de entrar na `main`.
+- Até o portal ser liberado ao time (fim das fases da v2), os commits vão direto para a `main`, por decisão do
+  Diretor Comercial. Cada entrega deve passar em `lint`, `tsc` e `build` antes do push.
 - A Vercel publica uma pré-visualização de cada branch; a `main` é a produção.
 - Mensagens de commit no padrão `feat:`, `fix:`, `docs:`.
