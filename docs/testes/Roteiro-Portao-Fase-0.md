@@ -56,6 +56,7 @@ Marque cada item ao conferir.
 ## Depois do roteiro
 
 - [ ] Rodar `supabase/dados/remover_dados_ficticios.sql`.
-- [ ] Rodar `supabase/migrations/20261012130100_motivos_e_origens_v2_apagar_antigos.sql` no SQL Editor (apaga as
-      origens e os motivos antigos, hoje inativos).
-- [ ] Registrar aqui a data da validação e liberar a Fase 1.
+- [x] Rodar `supabase/migrations/20261012130100_motivos_e_origens_v2_apagar_antigos.sql` no SQL Editor (apaga as
+      origens e os motivos antigos, hoje inativos). Feito pelo Diretor Comercial; conferido: 0 itens antigos.
+- [x] Registrar aqui a data da validação e liberar a Fase 1. **Portão aprovado pelo Diretor Comercial em 12/10/2026.**
+      Os dados fictícios continuam no banco para os testes da Fase 1.

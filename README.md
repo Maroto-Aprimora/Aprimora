@@ -24,8 +24,9 @@ Na v2 o portal é o **sistema de trabalho exclusivo da Diretoria Comercial**: le
 - [x] Fase 2: atividades e rotina (agenda com R.I/R.G, tarefas, notificações com push, transferência de carteira, auditoria)
 - [x] Fase 2b: menu por diretoria, painel geral, pontuação (Vice-Presidência) e configuração de metas
 - [x] Fase 3: indicadores do funil no painel comercial, metas automáticas, exportação (xlsx/csv) e anexos
-- [x] v2 (PE-PA-002): Fase 0 — fundação do processo (código pronto; portão em `docs/testes/Roteiro-Portao-Fase-0.md`)
-- [ ] v2: Fases 1 a 6 — veja a Seção 9 do PE-PA-002
+- [x] v2 (PE-PA-002): Fase 0 — fundação do processo (portão aprovado em 12/10/2026)
+- [ ] v2: Fase 1 — infraestrutura dos agentes (em andamento)
+- [ ] v2: Fases 2 a 6 — veja a Seção 9 do PE-PA-002
 
 ## Stack prevista
 

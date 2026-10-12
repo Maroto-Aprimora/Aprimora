@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.5 |
+| Versão do documento | 1.6 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -688,6 +688,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.6 | 12/10/2026 | Portão da Fase 0 aprovado; listas antigas de motivos e origens apagadas |
 | 1.5 | 12/10/2026 | v2 Fase 0, PR 6: indicadores no banco, responsável da época no histórico, indicadores novos e visão por membro só do diretor |
 | 1.4 | 12/10/2026 | v2 Fase 0, PR 5: tarefas automáticas (cadência, D21 → Reciclagem, Oportunidade, retorno da Reciclagem, compromissos), job das 07h30, tarefas pessoais e Início com a fila do dia |
 | 1.3 | 12/10/2026 | v2 Fase 0, PRs 2 a 4: ligações e resultados, motivos e origens novos, remarcação, valor por serviço, base de tarefas automáticas e feriados |
