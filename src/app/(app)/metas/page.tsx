@@ -6,7 +6,7 @@ import { Cartao, CabecalhoCartao, TituloPagina, Vazio } from "@/components/ui/ca
 import { Selo } from "@/components/ui/selo";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { formatarMoeda, formatarNumero } from "@/lib/formatar";
-import { carregarDadosComerciais, valorIndicadorMeta } from "@/lib/indicadores";
+import { valorIndicadorMeta } from "@/lib/indicadores";
 import { ehIndicador, INDICADORES_META } from "@/lib/indicadores-catalogo";
 import { periodoDoTrimestre } from "@/lib/periodo";
 import { obterUsuario } from "@/lib/usuario";
@@ -27,12 +27,11 @@ export default async function PaginaMetas({ searchParams }: PageProps<"/metas">)
   const pedido = typeof sp.t === "string" ? sp.t : "";
   const atual = trimestres.includes(pedido) ? pedido : trimestres.includes(trimestreAtual()) ? trimestreAtual() : trimestres[0];
   // Metas automáticas: realizado = cálculo do portal + ajuste manual (o que aconteceu antes do portal)
-  const dados = atual && (metas ?? []).some((m) => m.trimestre === atual && ehIndicador(m.indicador))
-    ? await carregarDadosComerciais(periodoDoTrimestre(atual)) : null;
-  const doTrimestre = (metas ?? []).filter((m) => m.trimestre === atual).map((m) => {
-    const automatico = dados && ehIndicador(m.indicador) ? valorIndicadorMeta(dados, m.indicador, m.membro_id) : null;
+  const periodo = atual ? periodoDoTrimestre(atual) : null;
+  const doTrimestre = await Promise.all((metas ?? []).filter((m) => m.trimestre === atual).map(async (m) => {
+    const automatico = periodo && ehIndicador(m.indicador) ? await valorIndicadorMeta(m.indicador, periodo, m.membro_id) : null;
     return { ...m, automatico, realizado: (automatico ?? 0) + (m.realizado_manual ?? 0) };
-  });
+  }));
   const objetivos = [...new Set(doTrimestre.map((m) => m.objetivo))];
 
   const progresso = (m: (typeof doTrimestre)[number]) => (m.alvo > 0 ? Math.min(1.5, m.realizado / m.alvo) : 0);

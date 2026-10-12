@@ -967,6 +967,7 @@ export type Database = {
           id: number
           motivo_id: string | null
           negocio_id: string
+          responsavel_id: string | null
         }
         Insert: {
           automatico?: boolean
@@ -978,6 +979,7 @@ export type Database = {
           id?: never
           motivo_id?: string | null
           negocio_id: string
+          responsavel_id?: string | null
         }
         Update: {
           automatico?: boolean
@@ -989,6 +991,7 @@ export type Database = {
           id?: never
           motivo_id?: string | null
           negocio_id?: string
+          responsavel_id?: string | null
         }
         Relationships: [
           {
@@ -1024,6 +1027,13 @@ export type Database = {
             columns: ["negocio_id"]
             isOneToOne: false
             referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocio_historico_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "membros"
             referencedColumns: ["id"]
           },
         ]
@@ -1965,6 +1975,10 @@ export type Database = {
         Args: { _destino?: string; _fase: string }
         Returns: Json
       }
+      indicadores_comerciais: {
+        Args: { _ate: string; _de: string; _responsavel?: string }
+        Returns: Json
+      }
       mover_negocio: {
         Args: {
           _comentario?: string
@@ -1990,6 +2004,10 @@ export type Database = {
       transferir_carteira: {
         Args: { _de: string; _diretoria: string; _para: string }
         Returns: Json
+      }
+      valor_indicador_meta: {
+        Args: { _ate: string; _chave: string; _de: string; _membro?: string }
+        Returns: number
       }
     }
     Enums: {

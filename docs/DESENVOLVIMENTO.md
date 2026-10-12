@@ -104,8 +104,11 @@ npm run build
 
 ### Indicadores, metas automáticas e anexos (Fase 3)
 
-- Cálculo em `src/lib/indicadores.ts` (servidor), a partir do `negocio_historico`: um negócio "chegou" a uma fase
-  no período quando há registro de entrada nela dentro do período (conta uma vez por fase).
+- Cálculo no banco desde a v2: `public.indicadores_comerciais(de, ate, responsavel?)` e
+  `public.valor_indicador_meta(chave, de, ate, membro?)`, a partir do `negocio_historico`: um negócio "chegou" a uma
+  fase no período quando há registro de entrada nela dentro do período (conta uma vez por fase). Por pessoa vale o
+  responsável da época (`negocio_historico.responsavel_id`). `src/lib/indicadores.ts` só chama essas funções.
+- Ao mudar uma regra de indicador, rode `supabase/testes/comparar_indicadores.sh` (compara com o cálculo da Fase 3).
   Leads = negócios criados no período; contratos/faturamento = `ganho_em` no período.
 - Painel comercial (`/comercial`): filtro de período (`?periodo=mes|trimestre|30d|ano|personalizado&de=&ate=`)
   e de responsável (`?resp=`). Exportação em `/comercial/exportar?conteudo=indicadores|negocios&formato=xlsx|csv`.

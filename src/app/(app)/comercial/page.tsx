@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Mail, PhoneCall, Plus } from "lucide-react";
+import { Mail, Plus } from "lucide-react";
 import { classeBotao } from "@/components/ui/botao";
 import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
 import { formatarMoeda, formatarNumero } from "@/lib/formatar";
-import { calcularIndicadores, carregarDadosComerciais } from "@/lib/indicadores";
+import { calcularIndicadores, carregarAtividadesEquipe } from "@/lib/indicadores";
 import { periodoDosParametros } from "@/lib/periodo";
 import { resumoComercial } from "@/lib/resumo-comercial";
 import { obterUsuario } from "@/lib/usuario";
@@ -24,8 +24,9 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
   const periodo = periodoDosParametros(sp);
   const responsavel = typeof sp.resp === "string" ? sp.resp : "";
   const usuario = await obterUsuario();
-  const [dados, atual] = await Promise.all([carregarDadosComerciais(periodo), resumoComercial(usuario.id)]);
-  const ind = calcularIndicadores(dados, responsavel || null);
+  const [ind, dados, atual] = await Promise.all([
+    calcularIndicadores(periodo, responsavel || null), carregarAtividadesEquipe(periodo), resumoComercial(usuario.id),
+  ]);
   const r = ind.resumo;
   const maiorEtapa = Math.max(1, ...ind.funil.map((e) => e.quantidade));
 
@@ -57,12 +58,12 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Numero rotulo="Leads novos" valor={String(r.leadsNovos)} />
         <Numero rotulo="Diagnósticos marcados" valor={String(r.diagnosticos)} detalhe={`${r.oportunidades} oportunidades`} />
-        <Numero rotulo="Propostas apresentadas" valor={String(r.propostas)} />
+        <Numero rotulo="Propostas apresentadas" valor={String(r.propostas)} detalhe={`${r.propostasRemarcadas} remarcada${r.propostasRemarcadas === 1 ? "" : "s"}`} />
         <Numero rotulo="Contratos fechados" valor={String(r.contratos)} detalhe={formatarMoeda(r.faturamento)} />
         <Numero rotulo="Ticket médio" valor={r.ticketMedio == null ? "—" : formatarMoeda(r.ticketMedio)} />
         <Numero rotulo="Taxa de ganho" valor={pct(r.taxaGanho)} detalhe={`${r.contratos} ganhos × ${r.perdidos} não vendidos`} />
         <Numero rotulo="Ciclo de venda" valor={dias(r.cicloDias)} detalhe="da criação ao contrato" />
-        <Numero rotulo="Pipeline ponderado (hoje)" valor={formatarMoeda(atual.ponderado)} detalhe={`${atual.ativos} negócios ativos`} />
+        <Numero rotulo="Pipeline ponderado (hoje)" valor={formatarMoeda(r.pipelinePonderado)} detalhe={`${r.negociosAtivos} negócios ativos · valor × probabilidade da fase`} />
       </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-2">
@@ -83,27 +84,53 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
         </Cartao>
 
         <Cartao>
-          <CabecalhoCartao titulo="Tempo médio em cada fase" descricao="Quanto os negócios ficaram em cada fase antes de sair dela no período." />
+          <CabecalhoCartao titulo="Tempo em cada fase, SLA e saídas" descricao="Quanto os negócios ficaram em cada fase antes de sair dela no período, quantos saíram dentro do SLA e para onde foram." />
           <Tabela
-            colunas={["Fase", "Média", "SLA", "Saídas"]}
+            colunas={["Fase", "Média", "SLA", "No SLA", "Saídas"]}
             linhas={ind.tempoPorFase.map((t) => [
               t.fase,
               <span key="m" className={cn(!!t.sla && t.mediaDias != null && t.mediaDias > t.sla && "font-semibold text-perigo")}>{dias(t.mediaDias)}</span>,
               t.sla ? `${t.sla} dias` : "—",
-              String(t.amostras),
+              pct(t.dentroSla),
+              <span key="s" title={t.saidas.map((x) => `${x.destino}: ${x.quantidade}`).join("\n")}>
+                {t.amostras}{t.saidas.length > 0 && <span className="block text-xs font-normal text-texto-suave">{t.saidas.slice(0, 2).map((x) => `${x.destino} ${x.quantidade}`).join(" · ")}</span>}
+              </span>,
             ])}
           />
         </Cartao>
       </div>
 
-      <Cartao className="mb-6">
-        <CabecalhoCartao titulo="Desempenho por responsável" descricao="Pelo responsável atual de cada negócio. Atividades = visitas, ligações e reuniões marcadas como realizadas." />
-        <Tabela
-          colunas={["Pessoa", "Leads", "Diagnósticos", "Propostas", "Contratos", "Faturamento", "Atividades"]}
-          linhas={ind.pessoas.map((p) => [p.nome, p.leads, p.diagnosticos, p.propostas, p.contratos, formatarMoeda(p.faturamento), p.atividades].map(String))}
-          vazio="Nenhuma movimentação no período."
-        />
-      </Cartao>
+      {ehDiretor && (
+        <Cartao className="mb-6">
+          <CabecalhoCartao titulo="Desempenho por responsável"
+            descricao="Pelo responsável da época de cada movimentação (transferir a carteira não muda o passado). Atividades = visitas, ligações e reuniões realizadas. Visível só para o diretor." />
+          <Tabela
+            colunas={["Pessoa", "Leads", "Ligações", "Diagnósticos", "Propostas", "Contratos", "Faturamento", "Atividades"]}
+            linhas={ind.pessoas.map((p) => [p.nome, p.leads, p.ligacoes, p.diagnosticos, p.propostas, p.contratos, formatarMoeda(p.faturamento), p.atividades].map(String))}
+            vazio="Nenhuma movimentação no período."
+          />
+        </Cartao>
+      )}
+
+      <div className="mb-6 grid gap-6 xl:grid-cols-2">
+        <Cartao>
+          <CabecalhoCartao titulo="Coldcall" descricao={`${ind.coldcall.ligacoes} ligações em ${ind.coldcall.negocios} negócios · ${pct(ind.coldcall.pctDiagnostico)} viraram diagnóstico${ind.coldcall.duracaoMediaMin != null ? ` · ${formatarNumero(Math.round(ind.coldcall.duracaoMediaMin * 10) / 10)} min em média` : ""}. A nota da rubrica chega com o Avaliador (Fase 2).`} />
+          <Tabela
+            colunas={["Resultado", "Ligações", "%"]}
+            linhas={ind.coldcall.porResultado.map((x) => [x.resultado, String(x.quantidade), pct(x.pct)])}
+            vazio="Nenhuma ligação registrada no período."
+          />
+        </Cartao>
+        <Cartao>
+          <CabecalhoCartao titulo="Ticket por solução" descricao="Soma do valor de cada serviço nos contratos do período ÷ contratos com esse serviço e valor preenchido." />
+          <Tabela
+            colunas={["Serviço", "Contratos", "Soma", "Ticket"]}
+            linhas={ind.ticketPorSolucao.map((t) => [t.servico, `${t.contratos}${t.comValor < t.contratos ? ` (${t.comValor} c/ valor)` : ""}`,
+              t.soma == null ? "—" : formatarMoeda(t.soma), t.ticket == null ? "—" : formatarMoeda(t.ticket)])}
+            vazio="Nenhum contrato com serviço no período."
+          />
+        </Cartao>
+      </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-2">
         <Cartao>
@@ -130,6 +157,24 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
           <CabecalhoCartao titulo="Motivos de desqualificação" descricao={`${r.desqualificados} leads não qualificados no período.`} />
           <ListaMotivos itens={ind.motivosDesqualificacao} />
         </Cartao>
+        <Cartao>
+          <CabecalhoCartao titulo="Motivos por fase de saída" descricao="Em que fase o negócio estava quando foi perdido ou desqualificado." />
+          <Tabela
+            colunas={["Fase de saída", "Motivo", "Quantidade"]}
+            linhas={ind.motivosPorFase.map((m) => [m.fase, m.motivo, String(m.quantidade)])}
+            vazio="Nenhuma perda no período."
+          />
+        </Cartao>
+        {ehDiretor && (
+          <Cartao>
+            <CabecalhoCartao titulo="Motivos por membro" descricao="Responsável da época da perda. Visível só para o diretor." />
+            <Tabela
+              colunas={["Membro", "Motivo", "Quantidade"]}
+              linhas={ind.motivosPorMembro.map((m) => [m.membro, m.motivo, String(m.quantidade)])}
+              vazio="Nenhuma perda no período."
+            />
+          </Cartao>
+        )}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -146,10 +191,9 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
           </ul>
         </Cartao>
         <Cartao>
-          <CabecalhoCartao titulo="Em breve" descricao="Chegam com as integrações de e-mail (n8n) e de ligações (API4COM)." />
+          <CabecalhoCartao titulo="Em breve" descricao="Chega com a cadência de e-mail (Fase 3)." />
           <ul className="space-y-2 px-5 py-4 text-sm text-texto-suave">
-            <li className="flex gap-2"><Mail className="mt-0.5 h-4 w-4 shrink-0 text-destaque" /> E-mails enviados, taxa de entrega, de abertura, de resposta e de resposta positiva por modelo e por etapa da cadência.</li>
-            <li className="flex gap-2"><PhoneCall className="mt-0.5 h-4 w-4 shrink-0 text-destaque" /> Ligações feitas, taxa de atendimento, conversas com o decisor, duração média e ligações até a oportunidade.</li>
+            <li className="flex gap-2"><Mail className="mt-0.5 h-4 w-4 shrink-0 text-destaque" /> E-mails enviados, taxa de resposta e respostas por classificação.</li>
           </ul>
         </Cartao>
       </div>

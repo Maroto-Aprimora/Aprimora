@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.4 |
+| Versão do documento | 1.5 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -334,7 +334,7 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `empresas` | nome, razao_social, cnpj, segmento_id, telefone, e-mails, site, rede_social, endereco, cidade, uf, ficticio; colunas derivadas `nome_normalizado`, `cnpj_digitos`, `telefone_digitos` | Leads/clientes. Colunas derivadas para busca e duplicidade |
 | `contatos` | empresa_id, nome, cargo, decisor, email, telefone, linkedin, nao_contatar | Pessoas da empresa |
 | `negocios` | funil_id, empresa_id, contato_id, titulo, fase_id, responsavel_id, valor, origem_id, campos (jsonb), motivo_id, retorno_em, entrou_na_fase_em, ganho_em, encerrado_em, ficticio | O card do funil |
-| `negocio_historico` | negocio_id, fase_origem_id, fase_destino_id, autor_id, automatico, motivo_id, comentario | Toda movimentação de fase (base dos indicadores) |
+| `negocio_historico` | negocio_id, fase_origem_id, fase_destino_id, autor_id, automatico, motivo_id, comentario, responsavel_id (da época) | Toda movimentação de fase (base dos indicadores) |
 | `negocio_servicos`, `negocio_participantes` | `negocio_servicos.valor` | Serviços da Carta de Serviços (com valor por serviço) e pessoas envolvidas |
 | `rodizio_estado` | funil_id, ultimo_membro_id | Ponteiro do rodízio |
 | `segmentos`, `origens`, `servicos`, `motivos` | diretoria, nome, ativo (+ tipo/área/ordem); `origens.chave`, `motivos.chave`, `motivos.exige_comentario`, `motivos.marca_nao_contatar` | Cadastros auxiliares configuráveis. Listas de motivos e origens da v2 (PE-PA-002, 3.3 e 3.4) |
@@ -432,7 +432,7 @@ evolução). Grupos sem itens não são exibidos. O menu recolhe para uma barra 
 | F-PRE-01 | `/auditoria` | diretores | Últimas 200 ações sensíveis com filtro por tipo | EM PRODUÇÃO |
 | F-VP-01 | `/membros` | todos (gestão: diretores) | Pré-cadastro e convite, cargos, rodízio, ativação, data de entrada, transferência de carteira, processos seletivos | EM PRODUÇÃO |
 | F-VP-02 | `/vice-presidencia/pontuacao` | todos (lançar: diretoria `rh`) | Medidor 0–12 com marco em 6; ranking (diretores); lançar/abonar/cancelar; histórico | EM PRODUÇÃO |
-| F-COM-01 | `/comercial` | todos | Painel comercial com indicadores do período (Seção 10), SLA estourado e, só para o diretor, lista das atividades da equipe com filtro por membro e tipo | EM PRODUÇÃO |
+| F-COM-01 | `/comercial` | todos (visão por membro: diretor) | Painel comercial com indicadores do período calculados no banco (Seção 10), incluindo coldcall, ticket por solução, % no SLA e destinos, motivos por fase; SLA estourado; só para o diretor: desempenho por responsável da época, motivos por membro e atividades da equipe | EM PRODUÇÃO |
 | F-COM-02 | `/comercial/exportar` | todos | Exporta indicadores (várias abas) ou lista de negócios em .xlsx/.csv, com os filtros da tela | EM PRODUÇÃO |
 | F-COM-03 | `/funil` | todos | Kanban com arrastar e soltar; filtros retráteis (busca, responsável, origem, segmento); destaque de SLA; diálogo de motivo nas perdas (comentário obrigatório no "Outro"); selo da última ligação e registro rápido de ligação no card | EM PRODUÇÃO |
 | F-COM-04 | `/funil/configuracoes` | diretor comercial | Fases (nome, SLA, ação, destino, probabilidade, rodízio, ativa, **excluir**), campos por fase, **cadência** (toques e prazos), **resultados de ligação** (ação no card e tarefa), motivos, origens, segmentos, serviços, **feriados** | EM PRODUÇÃO |
@@ -447,13 +447,14 @@ evolução). Grupos sem itens não são exibidos. O menu recolhe para uma barra 
 
 # 10. Indicadores e metas automáticas
 
-Implementação: `src/lib/indicadores.ts` (servidor), `src/lib/indicadores-catalogo.ts`, `src/lib/periodo.ts`.
+Implementação: no banco, `public.indicadores_comerciais(de, ate, responsavel?)` (JSON com todos os indicadores) e `public.valor_indicador_meta(chave, de, ate, membro?)`, apoiadas em `privado.negocios_comerciais()` e `privado.historico_comercial()`; `src/lib/indicadores.ts` só chama essas funções (RPC). `src/lib/indicadores-catalogo.ts` e `src/lib/periodo.ts` continuam no app.
 
 ## 10.1 Como os dados são lidos
 
-`carregarDadosComerciais(periodo)` busca, com paginação de 1.000 linhas (limite da API), todos os negócios do funil
-Comercial, todo o `negocio_historico` desse funil e as atividades do período. O cálculo é feito **em memória no
-servidor da Vercel** a cada carregamento de página (não há tabela de agregados).
+Desde a v2 (Fase 0, PR 6) o cálculo é feito **no Postgres**, numa única chamada por página, em vez de carregar todos
+os negócios e o histórico na Vercel. Os números são os mesmos do cálculo anterior: a comparação automática
+(`supabase/testes/comparar_indicadores.sh`, com o cálculo antigo preservado em `supabase/testes/indicadores_v1.ts`)
+deu resultado idêntico em 5 períodos, com e sem filtro por responsável, inclusive nas metas automáticas.
 
 ## 10.2 Definições
 
@@ -469,7 +470,16 @@ servidor da Vercel** a cada carregamento de página (não há tabela de agregado
   Contrato; % sobre a etapa anterior. Como é um funil de **fluxo** (não de coorte), uma etapa pode passar de 100%.
 - **Tempo médio por fase:** intervalo entre a entrada na fase e a próxima movimentação do mesmo negócio, para saídas
   dentro do período.
-- **Por responsável:** usa o **responsável atual** do negócio, não o da época da movimentação.
+- **Por responsável:** usa o **responsável da época** (`negocio_historico.responsavel_id`, gravado a cada movimentação):
+  leads pelo primeiro responsável que o negócio teve; entradas em fases pelo responsável na entrada; contratos e perdas
+  pelo responsável na entrada da fase de desfecho; atividades e ligações por quem as fez. Transferir a carteira não muda
+  o passado. Antes da v2 o histórico não tinha o responsável: esses registros receberam o responsável atual.
+- **Novos (v2):** propostas remarcadas (atividades de Apresentação de proposta com status `remarcada`); ticket por
+  solução (soma de `negocio_servicos.valor` nos contratos ÷ contratos com valor); pipeline ponderado (valor ×
+  probabilidade da fase atual, negócios abertos); % de saídas dentro do SLA e destinos de saída por fase; motivos por
+  fase de saída e por membro; coldcall (ligações, % por resultado, % que vira diagnóstico, duração média; nota da
+  rubrica na Fase 2).
+- **Visão por membro** (tabela por responsável e motivos por membro): só o diretor, no painel e na exportação.
 
 ## 10.3 Metas automáticas
 
@@ -599,8 +609,8 @@ trabalho, então trocar o n8n de servidor não exige mudar o portal.
 |---|---|---|---|
 | L1 | Sem testes automatizados (unitários ou de ponta a ponta); o CI só verifica lint, tipos e build | Regressões só aparecem no uso | Testes das funções de `src/lib` (indicadores, período) e testes de RLS em SQL |
 | L2 | Envio de e-mail padrão do Supabase | Convites e recuperação de senha podem não chegar a quem não é da equipe do projeto no Supabase | SMTP próprio (Google Workspace com senha de app, ou Brevo) |
-| L3 | Indicadores calculados em memória a cada acesso | Adequado para milhares de negócios; fica lento com dezenas de milhares | *Views* materializadas ou agregados no banco |
-| L4 | Indicador "por responsável" usa o responsável atual | Transferências de carteira mudam números passados | Registrar o responsável no `negocio_historico` |
+| L3 | ~~Indicadores calculados em memória a cada acesso~~ | Resolvido na v2 (Fase 0, PR 6): cálculo no Postgres | Se crescer muito, agregados materializados |
+| L4 | ~~Indicador "por responsável" usa o responsável atual~~ | Resolvido na v2 (Fase 0, PR 6): responsável da época | — |
 | L5 | Histórico confiável só a partir do uso do portal | Períodos antigos ficam incompletos nos indicadores | Ajuste manual nas metas (já existe) ou importação de histórico |
 | L6 | Push só em produção | Não dá para testar push nas pré-visualizações | Aceitável |
 | L7 | Fuso fixo UTC−3 | Erra se o Brasil voltar a ter horário de verão | Usar `Intl` com `America/Sao_Paulo` em todo cálculo |
@@ -661,6 +671,7 @@ Escopo v1.0 (Seção 14).
 | F-V2-02 | Motivos e origens da v2; comentário obrigatório no "Outro"; "não contatar" | v2 F0 | EM PRODUÇÃO | `motivos`, `origens` |
 | F-V2-03 | Proposta remarcada e valor por serviço | v2 F0 | EM PRODUÇÃO | `remarcar_atividade`, `negocio_servicos.valor` |
 | F-V2-04 | Tarefas automáticas (resultados de ligação, cadência, Oportunidade, Reciclagem, compromissos), dias úteis, feriados e notificação de toda tarefa | v2 F0 | EM PRODUÇÃO | `privado.criar_tarefa`, `privado.gerar_tarefas_diarias`, `cadencia_passos` |
+| F-V2-05 | Indicadores no banco, pelo responsável da época, e indicadores novos da Seção 7 | v2 F0 | EM PRODUÇÃO | `indicadores_comerciais`, `valor_indicador_meta` |
 | F-INT-01 | n8n: instância e fluxos | 4 | PRONTO, NÃO INSTALADO | `n8n/` |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
 | F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
@@ -677,6 +688,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.5 | 12/10/2026 | v2 Fase 0, PR 6: indicadores no banco, responsável da época no histórico, indicadores novos e visão por membro só do diretor |
 | 1.4 | 12/10/2026 | v2 Fase 0, PR 5: tarefas automáticas (cadência, D21 → Reciclagem, Oportunidade, retorno da Reciclagem, compromissos), job das 07h30, tarefas pessoais e Início com a fila do dia |
 | 1.3 | 12/10/2026 | v2 Fase 0, PRs 2 a 4: ligações e resultados, motivos e origens novos, remarcação, valor por serviço, base de tarefas automáticas e feriados |
 

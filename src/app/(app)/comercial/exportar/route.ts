@@ -1,5 +1,6 @@
 import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
-import { calcularIndicadores, carregarDadosComerciais } from "@/lib/indicadores";
+import { calcularIndicadores } from "@/lib/indicadores";
+import { obterUsuario } from "@/lib/usuario";
 import { gerarCsv, gerarXlsx, type Planilha } from "@/lib/exportar";
 import { periodoDosParametros } from "@/lib/periodo";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -22,16 +23,18 @@ export async function GET(request: Request) {
   let planilhas: Planilha[];
 
   if (conteudo === "indicadores") {
-    const dados = await carregarDadosComerciais(periodo);
-    const ind = calcularIndicadores(dados, responsavel);
+    const [ind, usuario, { data: membros }] = await Promise.all([
+      calcularIndicadores(periodo, responsavel), obterUsuario(), supabase.from("membros").select("id, nome"),
+    ]);
     const r = ind.resumo;
+    const pct = (v: number | null) => arred(v == null ? null : v * 100);
     planilhas = [
       {
         nome: "Resumo",
         colunas: ["Indicador", "Valor"],
         linhas: [
           ["Período", `${periodo.de} a ${periodo.ate}`],
-          ["Responsável", responsavel ? dados.membros.find((m) => m.id === responsavel)?.nome ?? responsavel : "Toda a equipe"],
+          ["Responsável (da época)", responsavel ? (membros ?? []).find((m) => m.id === responsavel)?.nome ?? responsavel : "Toda a equipe"],
           ["Leads novos", r.leadsNovos],
           ["Oportunidades", r.oportunidades],
           ["Diagnósticos marcados", r.diagnosticos],
@@ -44,18 +47,31 @@ export async function GET(request: Request) {
           ["Ciclo de venda (dias)", arred(r.cicloDias)],
           ["Projetos não vendidos", r.perdidos],
           ["Leads não qualificados", r.desqualificados],
+          ["Propostas remarcadas", r.propostasRemarcadas],
+          ["Pipeline ponderado hoje (R$)", arred(r.pipelinePonderado, 2)],
+          ["Ligações", ind.coldcall.ligacoes],
+          ["Ligações que viraram diagnóstico (%)", pct(ind.coldcall.pctDiagnostico)],
         ],
       },
       { nome: "Funil", colunas: ["Etapa", "Quantidade", "Conversão da etapa anterior (%)"],
         linhas: ind.funil.map((e) => [e.rotulo, e.quantidade, arred(e.conversao == null ? null : e.conversao * 100)]) },
-      { nome: "Tempo por fase", colunas: ["Fase", "Média (dias)", "SLA (dias)", "Saídas no período"],
-        linhas: ind.tempoPorFase.map((t) => [t.fase, arred(t.mediaDias), t.sla, t.amostras]) },
-      { nome: "Por responsável", colunas: ["Pessoa", "Leads", "Diagnósticos", "Propostas", "Contratos", "Faturamento (R$)", "Atividades realizadas"],
-        linhas: ind.pessoas.map((p) => [p.nome, p.leads, p.diagnosticos, p.propostas, p.contratos, p.faturamento, p.atividades]) },
-      { nome: "Origens", colunas: ["Origem", "Leads", "Diagnósticos", "Contratos"],
-        linhas: ind.origens.map((o) => [o.origem, o.leads, o.diagnosticos, o.contratos]) },
-      { nome: "Motivos", colunas: ["Tipo", "Motivo", "Quantidade"],
-        linhas: [...ind.motivosPerda.map((m) => ["Perda", m.motivo, m.quantidade]), ...ind.motivosDesqualificacao.map((m) => ["Desqualificação", m.motivo, m.quantidade])] },
+      { nome: "Tempo por fase", colunas: ["Fase", "Média (dias)", "SLA (dias)", "Saídas no período", "Dentro do SLA (%)", "Destinos"],
+        linhas: ind.tempoPorFase.map((t) => [t.fase, arred(t.mediaDias), t.sla, t.amostras, pct(t.dentroSla),
+          t.saidas.map((x) => `${x.destino}: ${x.quantidade}`).join("; ")]) },
+      ...(usuario.ehDiretorDe("comercial") ? [
+        { nome: "Por responsável", colunas: ["Pessoa", "Leads", "Ligações", "Diagnósticos", "Propostas", "Contratos", "Faturamento (R$)", "Atividades realizadas"],
+          linhas: ind.pessoas.map((p) => [p.nome, p.leads, p.ligacoes, p.diagnosticos, p.propostas, p.contratos, p.faturamento, p.atividades]) },
+        { nome: "Motivos por membro", colunas: ["Membro", "Motivo", "Quantidade"],
+          linhas: ind.motivosPorMembro.map((m) => [m.membro, m.motivo, m.quantidade]) },
+      ] : []),
+      { nome: "Origens", colunas: ["Origem", "Leads", "Diagnósticos", "Contratos", "Faturamento (R$)"],
+        linhas: ind.origens.map((o) => [o.origem, o.leads, o.diagnosticos, o.contratos, o.faturamento]) },
+      { nome: "Motivos", colunas: ["Tipo", "Fase de saída", "Motivo", "Quantidade"],
+        linhas: ind.motivosPorFase.map((m) => [m.tipo === "nao_vendido" ? "Perda" : "Desqualificação", m.fase, m.motivo, m.quantidade]) },
+      { nome: "Ticket por solução", colunas: ["Serviço", "Contratos", "Contratos com valor", "Soma (R$)", "Ticket (R$)"],
+        linhas: ind.ticketPorSolucao.map((t) => [t.servico, t.contratos, t.comValor, t.soma, arred(t.ticket, 2)]) },
+      { nome: "Coldcall", colunas: ["Resultado", "Ligações", "%"],
+        linhas: ind.coldcall.porResultado.map((x) => [x.resultado, x.quantidade, pct(x.pct)]) },
       { nome: "Atividades", colunas: ["Tipo", "Realizadas", "Agendadas", "Canceladas"],
         linhas: ind.atividadesPorTipo.map((a) => [a.tipo, a.realizadas, a.agendadas, a.canceladas]) },
     ];
