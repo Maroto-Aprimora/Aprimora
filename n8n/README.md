@@ -1,8 +1,7 @@
 # n8n da Aprimora
 
 Automações que rodam fora do portal: processamento das ligações (API4COM → Google Drive → Gemini) e
-cadência de e-mails (Gmail). Roda numa **instância própria do n8n**, separada do n8n da agência, no mesmo VPS
-por enquanto. Quando a Aprimora tiver um VPS próprio, a migração é copiar esta pasta e o volume de dados.
+cadência de e-mails (Gmail). Roda numa **VPS própria da Aprimora** (Hostinger), em https://srv2043014.hstgr.cloud.
 
 ## Como as peças conversam
 
@@ -67,22 +66,30 @@ Configurada no `docker-compose.yml`, vale para todos os fluxos:
 Limites do container: **1 vCPU e 1,5 GB de RAM**. Se a Aprimora passar disso, só ela fica lenta; a agência não sente.
 Ajuste em `deploy.resources.limits` conforme a folga do VPS.
 
-## Instalar no VPS (uma vez)
+## Instalação atual (12/10/2026)
 
-1. **DNS**: crie o subdomínio (ex.: `n8n-aprimora.seudominio.com.br`) apontando para o IP do VPS.
-2. **Pasta**: copie esta pasta `n8n/` para o VPS (ex.: `/opt/n8n-aprimora`) e crie o `.env` a partir do `.env.example`.
-   - `N8N_ENCRYPTION_KEY`: `openssl rand -hex 32`. **Guarde em lugar seguro**: sem ela as credenciais salvas não abrem.
-   - `PORTAL_N8N_SEGREDO`: `openssl rand -hex 32`, o mesmo valor que vai na Vercel como `N8N_SEGREDO`.
-3. **Subir**: `docker compose -p n8n-aprimora --env-file .env up -d`.
-4. **Proxy reverso**: publique `https://n8n-aprimora.seudominio` → `127.0.0.1:5679` no Nginx/Caddy/Traefik que já
-   atende o n8n da agência (é só mais um site/rota, com HTTPS).
-5. **Conta**: abra o subdomínio e crie o usuário dono com o e-mail institucional da Aprimora (não o da agência).
-6. **Credenciais** (Settings → Credentials):
-   - *Google Drive OAuth2* e *Gmail OAuth2*, conectadas na conta Google da Aprimora;
-   - o Gemini e o portal usam as variáveis do `.env`, sem credencial no n8n.
-7. **Importar** os 5 arquivos de `fluxos/` (Workflows → Import from file), escolher as credenciais do Google nos nós
-   do Drive e do Gmail e definir **Sistema · Tratamento de erros** como *Error workflow* dos outros quatro.
-8. **Ativar** os fluxos só depois que as rotas `/api/n8n/*` do portal estiverem publicadas.
+- **VPS:** Hostinger KVM 2 (2 vCPU, 8 GB, Ubuntu 24.04), `srv2043014.hstgr.cloud` / `179.236.67.145`, só da Aprimora.
+- **Endereço do n8n:** https://srv2043014.hstgr.cloud (endereço gratuito da Hostinger; o portal continua em
+  `aprimora.vercel.app`). Para usar um domínio próprio no futuro, troque `N8N_DOMINIO` e suba de novo.
+- **Projeto Docker:** `n8n-aprimora`, criado pelo Docker Manager da Hostinger com este `docker-compose.yml`:
+  `caddy-aprimora` (HTTPS automático com Let's Encrypt, portas 80/443) e `n8n-aprimora` (sem porta exposta).
+- **Variáveis** (`N8N_ENCRYPTION_KEY`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY`…): ficam só no projeto da Hostinger
+  (hPanel → VPS → Docker Manager → n8n-aprimora → Environment). Nunca no GitHub. A `N8N_ENCRYPTION_KEY` também é
+  copiada pelo n8n para o volume `n8n_aprimora_dados`; perdê-la significa perder as credenciais salvas.
+
+## Instalar em outra VPS
+
+1. **Endereço**: use o nome da VPS (ex.: `srvNNNN.hstgr.cloud`) ou crie um registro `A` de um domínio para o IP.
+2. **Variáveis**: a partir do `.env.example`. `N8N_ENCRYPTION_KEY` e `PORTAL_N8N_SEGREDO` com `openssl rand -hex 32`;
+   `PORTAL_N8N_SEGREDO` igual à `N8N_SEGREDO` da Vercel.
+3. **Subir**: `docker compose -p n8n-aprimora --env-file .env up -d` (ou Docker Manager da Hostinger, colando o
+   `docker-compose.yml` e as variáveis). O Caddy emite o certificado sozinho em menos de um minuto.
+4. **Conta**: abra o endereço e crie **na hora** o usuário dono com o e-mail da Aprimora (até isso, qualquer pessoa
+   que abrir o endereço pode se cadastrar como dona).
+5. **Credenciais** (Settings → Credentials): *Google Drive OAuth2* e *Gmail OAuth2* na conta Google da Aprimora,
+   com a URL de retorno `https://<endereço>/rest/oauth2-credential/callback`; o Gemini e o portal usam as variáveis.
+6. **Importar** os fluxos de `fluxos/` e definir **Sistema · Tratamento de erros** como *Error workflow* dos outros.
+7. **Ativar** os fluxos só depois que as rotas `/api/n8n/*` do portal estiverem publicadas.
 
 ## Contrato com o portal (rotas a implementar no portal)
 

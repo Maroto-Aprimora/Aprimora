@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.6 |
+| Versão do documento | 1.7 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -528,7 +528,7 @@ da Vercel, então o push só funciona em produção.
 | Vercel | EM PRODUÇÃO | Implanta a `main` em produção e cada branch como pré-visualização |
 | Web Push | EM PRODUÇÃO | Chaves VAPID nas variáveis da Vercel |
 | E-mail transacional (convite, senha) | PARCIAL | Usa o envio padrão do Supabase (limitado). SMTP próprio pendente (Seção 16) |
-| n8n da Aprimora | PRONTO, NÃO INSTALADO | `n8n/docker-compose.yml` (instância separada, 1 vCPU / 1,5 GB, limpeza automática de execuções, áudios em disco, 2 execuções simultâneas) e 5 fluxos em `n8n/fluxos/` |
+| n8n da Aprimora | INSTALADO (fluxos ainda não importados) | VPS Hostinger KVM 2 própria, https://srv2043014.hstgr.cloud; `n8n/docker-compose.yml` com Caddy (HTTPS automático) e n8n (1 vCPU / 1,5 GB, limpeza automática de execuções, áudios em disco, 2 execuções simultâneas); 5 fluxos em `n8n/fluxos/` |
 | API4COM (ligações) | NÃO IMPLEMENTADO no portal | Previsto: webhook → portal (fila) → n8n → Google Drive + Gemini → card do negócio |
 | Gmail (cadência e respostas) | NÃO IMPLEMENTADO no portal | Previsto: e-mails aprovados no portal enviados pelo n8n; respostas classificadas pelo Gemini |
 | Google Drive, Gemini | NÃO IMPLEMENTADO no portal | Usados pelos fluxos do n8n |
@@ -672,7 +672,7 @@ Escopo v1.0 (Seção 14).
 | F-V2-03 | Proposta remarcada e valor por serviço | v2 F0 | EM PRODUÇÃO | `remarcar_atividade`, `negocio_servicos.valor` |
 | F-V2-04 | Tarefas automáticas (resultados de ligação, cadência, Oportunidade, Reciclagem, compromissos), dias úteis, feriados e notificação de toda tarefa | v2 F0 | EM PRODUÇÃO | `privado.criar_tarefa`, `privado.gerar_tarefas_diarias`, `cadencia_passos` |
 | F-V2-05 | Indicadores no banco, pelo responsável da época, e indicadores novos da Seção 7 | v2 F0 | EM PRODUÇÃO | `indicadores_comerciais`, `valor_indicador_meta` |
-| F-INT-01 | n8n: instância e fluxos | 4 | PRONTO, NÃO INSTALADO | `n8n/` |
+| F-INT-01 | n8n: instância e fluxos | v2 F1 | PARCIAL (instância no ar; rotas e fluxos na Fase 1) | `n8n/`, VPS Hostinger |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
 | F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
 | F-INT-04 | Resumo semanal e passagem do ganho para Projetos/Presidência | 4 | NÃO IMPLEMENTADO | — |
@@ -688,6 +688,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.7 | 12/10/2026 | v2 Fase 1: n8n instalado na VPS da Hostinger (https://srv2043014.hstgr.cloud) com Caddy |
 | 1.6 | 12/10/2026 | Portão da Fase 0 aprovado; listas antigas de motivos e origens apagadas |
 | 1.5 | 12/10/2026 | v2 Fase 0, PR 6: indicadores no banco, responsável da época no histórico, indicadores novos e visão por membro só do diretor |
 | 1.4 | 12/10/2026 | v2 Fase 0, PR 5: tarefas automáticas (cadência, D21 → Reciclagem, Oportunidade, retorno da Reciclagem, compromissos), job das 07h30, tarefas pessoais e Início com a fila do dia |

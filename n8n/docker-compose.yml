@@ -1,19 +1,33 @@
-# n8n da Aprimora — instância SEPARADA do n8n da agência, no mesmo VPS.
-# Tem banco, pasta de dados, chave de criptografia, usuários e credenciais próprios.
-# Limites de CPU/memória: se a Aprimora estourar, só este container sente.
+# n8n da Aprimora na VPS própria (Hostinger KVM 2, srv2043014.hstgr.cloud).
+# O Caddy publica o n8n em HTTPS no endereço N8N_DOMINIO e renova o certificado sozinho.
 #
-# Subir:   docker compose -p n8n-aprimora --env-file .env up -d
+# Subir:   docker compose -p n8n-aprimora --env-file .env up -d   (ou pelo Docker Manager da Hostinger)
 # Logs:    docker compose -p n8n-aprimora logs -f n8n-aprimora
-# Migrar para o VPS próprio da Aprimora: copie esta pasta (com o volume n8n_aprimora_dados) e suba lá.
+# Trocar de VPS: suba o mesmo arquivo com o mesmo .env e copie o volume n8n_aprimora_dados.
 
 services:
+  caddy:
+    image: caddy:2
+    container_name: caddy-aprimora
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${N8N_DOMINIO} --to n8n-aprimora:5678
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_dados:/data
+      - caddy_config:/config
+    depends_on:
+      - n8n-aprimora
+
   n8n-aprimora:
     image: docker.n8n.io/n8nio/n8n:${N8N_VERSAO:-stable}
     container_name: n8n-aprimora
     restart: unless-stopped
-    # Só escuta localmente: o proxy reverso do VPS (Nginx, Caddy ou Traefik) publica o subdomínio.
-    ports:
-      - "127.0.0.1:5679:5678"
+    # Não fica exposto: só o Caddy (mesma rede do Docker) chega nele.
+    expose:
+      - "5678"
     environment:
       # --- Identificação e acesso ---
       - N8N_HOST=${N8N_DOMINIO}
@@ -68,3 +82,5 @@ services:
 
 volumes:
   n8n_aprimora_dados:
+  caddy_dados:
+  caddy_config:
