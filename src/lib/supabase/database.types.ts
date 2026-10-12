@@ -108,6 +108,8 @@ export type Database = {
           negocio_id: string | null
           proximos_passos: string | null
           realizada_em: string | null
+          remarcada_de_id: string | null
+          remarcada_para_id: string | null
           responsavel_id: string | null
           resumo: string | null
           stakeholder: string | null
@@ -131,6 +133,8 @@ export type Database = {
           negocio_id?: string | null
           proximos_passos?: string | null
           realizada_em?: string | null
+          remarcada_de_id?: string | null
+          remarcada_para_id?: string | null
           responsavel_id?: string | null
           resumo?: string | null
           stakeholder?: string | null
@@ -154,6 +158,8 @@ export type Database = {
           negocio_id?: string | null
           proximos_passos?: string | null
           realizada_em?: string | null
+          remarcada_de_id?: string | null
+          remarcada_para_id?: string | null
           responsavel_id?: string | null
           resumo?: string | null
           stakeholder?: string | null
@@ -189,6 +195,20 @@ export type Database = {
             columns: ["negocio_id"]
             isOneToOne: false
             referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atividades_remarcada_de_id_fkey"
+            columns: ["remarcada_de_id"]
+            isOneToOne: false
+            referencedRelation: "atividades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atividades_remarcada_para_id_fkey"
+            columns: ["remarcada_para_id"]
+            isOneToOne: false
+            referencedRelation: "atividades"
             referencedColumns: ["id"]
           },
           {
@@ -251,6 +271,7 @@ export type Database = {
           nome: string
           observacoes: string | null
           telefone: string | null
+          telefone_invalido: boolean
           updated_at: string
         }
         Insert: {
@@ -266,6 +287,7 @@ export type Database = {
           nome: string
           observacoes?: string | null
           telefone?: string | null
+          telefone_invalido?: boolean
           updated_at?: string
         }
         Update: {
@@ -281,6 +303,7 @@ export type Database = {
           nome?: string
           observacoes?: string | null
           telefone?: string | null
+          telefone_invalido?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -343,6 +366,7 @@ export type Database = {
           site: string | null
           telefone: string | null
           telefone_digitos: string | null
+          telefone_invalido: boolean
           uf: string | null
           updated_at: string
         }
@@ -367,6 +391,7 @@ export type Database = {
           site?: string | null
           telefone?: string | null
           telefone_digitos?: string | null
+          telefone_invalido?: boolean
           uf?: string | null
           updated_at?: string
         }
@@ -391,6 +416,7 @@ export type Database = {
           site?: string | null
           telefone?: string | null
           telefone_digitos?: string | null
+          telefone_invalido?: boolean
           uf?: string | null
           updated_at?: string
         }
@@ -537,6 +563,24 @@ export type Database = {
           },
         ]
       }
+      feriados: {
+        Row: {
+          created_at: string
+          data: string
+          nome: string
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          nome: string
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       funis: {
         Row: {
           chave: string
@@ -563,6 +607,120 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "diretorias"
             referencedColumns: ["slug"]
+          },
+        ]
+      }
+      ligacoes: {
+        Row: {
+          api4com_id: string | null
+          comentario: string | null
+          compromisso_em: string | null
+          contato_id: string | null
+          created_at: string
+          criado_por: string | null
+          decisor_melhor_horario: string | null
+          decisor_nome: string | null
+          duracao_seg: number | null
+          gravacao_url: string | null
+          id: string
+          inicio: string
+          membro_id: string
+          negocio_id: string
+          origem: Database["public"]["Enums"]["origem_registro"]
+          proximo_passo: string | null
+          resultado_aplicado_em: string | null
+          resultado_id: string | null
+          resumo: string | null
+          retorno_em: string | null
+          telefone: string | null
+          transcricao: string | null
+          updated_at: string
+        }
+        Insert: {
+          api4com_id?: string | null
+          comentario?: string | null
+          compromisso_em?: string | null
+          contato_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          decisor_melhor_horario?: string | null
+          decisor_nome?: string | null
+          duracao_seg?: number | null
+          gravacao_url?: string | null
+          id?: string
+          inicio?: string
+          membro_id?: string
+          negocio_id: string
+          origem?: Database["public"]["Enums"]["origem_registro"]
+          proximo_passo?: string | null
+          resultado_aplicado_em?: string | null
+          resultado_id?: string | null
+          resumo?: string | null
+          retorno_em?: string | null
+          telefone?: string | null
+          transcricao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api4com_id?: string | null
+          comentario?: string | null
+          compromisso_em?: string | null
+          contato_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          decisor_melhor_horario?: string | null
+          decisor_nome?: string | null
+          duracao_seg?: number | null
+          gravacao_url?: string | null
+          id?: string
+          inicio?: string
+          membro_id?: string
+          negocio_id?: string
+          origem?: Database["public"]["Enums"]["origem_registro"]
+          proximo_passo?: string | null
+          resultado_aplicado_em?: string | null
+          resultado_id?: string | null
+          resumo?: string | null
+          retorno_em?: string | null
+          telefone?: string | null
+          transcricao?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ligacoes_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ligacoes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ligacoes_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ligacoes_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ligacoes_resultado_id_fkey"
+            columns: ["resultado_id"]
+            isOneToOne: false
+            referencedRelation: "resultados_ligacao"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -710,24 +868,33 @@ export type Database = {
       motivos: {
         Row: {
           ativo: boolean
+          chave: string | null
           diretoria: string
+          exige_comentario: boolean
           id: string
+          marca_nao_contatar: boolean
           nome: string
           ordem: number
           tipo: Database["public"]["Enums"]["tipo_motivo"]
         }
         Insert: {
           ativo?: boolean
+          chave?: string | null
           diretoria?: string
+          exige_comentario?: boolean
           id?: string
+          marca_nao_contatar?: boolean
           nome: string
           ordem?: number
           tipo: Database["public"]["Enums"]["tipo_motivo"]
         }
         Update: {
           ativo?: boolean
+          chave?: string | null
           diretoria?: string
+          exige_comentario?: boolean
           id?: string
+          marca_nao_contatar?: boolean
           nome?: string
           ordem?: number
           tipo?: Database["public"]["Enums"]["tipo_motivo"]
@@ -851,14 +1018,17 @@ export type Database = {
         Row: {
           negocio_id: string
           servico_id: string
+          valor: number | null
         }
         Insert: {
           negocio_id: string
           servico_id: string
+          valor?: number | null
         }
         Update: {
           negocio_id?: string
           servico_id?: string
+          valor?: number | null
         }
         Relationships: [
           {
@@ -1062,6 +1232,7 @@ export type Database = {
       origens: {
         Row: {
           ativo: boolean
+          chave: string | null
           diretoria: string
           id: string
           nome: string
@@ -1069,6 +1240,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          chave?: string | null
           diretoria?: string
           id?: string
           nome: string
@@ -1076,6 +1248,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          chave?: string | null
           diretoria?: string
           id?: string
           nome?: string
@@ -1282,6 +1455,98 @@ export type Database = {
           },
         ]
       }
+      resultados_ligacao: {
+        Row: {
+          ativo: boolean
+          chave: string
+          conta_tentativa: boolean
+          created_at: string
+          descricao: string | null
+          diretoria: string
+          exige_retorno: boolean
+          fase_destino_id: string | null
+          id: string
+          marca_telefone_invalido: boolean
+          motivo_id: string | null
+          nome: string
+          ordem: number
+          registra_decisor: boolean
+          tarefa_prazo: Database["public"]["Enums"]["prazo_tarefa_auto"] | null
+          tarefa_titulo: string | null
+          tipo_atividade_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          conta_tentativa?: boolean
+          created_at?: string
+          descricao?: string | null
+          diretoria?: string
+          exige_retorno?: boolean
+          fase_destino_id?: string | null
+          id?: string
+          marca_telefone_invalido?: boolean
+          motivo_id?: string | null
+          nome: string
+          ordem?: number
+          registra_decisor?: boolean
+          tarefa_prazo?: Database["public"]["Enums"]["prazo_tarefa_auto"] | null
+          tarefa_titulo?: string | null
+          tipo_atividade_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          conta_tentativa?: boolean
+          created_at?: string
+          descricao?: string | null
+          diretoria?: string
+          exige_retorno?: boolean
+          fase_destino_id?: string | null
+          id?: string
+          marca_telefone_invalido?: boolean
+          motivo_id?: string | null
+          nome?: string
+          ordem?: number
+          registra_decisor?: boolean
+          tarefa_prazo?: Database["public"]["Enums"]["prazo_tarefa_auto"] | null
+          tarefa_titulo?: string | null
+          tipo_atividade_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resultados_ligacao_diretoria_fkey"
+            columns: ["diretoria"]
+            isOneToOne: false
+            referencedRelation: "diretorias"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "resultados_ligacao_fase_destino_id_fkey"
+            columns: ["fase_destino_id"]
+            isOneToOne: false
+            referencedRelation: "fases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resultados_ligacao_motivo_id_fkey"
+            columns: ["motivo_id"]
+            isOneToOne: false
+            referencedRelation: "motivos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resultados_ligacao_tipo_atividade_id_fkey"
+            columns: ["tipo_atividade_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_atividade"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reunioes_recorrentes: {
         Row: {
           ativa: boolean
@@ -1474,6 +1739,8 @@ export type Database = {
       }
       tarefas: {
         Row: {
+          atividade_id: string | null
+          chave: string | null
           concluida_em: string | null
           created_at: string
           criado_por: string | null
@@ -1481,6 +1748,7 @@ export type Database = {
           diretoria: string
           id: string
           negocio_id: string | null
+          origem: Database["public"]["Enums"]["origem_registro"]
           prazo: string | null
           prioridade: Database["public"]["Enums"]["prioridade"]
           status: Database["public"]["Enums"]["status_tarefa"]
@@ -1488,6 +1756,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          atividade_id?: string | null
+          chave?: string | null
           concluida_em?: string | null
           created_at?: string
           criado_por?: string | null
@@ -1495,6 +1765,7 @@ export type Database = {
           diretoria: string
           id?: string
           negocio_id?: string | null
+          origem?: Database["public"]["Enums"]["origem_registro"]
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["prioridade"]
           status?: Database["public"]["Enums"]["status_tarefa"]
@@ -1502,6 +1773,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          atividade_id?: string | null
+          chave?: string | null
           concluida_em?: string | null
           created_at?: string
           criado_por?: string | null
@@ -1509,6 +1782,7 @@ export type Database = {
           diretoria?: string
           id?: string
           negocio_id?: string | null
+          origem?: Database["public"]["Enums"]["origem_registro"]
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["prioridade"]
           status?: Database["public"]["Enums"]["status_tarefa"]
@@ -1516,6 +1790,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tarefas_atividade_id_fkey"
+            columns: ["atividade_id"]
+            isOneToOne: false
+            referencedRelation: "atividades"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tarefas_criado_por_fkey"
             columns: ["criado_por"]
@@ -1620,6 +1901,15 @@ export type Database = {
         Returns: undefined
       }
       normalizar: { Args: { _t: string }; Returns: string }
+      remarcar_atividade: {
+        Args: {
+          _atividade: string
+          _motivo?: string
+          _novo_fim?: string
+          _novo_inicio: string
+        }
+        Returns: string
+      }
       so_digitos: { Args: { _t: string }; Returns: string }
       transferir_carteira: {
         Args: { _de: string; _diretoria: string; _para: string }
@@ -1638,8 +1928,20 @@ export type Database = {
         | "ganho"
         | "pausa"
         | "perda"
+      origem_registro: "manual" | "sistema" | "agente"
+      prazo_tarefa_auto:
+        | "mesmo_dia"
+        | "proximo_dia_util"
+        | "proximo_toque"
+        | "data_retorno"
+        | "vespera_compromisso"
       prioridade: "baixa" | "media" | "alta"
-      status_atividade: "pendente" | "confirmada" | "realizada" | "cancelada"
+      status_atividade:
+        | "pendente"
+        | "confirmada"
+        | "realizada"
+        | "remarcada"
+        | "cancelada"
       status_tarefa: "pendente" | "em_andamento" | "concluida"
       tipo_campo:
         | "texto"
@@ -1792,8 +2094,22 @@ export const Constants = {
         "pausa",
         "perda",
       ],
+      origem_registro: ["manual", "sistema", "agente"],
+      prazo_tarefa_auto: [
+        "mesmo_dia",
+        "proximo_dia_util",
+        "proximo_toque",
+        "data_retorno",
+        "vespera_compromisso",
+      ],
       prioridade: ["baixa", "media", "alta"],
-      status_atividade: ["pendente", "confirmada", "realizada", "cancelada"],
+      status_atividade: [
+        "pendente",
+        "confirmada",
+        "realizada",
+        "remarcada",
+        "cancelada",
+      ],
       status_tarefa: ["pendente", "em_andamento", "concluida"],
       tipo_campo: [
         "texto",

@@ -46,7 +46,7 @@ export function AtividadesDoNegocio({
             <li key={a.id} className="flex items-start gap-3 px-5 py-3 text-sm">
               <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", COR_TIPO[tipo?.cor ?? "marca"])} />
               <div className="min-w-0 flex-1">
-                <p className={cn("font-semibold", a.status === "cancelada" && "line-through opacity-60")}>{a.titulo}</p>
+                <p className={cn("font-semibold", (a.status === "cancelada" || a.status === "remarcada") && "line-through opacity-60")}>{a.titulo}</p>
                 <p className="text-xs text-texto-suave">
                   {tipo?.nome} · {diaBR(a.inicio)} {horaBR(a.inicio)} · {nome(a.responsavel_id)}
                 </p>

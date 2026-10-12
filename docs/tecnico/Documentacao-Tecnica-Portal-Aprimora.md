@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.2 |
+| Versão do documento | 1.3 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -218,7 +218,7 @@ src/
     agenda.ts, datas.ts         Agenda, ocorrências recorrentes e fuso
     pontuacao.ts, exportar.ts   Pontuação; geração de xlsx/csv
 supabase/
-  migrations/                   9 migrações SQL (fonte da verdade do banco)
+  migrations/                   Migrações SQL (fonte da verdade do banco)
   dados/                        Scripts de dados fictícios (já removidos do banco)
 ```
 
@@ -306,9 +306,11 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `tipo_campo` | texto, texto_longo, data, numero, moeda, membros, selecao, booleano, link |
 | `tipo_motivo` | perda, desqualificacao |
 | `area_servico` | negocios, producao, qualidade |
-| `status_atividade` | pendente, confirmada, realizada, cancelada |
+| `status_atividade` | pendente, confirmada, realizada, remarcada, cancelada |
 | `prioridade` | baixa, media, alta |
 | `status_tarefa` | pendente, em_andamento, concluida |
+| `origem_registro` | manual, sistema, agente (tarefas e ligações) |
+| `prazo_tarefa_auto` | mesmo_dia, proximo_dia_util, proximo_toque, data_retorno, vespera_compromisso |
 
 ## 7.2 Pessoas e organização
 
@@ -333,9 +335,12 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `contatos` | empresa_id, nome, cargo, decisor, email, telefone, linkedin, nao_contatar | Pessoas da empresa |
 | `negocios` | funil_id, empresa_id, contato_id, titulo, fase_id, responsavel_id, valor, origem_id, campos (jsonb), motivo_id, retorno_em, entrou_na_fase_em, ganho_em, encerrado_em, ficticio | O card do funil |
 | `negocio_historico` | negocio_id, fase_origem_id, fase_destino_id, autor_id, automatico, motivo_id, comentario | Toda movimentação de fase (base dos indicadores) |
-| `negocio_servicos`, `negocio_participantes` | — | Serviços da Carta de Serviços e pessoas envolvidas |
+| `negocio_servicos`, `negocio_participantes` | `negocio_servicos.valor` | Serviços da Carta de Serviços (com valor por serviço) e pessoas envolvidas |
 | `rodizio_estado` | funil_id, ultimo_membro_id | Ponteiro do rodízio |
-| `segmentos`, `origens`, `servicos`, `motivos` | diretoria, nome, ativo (+ tipo/área/ordem) | Cadastros auxiliares configuráveis |
+| `segmentos`, `origens`, `servicos`, `motivos` | diretoria, nome, ativo (+ tipo/área/ordem); `origens.chave`, `motivos.chave`, `motivos.exige_comentario`, `motivos.marca_nao_contatar` | Cadastros auxiliares configuráveis. Listas de motivos e origens da v2 (PE-PA-002, 3.3 e 3.4) |
+| `resultados_ligacao` | chave, nome, ordem, ativo, fase_destino_id, motivo_id, conta_tentativa, exige_retorno, registra_decisor, marca_telefone_invalido, tipo_atividade_id, tarefa_titulo, tarefa_prazo | Lista fechada de resultados de ligação e a ação de cada um (9 resultados iniciais) |
+| `ligacoes` | negocio_id, contato_id, membro_id, inicio, duracao_seg, resultado_id, proximo_passo, retorno_em, compromisso_em, decisor_nome, decisor_melhor_horario, comentario, origem, resultado_aplicado_em; reservadas para a Fase 2: api4com_id, gravacao_url, transcricao, resumo | Registro de cada ligação |
+| `feriados` | data, nome | Dias não úteis (nacionais 2026–2027 e aniversário de Londrina); tarefas automáticas pulam fins de semana e feriados |
 | `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
 | `anexos` | negocio_id, nome, caminho, tamanho (≤ 10 MB), tipo_mime, enviado_por | Metadados dos arquivos do bucket `anexos` |
 
@@ -349,10 +354,10 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | Tabela | Colunas principais | Função |
 |---|---|---|
 | `tipos_atividade` | diretoria (nula = geral), chave, nome, cor, ligada_a_lead, exige_confirmacao, ativo | Diagnóstico, Pré-escopo, Apresentação de proposta, Coldcall, Prospecção de campo, ProspectDay, Evento MEJ, R.I, R.G |
-| `atividades` | tipo_id, diretoria, titulo, inicio, fim, local, link_reuniao, empresa_id, negocio_id, responsavel_id, status, resumo, proximos_passos | Compromissos da agenda |
+| `atividades` | tipo_id, diretoria, titulo, inicio, fim, local, link_reuniao, empresa_id, negocio_id, responsavel_id, status, resumo, proximos_passos, remarcada_para_id, remarcada_de_id | Compromissos da agenda. Remarcar deixa a original como `remarcada` e cria outra na data nova |
 | `atividade_participantes` | atividade_id, membro_id | — |
 | `reunioes_recorrentes` | tipo_id, diretoria, titulo, dia_semana, hora_inicio, hora_fim, local, valida_de, valida_ate, ativa | R.I (Comercial, seg 15:30–16:40) e R.G (todos, sex 15:30–16:40). **As ocorrências não são gravadas:** são calculadas na leitura (`ocorrenciasRecorrentes()`), então mudar o horário vale para as datas futuras |
-| `tarefas`, `tarefa_responsaveis` | diretoria, titulo, descricao, prazo, prioridade, status, negocio_id, concluida_em | Tarefas distribuídas por diretores |
+| `tarefas`, `tarefa_responsaveis` | diretoria, titulo, descricao, prazo, prioridade, status, negocio_id, atividade_id, origem, chave (única), concluida_em | Tarefas distribuídas por diretores ou criadas pelo sistema (`privado.criar_tarefa`) |
 | `notificacoes` | membro_id, tipo, titulo, mensagem, link, chave (única por membro), lida_em | Avisos do sino; `chave` impede duplicidade |
 | `push_assinaturas` | membro_id, endpoint, p256dh, auth, user_agent | Aparelhos inscritos no Web Push |
 | `privado.config` | chave, valor | `push_url` e `push_segredo` (fora da API) |
@@ -375,6 +380,11 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `proteger_tarefa` (`tarefas`) | antes de atualizar | Não diretor só altera `status`; carimba `concluida_em` |
 | `enviar_push` (`notificacoes`) | após inserir | Chama `/api/push` via `pg_net` com as assinaturas do membro |
 | `proteger_pontuacao` / `notificar_pontuacao` (`pontuacoes`) | antes de atualizar / após inserir | Lançamento só pode ser cancelado, nunca editado; avisa a pessoa com o total atual |
+| `antes_de_salvar_ligacao` (`ligacoes`) | antes de inserir/atualizar | Exige resultado (registro manual), data de retorno e data do compromisso quando o resultado pede; resultado aplicado não muda |
+| `aplicar_resultado_ligacao` (`ligacoes`) | após inserir / mudar `resultado_id` | Uma vez por ligação: conclui as tarefas de ligação abertas do negócio; move a fase (só para a frente, perdas e pausas sempre, nunca reabre encerrado; motivo do resultado); grava `retorno_em`; marca telefone inválido (contato ou empresa); cria o compromisso na agenda (90 min) e a tarefa do resultado com prazo em dia útil |
+| `notificar_tarefa_atribuida` (`tarefa_responsaveis`) | após inserir | Notifica (sino + push) toda tarefa atribuída, exceto a manual criada para si mesmo |
+| `a_validar_motivo_negocio` / `aplicar_motivo_negocio` (`negocios`) | antes / após salvar motivo | Motivo com `exige_comentario` ("Outro") exige `motivo_detalhe`; motivo com `marca_nao_contatar` marca o contato do negócio (ou todos da empresa) |
+| `somar_valor_servicos` (`negocio_servicos`) | após inserir/atualizar/excluir | Quando algum serviço tem valor, `negocios.valor` = soma dos valores |
 | `*_updated_at` | antes de atualizar | Atualiza `updated_at` |
 
 ## 8.2 Funções chamáveis pelo app (RPC)
@@ -385,6 +395,9 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `empresas_semelhantes(...)` | — | Aviso de empresa duplicada (CNPJ, telefone, domínio ou nome parecido, via `pg_trgm`) |
 | `transferir_carteira(de, para, diretoria)` | definer, exige diretor | Passa negócios abertos, tarefas abertas e atividades futuras; audita |
 | `excluir_fase(fase, destino)` | definer, exige diretor | Move os negócios e marca a fase como excluída (`excluida_em`), preservando o histórico; bloqueia a primeira fase e a última de ganho |
+| `remarcar_atividade(atividade, novo_inicio, novo_fim?, motivo?)` | invoker (respeita RLS) | Marca a atividade como `remarcada` e cria a nova (mesmos participantes) |
+
+Funções internas (schema `privado`): `criar_tarefa(...)` (tarefa do sistema/agente com `chave` para não duplicar), `dia_util(data)`, `dia_util_anterior(data)`, `hoje()`.
 
 ## 8.3 Tarefas agendadas (pg_cron, horário UTC)
 
@@ -407,7 +420,7 @@ evolução). Grupos sem itens não são exibidos. O menu recolhe para uma barra 
 |---|---|---|---|---|
 | F-GER-01 | `/painel` | todos | **Início**: minhas tarefas e minha agenda de hoje (a fila do dia completa chega no PR 5 da Fase 0) | EM PRODUÇÃO |
 | F-GER-06 | `/vice-presidencia/painel-geral` | todos | Painel geral da v1 (agenda, R.I/R.G, tarefas, pontuação, cartões da Vice-Presidência e do Comercial), mantido para comparação; sem cartões "Em breve" | EM PRODUÇÃO |
-| F-GER-02 | `/agenda` | todos | Visão mês/lista, filtro por pessoa, criar/editar atividades, confirmar/realizar/cancelar; reuniões recorrentes somente leitura | EM PRODUÇÃO |
+| F-GER-02 | `/agenda` | todos | Visão mês/lista, filtro por pessoa, criar/editar atividades, confirmar/realizar/**remarcar**/cancelar; reuniões recorrentes somente leitura | EM PRODUÇÃO |
 | F-GER-03 | `/agenda/configuracoes` | diretores | Reuniões recorrentes (dia, horário, local, vigência) e tipos de atividade (cor, exige confirmação, ligada a lead) | EM PRODUÇÃO |
 | F-GER-04 | `/tarefas` | todos | Tarefas de todas as diretorias; diretor cria/edita/exclui; responsável muda o andamento; filtros | EM PRODUÇÃO |
 | F-GER-05 | sino + `/api/push` | todos | Notificações no app e push no aparelho | EM PRODUÇÃO (push só em produção) |
@@ -416,10 +429,10 @@ evolução). Grupos sem itens não são exibidos. O menu recolhe para uma barra 
 | F-VP-02 | `/vice-presidencia/pontuacao` | todos (lançar: diretoria `rh`) | Medidor 0–12 com marco em 6; ranking (diretores); lançar/abonar/cancelar; histórico | EM PRODUÇÃO |
 | F-COM-01 | `/comercial` | todos | Painel comercial com indicadores do período (Seção 10), SLA estourado e, só para o diretor, lista das atividades da equipe com filtro por membro e tipo | EM PRODUÇÃO |
 | F-COM-02 | `/comercial/exportar` | todos | Exporta indicadores (várias abas) ou lista de negócios em .xlsx/.csv, com os filtros da tela | EM PRODUÇÃO |
-| F-COM-03 | `/funil` | todos | Kanban com arrastar e soltar; filtros retráteis (busca, responsável, origem, segmento); destaque de SLA; diálogo de motivo nas perdas | EM PRODUÇÃO |
-| F-COM-04 | `/funil/configuracoes` | diretor comercial | Fases (nome, SLA, ação, destino, probabilidade, rodízio, ativa, **excluir**), campos por fase, motivos, origens, segmentos, serviços | EM PRODUÇÃO |
+| F-COM-03 | `/funil` | todos | Kanban com arrastar e soltar; filtros retráteis (busca, responsável, origem, segmento); destaque de SLA; diálogo de motivo nas perdas (comentário obrigatório no "Outro"); selo da última ligação e registro rápido de ligação no card | EM PRODUÇÃO |
+| F-COM-04 | `/funil/configuracoes` | diretor comercial | Fases (nome, SLA, ação, destino, probabilidade, rodízio, ativa, **excluir**), campos por fase, **resultados de ligação** (ação no card e tarefa), motivos, origens, segmentos, serviços, **feriados** | EM PRODUÇÃO |
 | F-COM-05 | `/empresas`, `/empresas/novo`, `/empresas/[id]` | todos | Busca por nome/CNPJ/telefone; novo lead com aviso de duplicidade; contatos | EM PRODUÇÃO |
-| F-COM-06 | `/negocios/[id]` | todos (edição conforme RLS) | Dados do negócio, campos de cada fase, serviços, participantes, histórico, atividades do negócio, **anexos** | EM PRODUÇÃO |
+| F-COM-06 | `/negocios/[id]` | todos (edição conforme RLS) | Dados do negócio, campos de cada fase, serviços com valor por serviço, participantes, histórico, atividades do negócio, anexos, **registro e histórico de ligações**; selos de telefone inválido e não contatar nos contatos | EM PRODUÇÃO |
 | F-COM-07 | `/metas`, `/metas/configuracoes` | todos (configurar: diretor) | OKRs por trimestre; metas automáticas ou manuais; criar trimestre copiando outro | EM PRODUÇÃO |
 | F-AUT-01 | `/entrar`, `/primeiro-acesso`, `/esqueci-senha`, `/definir-senha`, `/auth/confirmar` | público | Login e links por e-mail | EM PRODUÇÃO (ver limitação de SMTP, Seção 16) |
 
@@ -639,6 +652,10 @@ Escopo v1.0 (Seção 14).
 | F-COM-01 | Indicadores do funil e atividades da equipe | 3 | EM PRODUÇÃO | `/comercial` |
 | F-COM-02 | Exportação xlsx/csv | 3 | EM PRODUÇÃO | `/comercial/exportar` |
 | F-COM-07 | Metas automáticas e configuráveis | 3 | EM PRODUÇÃO | `/metas` |
+| F-V2-01 | Resultado de ligação (lista fechada, ação no card, tarefa automática) | v2 F0 | EM PRODUÇÃO | `ligacoes`, `resultados_ligacao`, `components/crm/registrar-ligacao.tsx` |
+| F-V2-02 | Motivos e origens da v2; comentário obrigatório no "Outro"; "não contatar" | v2 F0 | EM PRODUÇÃO | `motivos`, `origens` |
+| F-V2-03 | Proposta remarcada e valor por serviço | v2 F0 | EM PRODUÇÃO | `remarcar_atividade`, `negocio_servicos.valor` |
+| F-V2-04 | Base de tarefas automáticas (origem, chave, dias úteis, feriados, notificação de toda tarefa) | v2 F0 | PARCIAL (cadência e job diário no PR 5) | `privado.criar_tarefa`, `feriados` |
 | F-INT-01 | n8n: instância e fluxos | 4 | PRONTO, NÃO INSTALADO | `n8n/` |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
 | F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
@@ -655,6 +672,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.3 | 12/10/2026 | v2 Fase 0, PRs 2 a 4: ligações e resultados, motivos e origens novos, remarcação, valor por serviço, base de tarefas automáticas e feriados |
 
 **Manutenção:** ao mesclar mudanças relevantes, atualize as seções afetadas, a matriz (Seção 18) e este histórico.
 A fonte deste documento é `docs/tecnico/Documentacao-Tecnica-Portal-Aprimora.md`.

@@ -8,7 +8,7 @@ export async function carregarConfiguracaoComercial() {
   const { data: funil } = await supabase.from("funis").select("id, nome").eq("diretoria", "comercial").eq("chave", "comercial").single();
   if (!funil) throw new Error("Funil comercial não encontrado. Rode as migrações do banco.");
 
-  const [fases, campos, motivos, origens, segmentos, servicos, cargos] = await Promise.all([
+  const [fases, campos, motivos, origens, segmentos, servicos, cargos, resultados] = await Promise.all([
     supabase.from("fases").select("*").eq("funil_id", funil.id).order("ordem"),
     supabase.from("fase_campos").select("*").order("ordem"),
     supabase.from("motivos").select("*").eq("diretoria", "comercial").order("ordem"),
@@ -16,6 +16,7 @@ export async function carregarConfiguracaoComercial() {
     supabase.from("segmentos").select("id, nome, ativo").eq("diretoria", "comercial").order("nome"),
     supabase.from("servicos").select("id, nome, area, descricao, ativo, ordem").eq("diretoria", "comercial").order("ordem"),
     supabase.from("membro_diretorias").select("cargo, membros!inner(id, nome, ativo)").eq("diretoria", "comercial"),
+    supabase.from("resultados_ligacao").select("*").eq("diretoria", "comercial").order("ordem"),
   ]);
 
   const idsFases = new Set((fases.data ?? []).map((f) => f.id));
@@ -35,6 +36,7 @@ export async function carregarConfiguracaoComercial() {
     origens: (origens.data ?? []).filter((o) => o.ativo),
     segmentos: (segmentos.data ?? []).filter((s) => s.ativo),
     servicos: (servicos.data ?? []).filter((s) => s.ativo),
+    resultadosLigacao: (resultados.data ?? []).filter((r) => r.ativo),
     membrosComercial,
   };
 }

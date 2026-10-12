@@ -11,6 +11,7 @@ import { diasDesde, formatarData, formatarDataHora, formatarMoeda, iniciais } fr
 import { obterUsuario } from "@/lib/usuario";
 import { AtividadesDoNegocio } from "@/components/agenda/atividades-negocio";
 import { AnexosDoNegocio } from "@/components/crm/anexos";
+import { RegistrarLigacao } from "@/components/crm/registrar-ligacao";
 import { AcoesTopoNegocio, FormCamposFase, FormNegocio } from "./componentes";
 
 export const metadata: Metadata = { title: "Negócio" };
@@ -24,19 +25,21 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
     carregarTodosMembros(),
     supabase
       .from("negocios")
-      .select("*, empresas(id, nome, cidade, uf, telefone, email_principal), negocio_servicos(servico_id), negocio_participantes(membro_id), motivos(nome)")
+      .select("*, empresas(id, nome, cidade, uf, telefone, email_principal), negocio_servicos(servico_id, valor), negocio_participantes(membro_id), motivos(nome)")
       .eq("id", id)
       .maybeSingle(),
   ]);
   if (!negocio) notFound();
 
-  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }, { data: anexos }] = await Promise.all([
-    supabase.from("contatos").select("id, nome, cargo, decisor").eq("empresa_id", negocio.empresa_id).order("decisor", { ascending: false }),
+  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }, { data: anexos }, { data: ligacoes }] = await Promise.all([
+    supabase.from("contatos").select("id, nome, cargo, decisor, telefone, telefone_invalido, nao_contatar").eq("empresa_id", negocio.empresa_id).order("decisor", { ascending: false }),
     supabase.from("negocio_historico").select("id, fase_origem_id, fase_destino_id, autor_id, automatico, comentario, created_at, motivos(nome)")
       .eq("negocio_id", id).order("created_at", { ascending: false }),
     supabase.from("atividades").select("*, atividade_participantes(membro_id)").eq("negocio_id", id).order("inicio", { ascending: false }),
     supabase.from("tipos_atividade").select("*").eq("ativo", true).order("ordem"),
     supabase.from("anexos").select("id, nome, caminho, tamanho, enviado_por, created_at").eq("negocio_id", id).order("created_at", { ascending: false }),
+    supabase.from("ligacoes").select("id, inicio, membro_id, duracao_seg, proximo_passo, comentario, retorno_em, decisor_nome, decisor_melhor_horario, origem, resultados_ligacao(nome), contatos(nome)")
+      .eq("negocio_id", id).order("inicio", { ascending: false }),
   ]);
 
   const fase = config.fases.find((f) => f.id === negocio.fase_id);
@@ -72,6 +75,11 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
             <Building2 className="h-4 w-4" /> {negocio.empresas.nome}{negocio.empresas.cidade ? ` · ${negocio.empresas.cidade}` : ""}
           </Link>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        {podeEditar && fase?.tipo !== "ganho" && fase?.tipo !== "perda" && (
+          <RegistrarLigacao negocioId={negocio.id} titulo={negocio.titulo} resultados={config.resultadosLigacao}
+            contatos={contatos ?? []} contatoPadrao={negocio.contato_id} />
+        )}
         <AcoesTopoNegocio
           negocioId={negocio.id}
           titulo={negocio.titulo}
@@ -81,6 +89,7 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
           podeEditar={podeEditar}
           podeExcluir={usuario.ehDiretorDe("comercial")}
         />
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -98,6 +107,9 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
       {negocio.retorno_em && fase?.tipo === "pausa" && (
         <Cartao className="mb-6 p-4 text-sm">Volta para o funil em <strong>{formatarData(negocio.retorno_em)}</strong>.</Cartao>
       )}
+      {negocio.retorno_em && fase?.tipo === "aberta" && (
+        <Cartao className="mb-6 p-4 text-sm">Retornar a ligação em <strong>{formatarData(negocio.retorno_em)}</strong>.</Cartao>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
@@ -110,6 +122,7 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
                 data_coldcall_1: negocio.data_coldcall_1, data_coldcall_2: negocio.data_coldcall_2, dores_identificadas: negocio.dores_identificadas,
               }}
               servicosSelecionados={negocio.negocio_servicos.map((s) => s.servico_id)}
+              valoresServicos={Object.fromEntries(negocio.negocio_servicos.map((s) => [s.servico_id, s.valor]))}
               participantes={participantes}
               membros={config.membrosComercial}
               origens={config.origens}
@@ -117,6 +130,31 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
               contatos={contatos ?? []}
               podeEditar={podeEditar}
             />
+          </Cartao>
+
+          <Cartao>
+            <CabecalhoCartao titulo="Ligações" descricao={`${(ligacoes ?? []).length} registrada${(ligacoes ?? []).length === 1 ? "" : "s"}`} />
+            <ul className="divide-y divide-borda">
+              {(ligacoes ?? []).map((l) => (
+                <li key={l.id} className="px-5 py-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Selo tom="marca">{l.resultados_ligacao?.nome ?? "Aguardando resultado"}</Selo>
+                    <span className="text-xs text-texto-suave">
+                      {formatarDataHora(l.inicio)} · {nomeMembro(l.membro_id)}
+                      {l.contatos ? ` · com ${l.contatos.nome}` : ""}
+                      {l.duracao_seg != null ? ` · ${Math.max(1, Math.round(l.duracao_seg / 60))} min` : ""}
+                    </span>
+                  </div>
+                  {(l.decisor_nome || l.decisor_melhor_horario) && (
+                    <p className="mt-1 text-xs">Decisor: {l.decisor_nome ?? "—"}{l.decisor_melhor_horario ? ` · melhor horário: ${l.decisor_melhor_horario}` : ""}</p>
+                  )}
+                  {l.retorno_em && <p className="mt-1 text-xs">Retornar em {formatarData(l.retorno_em)}</p>}
+                  {l.proximo_passo && <p className="mt-1"><strong>Próximo passo:</strong> {l.proximo_passo}</p>}
+                  {l.comentario && <p className="mt-1 whitespace-pre-line text-texto-suave">{l.comentario}</p>}
+                </li>
+              ))}
+              {(ligacoes ?? []).length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhuma ligação registrada.</li>}
+            </ul>
           </Cartao>
 
           {fasesComCampos.map(({ fase: f, campos }) => (
@@ -156,7 +194,11 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
             <ul className="divide-y divide-borda">
               {(contatos ?? []).map((c) => (
                 <li key={c.id} className="px-5 py-3 text-sm">
-                  <p className="font-semibold">{c.nome} {c.decisor && <Selo tom="destaque" className="ml-1">Decisor</Selo>}</p>
+                  <p className="font-semibold">
+                    {c.nome} {c.decisor && <Selo tom="destaque" className="ml-1">Decisor</Selo>}
+                    {c.telefone_invalido && <Selo tom="perigo" className="ml-1">Telefone inválido</Selo>}
+                    {c.nao_contatar && <Selo tom="perigo" className="ml-1">Não contatar</Selo>}
+                  </p>
                   {c.cargo && <p className="text-texto-suave">{c.cargo}</p>}
                 </li>
               ))}

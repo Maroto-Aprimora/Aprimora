@@ -29,10 +29,13 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
 
   let consulta = supabase
     .from("negocios")
-    .select("id, titulo, fase_id, responsavel_id, valor, entrou_na_fase_em, encerrado_em, ficticio, empresas!inner(nome, cidade, nome_normalizado)")
+    .select("id, titulo, fase_id, responsavel_id, contato_id, valor, entrou_na_fase_em, encerrado_em, ficticio, empresas!inner(nome, cidade, nome_normalizado), ligacoes(inicio, resultados_ligacao(nome))")
     .eq("funil_id", config.funil.id)
     .or(`encerrado_em.is.null,encerrado_em.gte.${limiteEncerrados()}`)
     .order("entrou_na_fase_em", { ascending: true })
+    // Só a última ligação de cada negócio (selo no card)
+    .order("inicio", { referencedTable: "ligacoes", ascending: false })
+    .limit(1, { referencedTable: "ligacoes" })
     .limit(1000);
   if (resp === "meus") consulta = consulta.eq("responsavel_id", usuario.id);
   else if (resp === "sem") consulta = consulta.is("responsavel_id", null);
@@ -52,6 +55,8 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
     entrouNaFaseEm: n.entrou_na_fase_em,
     cidade: n.empresas.cidade,
     ficticio: n.ficticio,
+    contatoId: n.contato_id,
+    ultimaLigacao: n.ligacoes[0]?.resultados_ligacao?.nome ?? null,
   }));
 
   return (
@@ -65,7 +70,7 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
         </>}
       />
       <FiltrosFunil membros={config.membrosComercial} origens={config.origens} segmentos={config.segmentos} />
-      <Kanban fases={config.fases} motivos={config.motivos} cartoes={cartoes} />
+      <Kanban fases={config.fases} motivos={config.motivos} resultados={config.resultadosLigacao} cartoes={cartoes} />
     </>
   );
 }

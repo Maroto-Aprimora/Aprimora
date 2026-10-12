@@ -5,13 +5,14 @@ import { useState } from "react";
 import { ArrowRightLeft } from "lucide-react";
 import { Avatar, Selo } from "@/components/ui/selo";
 import { useMoverNegocio } from "@/components/crm/mover-negocio";
-import { NOME_MACROETAPA, situacaoSla, type Fase, type Motivo } from "@/lib/crm";
+import { RegistrarLigacao } from "@/components/crm/registrar-ligacao";
+import { NOME_MACROETAPA, situacaoSla, type Fase, type Motivo, type ResultadoLigacao } from "@/lib/crm";
 import { diasDesde, formatarMoeda, iniciais } from "@/lib/formatar";
 import { cn } from "@/lib/utils";
 
 export type CartaoNegocio = {
   id: string; titulo: string; faseId: string; responsavel: string | null; valor: number | null;
-  entrouNaFaseEm: string; cidade: string | null; ficticio: boolean;
+  entrouNaFaseEm: string; cidade: string | null; ficticio: boolean; contatoId: string | null; ultimaLigacao: string | null;
 };
 
 const COR_MACRO: Record<string, string> = {
@@ -24,7 +25,7 @@ const COR_MACRO: Record<string, string> = {
   perda: "bg-perigo",
 };
 
-export function Kanban({ fases, motivos, cartoes }: { fases: Fase[]; motivos: Motivo[]; cartoes: CartaoNegocio[] }) {
+export function Kanban({ fases, motivos, resultados, cartoes }: { fases: Fase[]; motivos: Motivo[]; resultados: ResultadoLigacao[]; cartoes: CartaoNegocio[] }) {
   const [itens, setItens] = useState(cartoes);
   const [anteriores, setAnteriores] = useState(cartoes);
   const [sobre, setSobre] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export function Kanban({ fases, motivos, cartoes }: { fases: Fase[]; motivos: Mo
                   </div>
                 </header>
                 <div className="flex max-h-[calc(100vh-290px)] min-h-32 flex-col gap-2 overflow-y-auto p-2">
-                  {daFase.map((c) => <Cartao key={c.id} cartao={c} fase={fase} fases={fases} aoMover={(d) => mover(c.id, c.titulo, d)} />)}
+                  {daFase.map((c) => <Cartao key={c.id} cartao={c} fase={fase} fases={fases} resultados={resultados} aoMover={(d) => mover(c.id, c.titulo, d)} />)}
                   {daFase.length === 0 && <p className="py-6 text-center text-xs text-texto-suave">Nenhum negócio</p>}
                 </div>
               </section>
@@ -91,7 +92,9 @@ export function Kanban({ fases, motivos, cartoes }: { fases: Fase[]; motivos: Mo
   );
 }
 
-function Cartao({ cartao, fase, fases, aoMover }: { cartao: CartaoNegocio; fase: Fase; fases: Fase[]; aoMover: (destino: Fase) => void }) {
+function Cartao({ cartao, fase, fases, resultados, aoMover }: {
+  cartao: CartaoNegocio; fase: Fase; fases: Fase[]; resultados: ResultadoLigacao[]; aoMover: (destino: Fase) => void;
+}) {
   const [escolhendo, setEscolhendo] = useState(false);
   const dias = diasDesde(cartao.entrouNaFaseEm);
   const sla = situacaoSla(fase, dias);
@@ -116,10 +119,15 @@ function Cartao({ cartao, fase, fases, aoMover }: { cartao: CartaoNegocio; fase:
           {dias} {dias === 1 ? "dia" : "dias"}{sla === "estourado" ? " · SLA estourado" : ""}
         </Selo>
         {!cartao.responsavel && fase.tipo === "aberta" && <Selo>Sem responsável</Selo>}
+        {cartao.ultimaLigacao && <Selo title="Resultado da última ligação">☎ {cartao.ultimaLigacao}</Selo>}
         {cartao.ficticio && <Selo className="opacity-70">fictício</Selo>}
+        {fase.tipo === "aberta" && (
+          <RegistrarLigacao compacto negocioId={cartao.id} titulo={cartao.titulo} resultados={resultados}
+            contatoPadrao={cartao.contatoId} className="ml-auto" />
+        )}
         <button
           onClick={() => setEscolhendo((v) => !v)}
-          className="ml-auto rounded p-1 text-texto-suave opacity-70 hover:bg-superficie-2 hover:opacity-100"
+          className={cn("rounded p-1 text-texto-suave opacity-70 hover:bg-superficie-2 hover:opacity-100", fase.tipo !== "aberta" && "ml-auto")}
           aria-label="Mover para outra fase"
           title="Mover para outra fase"
         >

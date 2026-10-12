@@ -128,6 +128,24 @@ Para trocar o segredo ou o domínio: atualize `privado.config` (`push_url`, `pus
 `PUSH_SEGREDO` na Vercel com o mesmo valor. Novas chaves VAPID: `npx web-push generate-vapid-keys` (quem já ativou
 precisa ativar de novo). As pré-visualizações têm proteção da Vercel, então o push só funciona em produção.
 
+### v2 · Fase 0: processo padronizado (PE-PA-002)
+
+| Regra | Onde |
+|---|---|
+| Resultado de ligação: lista fechada com a ação de cada resultado (fase, motivo, retorno, telefone inválido, compromisso, tarefa) | `resultados_ligacao` (editável em Config. do funil) + gatilho `aplicar_resultado_ligacao` |
+| O resultado é aplicado uma vez; trocar exige nova ligação | gatilho `antes_de_salvar_ligacao` (`resultado_aplicado_em`) |
+| Card só avança pela ligação (nunca volta) e negócio encerrado não reabre | `aplicar_resultado_ligacao` |
+| Tarefas do sistema: uma por regra (`tarefas.chave` única), sempre em dia útil | `privado.criar_tarefa`, `privado.dia_util`, tabela `feriados` |
+| Toda tarefa atribuída notifica (sino + push), menos a manual criada para si | gatilho `notificar_tarefa_atribuida` |
+| "Outro" exige comentário; "Pediu para não ser contatado" marca `nao_contatar` | `motivos.exige_comentario`, `motivos.marca_nao_contatar` |
+| Remarcar: a original fica `remarcada` (com a data original) e nasce outra na data nova | `public.remarcar_atividade` |
+| Valor por serviço: com algum valor preenchido, o valor do negócio é a soma | gatilho `somar_valor_servicos` |
+
+**Testes de banco locais.** Há um Postgres 16 no ambiente de desenvolvimento. As migrações são testadas antes num
+banco local com imitações mínimas do Supabase (`auth.uid()`, `cron`, `net`, `storage`) e com roteiros de dados
+fictícios; só depois vão para o projeto `boxweeufsyaknialzedc`. Exclusões em massa (`delete`) não passam pelo conector
+MCP: rode-as no SQL Editor (ex.: `20261012130100_motivos_e_origens_v2_apagar_antigos.sql`).
+
 ## Dados fictícios
 
 `supabase/dados/dados_ficticios.sql` cria 50 empresas e negócios de teste (marcados com `ficticio = true`).

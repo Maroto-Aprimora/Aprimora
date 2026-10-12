@@ -10,7 +10,8 @@ import { Cartao, CabecalhoCartao } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
 import type { Tables } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
-import { excluirCampo, excluirFase, salvarCampo, salvarFase, salvarItem } from "./acoes";
+import { NOME_PRAZO_TAREFA } from "@/lib/crm";
+import { excluirCampo, excluirFase, excluirFeriado, salvarCampo, salvarFase, salvarFeriado, salvarItem, salvarResultadoLigacao } from "./acoes";
 
 const NOME_TIPO: Record<string, string> = {
   texto: "Texto", texto_longo: "Texto longo", data: "Data", numero: "Número", moeda: "Moeda", membros: "Membros",
@@ -198,6 +199,122 @@ export function ListaSimples({
           <Botao type="submit" tamanho="sm" carregando={pendente}><Plus className="h-3.5 w-3.5" /> Adicionar</Botao>
         </form>
       )}
+    </Cartao>
+  );
+}
+
+type Opcao = { id: string; nome: string };
+
+/** Um resultado de ligação: nome, ação no card e tarefa criada (PE-PA-002, Seção 3.1). */
+export function ResultadoLigacaoForm({
+  resultado, fases, motivos, tiposAtividade,
+}: {
+  resultado: Tables<"resultados_ligacao"> | null;
+  fases: (Opcao & { exige_motivo: Tables<"fases">["exige_motivo"] })[];
+  motivos: (Opcao & { tipo: Tables<"motivos">["tipo"] })[];
+  tiposAtividade: Opcao[];
+}) {
+  const [pendente, iniciar] = useTransition();
+  const [destino, setDestino] = useState(resultado?.fase_destino_id ?? "");
+  const exigeMotivo = fases.find((f) => f.id === destino)?.exige_motivo ?? null;
+  const marca = (nome: string, rotulo: string, valor: boolean | undefined) => (
+    <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name={nome} defaultChecked={valor} /> {rotulo}</label>
+  );
+
+  return (
+    <form
+      className={cn("grid gap-2 px-5 py-3 md:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(200px,1.3fr)_auto]", resultado && !resultado.ativo && "opacity-60")}
+      action={(form) => iniciar(async () => {
+        const txt = (k: string) => String(form.get(k) ?? "") || null;
+        const r = await salvarResultadoLigacao(resultado?.id ?? null, {
+          nome: String(form.get("nome") ?? ""),
+          ativo: resultado ? form.get("ativo") === "on" : true,
+          fase_destino_id: txt("fase_destino_id"),
+          motivo_id: exigeMotivo ? txt("motivo_id") : null,
+          conta_tentativa: form.get("conta_tentativa") === "on",
+          exige_retorno: form.get("exige_retorno") === "on",
+          registra_decisor: form.get("registra_decisor") === "on",
+          marca_telefone_invalido: form.get("marca_telefone_invalido") === "on",
+          tipo_atividade_id: txt("tipo_atividade_id"),
+          tarefa_titulo: txt("tarefa_titulo"),
+          tarefa_prazo: txt("tarefa_prazo") as "mesmo_dia" | null,
+        });
+        if (r.ok) toast.success(resultado ? "Resultado salvo." : "Resultado criado.");
+        else toast.error(r.erro);
+      })}
+    >
+      <div className="space-y-2">
+        <Entrada name="nome" defaultValue={resultado?.nome} placeholder="Nome do resultado" required className="h-9 font-semibold" />
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {resultado && marca("ativo", "ativo", resultado.ativo)}
+          {marca("conta_tentativa", "conta como tentativa", resultado?.conta_tentativa)}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Selecao name="fase_destino_id" value={destino} onChange={(e) => setDestino(e.target.value)} className="h-9" aria-label="O que acontece com o card">
+          <option value="">Fica na fase</option>
+          {fases.map((f) => <option key={f.id} value={f.id}>Vai para {f.nome}</option>)}
+        </Selecao>
+        {exigeMotivo && (
+          <Selecao name="motivo_id" defaultValue={resultado?.motivo_id ?? ""} className="h-9" aria-label="Motivo">
+            <option value="">Motivo: perguntar</option>
+            {motivos.filter((m) => m.tipo === exigeMotivo).map((m) => <option key={m.id} value={m.id}>Motivo: {m.nome}</option>)}
+          </Selecao>
+        )}
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {marca("exige_retorno", "pede data de retorno", resultado?.exige_retorno)}
+          {marca("registra_decisor", "pede decisor e horário", resultado?.registra_decisor)}
+          {marca("marca_telefone_invalido", "marca telefone inválido", resultado?.marca_telefone_invalido)}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Entrada name="tarefa_titulo" defaultValue={resultado?.tarefa_titulo ?? ""} placeholder="Tarefa criada (vazio = nenhuma)" className="h-9" />
+        <div className="grid grid-cols-2 gap-2">
+          <Selecao name="tarefa_prazo" defaultValue={resultado?.tarefa_prazo ?? ""} className="h-9" aria-label="Prazo da tarefa">
+            <option value="">Prazo…</option>
+            {Object.entries(NOME_PRAZO_TAREFA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </Selecao>
+          <Selecao name="tipo_atividade_id" defaultValue={resultado?.tipo_atividade_id ?? ""} className="h-9" aria-label="Compromisso na agenda">
+            <option value="">Sem compromisso</option>
+            {tiposAtividade.map((t) => <option key={t.id} value={t.id}>Agenda: {t.nome}</option>)}
+          </Selecao>
+        </div>
+      </div>
+      <div className="flex items-start">
+        <Botao type="submit" tamanho="sm" variante="secundario" carregando={pendente}>{resultado ? "Salvar" : <><Plus className="h-3.5 w-3.5" /> Adicionar</>}</Botao>
+      </div>
+    </form>
+  );
+}
+
+export function ListaFeriados({ feriados }: { feriados: Tables<"feriados">[] }) {
+  const [pendente, iniciar] = useTransition();
+  const hoje = new Date().toISOString().slice(0, 10);
+  const proximos = feriados.filter((f) => f.data >= hoje);
+  return (
+    <Cartao>
+      <CabecalhoCartao titulo="Feriados" descricao="Tarefas automáticas que cairiam em fim de semana ou feriado vão para o próximo dia útil." />
+      <ul className="max-h-72 divide-y divide-borda overflow-y-auto">
+        {proximos.map((f) => (
+          <li key={f.data} className="flex items-center justify-between gap-2 px-5 py-2 text-sm">
+            <span><strong className="mr-2 tabular-nums">{f.data.split("-").reverse().join("/")}</strong>{f.nome}</span>
+            <button aria-label={`Excluir ${f.nome}`} className="text-texto-suave hover:text-perigo" disabled={pendente}
+              onClick={() => iniciar(async () => { const r = await excluirFeriado(f.data); if (!r.ok) toast.error(r.erro); })}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </li>
+        ))}
+        {proximos.length === 0 && <li className="px-5 py-2 text-sm text-texto-suave">Nenhum feriado futuro cadastrado.</li>}
+      </ul>
+      <form className="flex gap-2 border-t border-borda px-5 py-3" action={(form) => iniciar(async () => {
+        const r = await salvarFeriado({ data: String(form.get("data")), nome: String(form.get("nome")) });
+        if (r.ok) toast.success("Feriado salvo.");
+        else toast.error(r.erro);
+      })}>
+        <Entrada type="date" name="data" required className="h-9 w-40" />
+        <Entrada name="nome" placeholder="Nome" required className="h-9" />
+        <Botao type="submit" tamanho="sm" carregando={pendente}><Plus className="h-3.5 w-3.5" /> Adicionar</Botao>
+      </form>
     </Cartao>
   );
 }

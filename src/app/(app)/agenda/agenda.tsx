@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { CalendarDays, ChevronLeft, ChevronRight, List, MapPin, Plus } from "lucide-react";
 import { Botao, classeBotao } from "@/components/ui/botao";
-import { Selecao } from "@/components/ui/campos";
+import { Entrada, Selecao } from "@/components/ui/campos";
 import { Cartao } from "@/components/ui/cartao";
 import { Dialogo } from "@/components/ui/dialogo";
 import { Selo } from "@/components/ui/selo";
@@ -15,7 +15,7 @@ import { COR_TIPO, NOME_STATUS, type ItemAgenda, type TipoAtividade } from "@/li
 import { diaBR, horaBR, NOMES_DIA, NOMES_MES, somarDias } from "@/lib/datas";
 import type { MembroResumo } from "@/lib/crm";
 import { cn } from "@/lib/utils";
-import { mudarStatusAtividade } from "./acoes";
+import { mudarStatusAtividade, remarcarAtividade } from "./acoes";
 
 export function Agenda({
   mes, visao, de, ate, hoje, itens, completas, tipos, membros, negocios, usuarioId, ehDiretorComercial,
@@ -169,7 +169,7 @@ function Chip({ item, tipo, aoClicar }: { item: ItemAgenda; tipo?: TipoAtividade
   return (
     <button onClick={aoClicar} title={item.titulo}
       className={cn("block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-semibold",
-        COR_TIPO[tipo?.cor ?? "marca"], item.status === "cancelada" && "line-through opacity-50",
+        COR_TIPO[tipo?.cor ?? "marca"], (item.status === "cancelada" || item.status === "remarcada") && "line-through opacity-50",
         item.status === "pendente" && tipo?.exige_confirmacao && "ring-2 ring-destaque/60 ring-inset")}>
       {horaBR(item.inicio)} {item.titulo}
     </button>
@@ -183,6 +183,7 @@ function DetalheItem({
   ehDiretorComercial: boolean; aoFechar: () => void; aoEditar: () => void;
 }) {
   const [pendente, iniciar] = useTransition();
+  const [remarcando, setRemarcando] = useState(false);
   const mudar = (status: "confirmada" | "realizada" | "cancelada" | "pendente") =>
     iniciar(async () => {
       const r = await mudarStatusAtividade(item.id, status);
@@ -202,7 +203,7 @@ function DetalheItem({
           <>
             <p><strong>Responsável:</strong> {nome(item.responsavelId)}</p>
             {item.participantes.length > 0 && <p><strong>Participantes:</strong> {item.participantes.map(nome).join(", ")}</p>}
-            <p><strong>Situação:</strong> <Selo tom={item.status === "realizada" ? "sucesso" : item.status === "cancelada" ? "perigo" : item.status === "confirmada" ? "marca" : "destaque"}>{NOME_STATUS[item.status!]}</Selo></p>
+            <p><strong>Situação:</strong> <Selo tom={item.status === "realizada" ? "sucesso" : item.status === "cancelada" ? "perigo" : item.status === "confirmada" ? "marca" : item.status === "remarcada" ? "neutro" : "destaque"}>{NOME_STATUS[item.status!]}</Selo></p>
           </>
         )}
         {item.recorrente && (
@@ -211,8 +212,27 @@ function DetalheItem({
           </p>
         )}
       </div>
-      {podeEditar && (
+      {podeEditar && remarcando && (
+        <form className="mt-4 space-y-2 rounded-md border border-borda p-3" action={(form) => iniciar(async () => {
+          const r = await remarcarAtividade(item.id, String(form.get("novo_inicio") ?? ""), String(form.get("motivo") ?? "") || null);
+          if (!r.ok) return void toast.error(r.erro);
+          toast.success("Atividade remarcada. A data original fica registrada.");
+          aoFechar();
+        })}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-texto-suave">Nova data e hora</p>
+          <Entrada type="datetime-local" name="novo_inicio" required />
+          <Entrada name="motivo" placeholder="Motivo da remarcação (opcional)" />
+          <div className="flex justify-end gap-2">
+            <Botao type="button" variante="fantasma" onClick={() => setRemarcando(false)}>Voltar</Botao>
+            <Botao type="submit" carregando={pendente}>Remarcar</Botao>
+          </div>
+        </form>
+      )}
+      {podeEditar && !remarcando && item.status !== "remarcada" && (
         <div className="mt-5 flex flex-wrap justify-end gap-2">
+          {!item.recorrente && (item.status === "pendente" || item.status === "confirmada") && (
+            <Botao variante="secundario" onClick={() => setRemarcando(true)}>Remarcar</Botao>
+          )}
           {item.status === "pendente" && <Botao variante="secundario" carregando={pendente} onClick={() => mudar("confirmada")}>Confirmar</Botao>}
           {item.status !== "realizada" && item.status !== "cancelada" && <Botao variante="secundario" carregando={pendente} onClick={() => mudar("realizada")}>Marcar como realizada</Botao>}
           {item.status !== "cancelada" && <Botao variante="fantasma" carregando={pendente} onClick={() => mudar("cancelada")}>Cancelar</Botao>}

@@ -20,6 +20,7 @@ export const NOME_STATUS: Record<StatusAtividade, string> = {
   pendente: "Pendente",
   confirmada: "Confirmada",
   realizada: "Realizada",
+  remarcada: "Remarcada",
   cancelada: "Cancelada",
 };
 

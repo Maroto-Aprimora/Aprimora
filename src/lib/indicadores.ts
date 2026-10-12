@@ -177,6 +177,8 @@ export function calcularIndicadores(d: DadosComerciais, responsavel?: string | n
   const atividadesPeriodo = d.atividades.filter((a) => !responsavel || a.responsavel_id === responsavel);
   const porTipo = new Map<string, { realizadas: number; agendadas: number; canceladas: number }>();
   for (const a of atividadesPeriodo) {
+    // A remarcada é substituída pela atividade na data nova; contar as duas duplicaria o agendamento
+    if (a.status === "remarcada") continue;
     const k = nomeTipo.get(a.tipo_id) ?? "Outro";
     if (!porTipo.has(k)) porTipo.set(k, { realizadas: 0, agendadas: 0, canceladas: 0 });
     const l = porTipo.get(k)!;

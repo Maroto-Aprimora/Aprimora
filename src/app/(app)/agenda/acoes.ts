@@ -84,3 +84,16 @@ export async function excluirAtividade(id: string): Promise<Resultado> {
   revalidar(data[0].negocio_id);
   return { ok: true };
 }
+
+/** Remarca: a atividade atual fica "remarcada" (com a data original) e uma nova é criada na data nova. */
+export async function remarcarAtividade(id: string, novoInicio: string, motivo: string | null): Promise<Resultado> {
+  if (!novoInicio || novoInicio.length < 16) return { ok: false, erro: "Informe a nova data e hora." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("remarcar_atividade", {
+    _atividade: id, _novo_inicio: deHorarioLocal(novoInicio)!, ...(motivo?.trim() ? { _motivo: motivo.trim() } : {}),
+  });
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  const { data } = await supabase.from("atividades").select("negocio_id").eq("id", id).maybeSingle();
+  revalidar(data?.negocio_id);
+  return { ok: true };
+}

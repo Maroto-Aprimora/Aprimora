@@ -20,6 +20,8 @@ type Pedido = { negocioId: string; titulo: string; destino: Fase };
 export function useMoverNegocio(motivos: Motivo[], aoMover?: (negocioId: string, faseId: string) => void) {
   const router = useRouter();
   const [pedido, setPedido] = useState<Pedido | null>(null);
+  const [motivoId, setMotivoId] = useState("");
+  const exigeComentario = motivos.find((m) => m.id === motivoId)?.exige_comentario ?? false;
   const [pendente, iniciar] = useTransition();
 
   function executar(p: Pedido, extras: { motivoId?: string; motivoDetalhe?: string; retornoEm?: string; comentario?: string } = {}) {
@@ -29,6 +31,7 @@ export function useMoverNegocio(motivos: Motivo[], aoMover?: (negocioId: string,
         toast.success(`"${p.titulo}" movido para ${p.destino.nome}.`);
         aoMover?.(p.negocioId, p.destino.id);
         setPedido(null);
+        setMotivoId("");
       } else {
         toast.error(r.erro, {
           action: { label: "Abrir negócio", onClick: () => router.push(`/negocios/${p.negocioId}`) },
@@ -45,7 +48,7 @@ export function useMoverNegocio(motivos: Motivo[], aoMover?: (negocioId: string,
   }
 
   const dialogo = pedido && (
-    <Dialogo aberto aoFechar={() => setPedido(null)} titulo={`Mover para ${pedido.destino.nome}`} descricao={pedido.titulo}>
+    <Dialogo aberto aoFechar={() => { setPedido(null); setMotivoId(""); }} titulo={`Mover para ${pedido.destino.nome}`} descricao={pedido.titulo}>
       <form
         className="space-y-4"
         action={(form) =>
@@ -60,15 +63,15 @@ export function useMoverNegocio(motivos: Motivo[], aoMover?: (negocioId: string,
         {pedido.destino.exige_motivo && (
           <>
             <Campo rotulo="Motivo" obrigatorio>
-              <Selecao name="motivo" required defaultValue="">
+              <Selecao name="motivo" required value={motivoId} onChange={(e) => setMotivoId(e.target.value)}>
                 <option value="" disabled>Selecione…</option>
                 {motivos.filter((m) => m.tipo === pedido.destino.exige_motivo).map((m) => (
                   <option key={m.id} value={m.id}>{m.nome}</option>
                 ))}
               </Selecao>
             </Campo>
-            <Campo rotulo="Detalhe do motivo">
-              <AreaTexto name="motivo_detalhe" placeholder="O que aconteceu? Isso ajuda a melhorar o processo." />
+            <Campo rotulo={exigeComentario ? "Comentário sobre o motivo" : "Detalhe do motivo"} obrigatorio={exigeComentario}>
+              <AreaTexto name="motivo_detalhe" required={exigeComentario} placeholder="O que aconteceu? Isso ajuda a melhorar o processo." />
             </Campo>
           </>
         )}
@@ -81,7 +84,7 @@ export function useMoverNegocio(motivos: Motivo[], aoMover?: (negocioId: string,
           <Entrada name="comentario" placeholder="Fica registrado no histórico" />
         </Campo>
         <div className="flex justify-end gap-2">
-          <Botao type="button" variante="secundario" onClick={() => setPedido(null)}>Cancelar</Botao>
+          <Botao type="button" variante="secundario" onClick={() => { setPedido(null); setMotivoId(""); }}>Cancelar</Botao>
           <Botao type="submit" carregando={pendente}>Mover</Botao>
         </div>
       </form>

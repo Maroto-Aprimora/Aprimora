@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
+import { deHorarioLocal } from "@/lib/datas";
 import { mensagemDeErro } from "@/lib/erros";
 
 export type Resultado<T = undefined> = { ok: true; dados?: T } | { ok: false; erro: string };
@@ -57,6 +58,7 @@ export async function salvarNegocio(
   dados: Record<string, unknown>,
   servicos: string[],
   participantes: string[],
+  valoresServicos: Record<string, number | null> = {},
 ): Promise<Resultado> {
   const v = esquemaNegocio.safeParse(dados);
   if (!v.success) return { ok: false, erro: v.error.issues[0].message };
@@ -74,14 +76,23 @@ export async function salvarNegocio(
   const novosPart = participantes.filter((p) => !partAtuais.has(p));
   const remPart = [...partAtuais].filter((p) => !participantes.includes(p));
 
+  const valorDe = (id: string) => {
+    const x = valoresServicos[id];
+    return x == null || Number.isNaN(x) || x < 0 ? null : x;
+  };
   const ops = [];
-  if (novosServ.length) ops.push(supabase.from("negocio_servicos").insert(novosServ.map((servico_id) => ({ negocio_id: negocioId, servico_id }))));
+  if (novosServ.length) ops.push(supabase.from("negocio_servicos").insert(novosServ.map((servico_id) => ({ negocio_id: negocioId, servico_id, valor: valorDe(servico_id) }))));
+  for (const id of servicos.filter((x) => servAtuais.has(x)))
+    ops.push(supabase.from("negocio_servicos").update({ valor: valorDe(id) }).eq("negocio_id", negocioId).eq("servico_id", id));
   if (remServ.length) ops.push(supabase.from("negocio_servicos").delete().eq("negocio_id", negocioId).in("servico_id", remServ));
   if (novosPart.length) ops.push(supabase.from("negocio_participantes").insert(novosPart.map((membro_id) => ({ negocio_id: negocioId, membro_id }))));
   if (remPart.length) ops.push(supabase.from("negocio_participantes").delete().eq("negocio_id", negocioId).in("membro_id", remPart));
   for (const r of await Promise.all(ops)) if (r.error) return { ok: false, erro: mensagemDeErro(r.error) };
 
-  const { data, error } = await supabase.from("negocios").update(v.data).eq("id", negocioId).select("id");
+  // Com valor por serviço, o valor do negócio é a soma (gatilho somar_valor_servicos) e não vem do formulário
+  const { valor, ...resto } = v.data;
+  const somaPorServico = servicos.some((id) => valorDe(id) != null);
+  const { data, error } = await supabase.from("negocios").update(somaPorServico ? resto : { ...resto, valor }).eq("id", negocioId).select("id");
   if (error) return { ok: false, erro: mensagemDeErro(error) };
   if (!data?.length) return { ok: false, erro: "Você não tem permissão para editar este negócio." };
 
@@ -132,4 +143,39 @@ export async function criarNegocio(dados: z.input<typeof esquemaNovoNegocio>): P
   if (error) return { ok: false, erro: mensagemDeErro(error) };
   revalidarCrm(data.id);
   return { ok: true, dados: { id: data.id } };
+}
+
+const esquemaLigacao = z.object({
+  negocio_id: z.string().uuid(),
+  resultado_id: z.string().uuid("Escolha o resultado da ligação."),
+  contato_id: uuidOpcional,
+  duracao_min: z.preprocess((v) => (v === "" || v == null ? null : Number(String(v).replace(",", "."))),
+    z.number().nonnegative("Duração inválida.").max(600).nullable()),
+  retorno_em: dataOpcional,
+  compromisso_em: z.preprocess(vazioParaNulo, z.string().min(16).nullable().optional()),
+  decisor_nome: textoOpcional,
+  decisor_melhor_horario: textoOpcional,
+  proximo_passo: textoOpcional,
+  comentario: textoOpcional,
+});
+
+/** Registra uma ligação. A ação do resultado (fase, retorno, tarefa, agenda) é aplicada pelo banco. */
+export async function registrarLigacao(dados: Record<string, unknown>): Promise<Resultado> {
+  const v = esquemaLigacao.safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const { duracao_min, compromisso_em, ...resto } = v.data;
+  const supabase = await criarClienteServidor();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, erro: "Sessão expirada. Entre de novo." };
+  const { error } = await supabase.from("ligacoes").insert({
+    ...resto,
+    membro_id: user.id,
+    duracao_seg: duracao_min == null ? null : Math.round(duracao_min * 60),
+    compromisso_em: deHorarioLocal(compromisso_em ?? null),
+  });
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  revalidarCrm(v.data.negocio_id);
+  revalidatePath("/tarefas");
+  revalidatePath("/agenda");
+  return { ok: true };
 }

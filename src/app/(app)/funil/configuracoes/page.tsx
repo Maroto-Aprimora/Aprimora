@@ -6,22 +6,31 @@ import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { NOME_AREA } from "@/lib/crm";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
-import { CamposDaFase, LinhaFase, ListaSimples } from "./componentes";
+import { CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm } from "./componentes";
 
 export const metadata: Metadata = { title: "Configurações do funil" };
+
+/** Mostra a regra automática de cada motivo ao lado do nome. */
+const comRegra = <T extends { exige_comentario: boolean; marca_nao_contatar: boolean }>(m: T) => ({
+  ...m, detalhe: m.exige_comentario ? "comentário obrigatório" : m.marca_nao_contatar ? "marca “não contatar”" : undefined,
+});
 
 export default async function PaginaConfiguracoes() {
   const usuario = await obterUsuario();
   if (!usuario.ehDiretorDe("comercial")) redirect("/funil");
   const supabase = await criarClienteServidor();
   const { data: funil } = await supabase.from("funis").select("id").eq("diretoria", "comercial").eq("chave", "comercial").single();
-  const [{ data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos }] = await Promise.all([
+  const [{ data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos },
+    { data: resultados }, { data: tiposAtividade }, { data: feriados }] = await Promise.all([
     supabase.from("fases").select("*").eq("funil_id", funil!.id).is("excluida_em", null).order("ordem"),
     supabase.from("fase_campos").select("*").order("ordem"),
     supabase.from("motivos").select("*").eq("diretoria", "comercial").order("ordem"),
     supabase.from("origens").select("*").eq("diretoria", "comercial").order("ordem"),
     supabase.from("segmentos").select("*").eq("diretoria", "comercial").order("nome"),
     supabase.from("servicos").select("*").eq("diretoria", "comercial").order("ordem"),
+    supabase.from("resultados_ligacao").select("*").eq("diretoria", "comercial").order("ordem"),
+    supabase.from("tipos_atividade").select("id, nome").eq("diretoria", "comercial").eq("ativo", true).eq("ligada_a_lead", true).order("ordem"),
+    supabase.from("feriados").select("*").order("data"),
   ]);
   const listaFases = fases ?? [];
   // Quantos negócios estão em cada fase (para pedir o destino ao excluir)
@@ -71,11 +80,27 @@ export default async function PaginaConfiguracoes() {
         </div>
       </Cartao>
 
+      <Cartao className="mb-6">
+        <CabecalhoCartao titulo="Resultados de ligação"
+          descricao="Lista fechada usada no registro de cada ligação. Define o que acontece com o card e qual tarefa o responsável recebe. Um card só avança de fase (nunca volta) e negócios encerrados não são reabertos." />
+        <div className="divide-y divide-borda">
+          {(resultados ?? []).map((r) => (
+            <ResultadoLigacaoForm key={r.id} resultado={r} tiposAtividade={tiposAtividade ?? []}
+              fases={listaFases.map((f) => ({ id: f.id, nome: f.nome, exige_motivo: f.exige_motivo }))}
+              motivos={(motivos ?? []).filter((m) => m.ativo).map((m) => ({ id: m.id, nome: m.nome, tipo: m.tipo }))} />
+          ))}
+          <ResultadoLigacaoForm resultado={null} tiposAtividade={tiposAtividade ?? []}
+            fases={listaFases.map((f) => ({ id: f.id, nome: f.nome, exige_motivo: f.exige_motivo }))}
+            motivos={(motivos ?? []).filter((m) => m.ativo).map((m) => ({ id: m.id, nome: m.nome, tipo: m.tipo }))} />
+        </div>
+      </Cartao>
+
       <div className="grid gap-6 lg:grid-cols-2">
-        <ListaSimples titulo="Motivos de perda" tabela="motivos" extra={{ tipo: "perda" }} itens={(motivos ?? []).filter((m) => m.tipo === "perda")} />
-        <ListaSimples titulo="Motivos de desqualificação" tabela="motivos" extra={{ tipo: "desqualificacao" }} itens={(motivos ?? []).filter((m) => m.tipo === "desqualificacao")} />
+        <ListaSimples titulo="Motivos de perda" tabela="motivos" extra={{ tipo: "perda" }} itens={(motivos ?? []).filter((m) => m.tipo === "perda").map(comRegra)} />
+        <ListaSimples titulo="Motivos de desqualificação" tabela="motivos" extra={{ tipo: "desqualificacao" }} itens={(motivos ?? []).filter((m) => m.tipo === "desqualificacao").map(comRegra)} />
         <ListaSimples titulo="Origens de lead" tabela="origens" itens={origens ?? []} />
         <ListaSimples titulo="Segmentos" tabela="segmentos" itens={segmentos ?? []} />
+        <ListaFeriados feriados={feriados ?? []} />
         <ListaSimples
           titulo="Serviços (Carta de Serviços)"
           tabela="servicos"
