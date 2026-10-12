@@ -9,7 +9,7 @@ remarcação, valor por serviço, tarefas e cadência, e a comparação dos indi
 
 ## Preparação
 
-1. Rodar `supabase/dados/dados_ficticios.sql` e `supabase/dados/historico_ficticio.sql` no SQL Editor do Supabase.
+1. Carregar os dados com `supabase/dados/carga_roteiro_fase0.sql` (feito em 12/10/2026: 50 empresas e negócios, distribuídos entre os membros do Comercial).
 2. Garantir que pelo menos um assessor de teste participa do rodízio (Membros → rodízio).
 
 ## Roteiro

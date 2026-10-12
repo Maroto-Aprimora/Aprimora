@@ -58,7 +58,7 @@ insert into public.negocios (funil_id, empresa_id, contato_id, titulo, fase_id, 
 select fa.funil_id, em.id, (select c.id from public.contatos c where c.empresa_id = em.id limit 1), em.nome, fa.id,
   case when fa.chave in ('oportunidade','diagnostico','escopo','proposta','ganho','nao_vendido')
        then (array[4500, 6800, 8000, 9500, 12000, 15000, 18000])[1 + (em.pos::int % 7)] end,
-  (select o.id from public.origens o where o.ordem = 1 + (em.pos::int % 7)),
+  (select o.id from public.origens o where o.ativo and o.ordem = 1 + (em.pos::int % 7)),
   case
     when fa.chave = 'oportunidade' then '{"qual_oportunidade":"Pediu proposta de mapeamento de processos"}'::jsonb
     when fa.chave = 'retornar' then jsonb_build_object('retornar_em', (current_date + 20)::text, 'retorna_para_decisor', 'Sócio-proprietário')
@@ -69,8 +69,8 @@ select fa.funil_id, em.id, (select c.id from public.contatos c where c.empresa_i
       'data_apresentacao', (current_date - (em.pos::int % 10))::text)
     else '{}'::jsonb end,
   case fa.chave
-    when 'nao_vendido' then (select m.id from public.motivos m where m.tipo = 'perda' order by m.ordem limit 1 offset (em.pos::int % 3))
-    when 'nao_qualificado' then (select m.id from public.motivos m where m.tipo = 'desqualificacao' order by m.ordem limit 1 offset (em.pos::int % 3))
+    when 'nao_vendido' then (select m.id from public.motivos m where m.ativo and m.tipo = 'perda' order by m.ordem limit 1 offset (em.pos::int % 3))
+    when 'nao_qualificado' then (select m.id from public.motivos m where m.ativo and m.tipo = 'desqualificacao' order by m.ordem limit 1 offset (em.pos::int % 3))
   end,
   case when fa.chave = 'reciclagem' then current_date + 30 end,
   true
