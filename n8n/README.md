@@ -90,7 +90,7 @@ Ajuste em `deploy.resources.limits` conforme a folga do VPS.
 5. **Credenciais** (Settings → Credentials): *Google Drive OAuth2* e *Gmail OAuth2* na conta Google da Aprimora,
    com a URL de retorno `https://<endereço>/rest/oauth2-credential/callback`; o Gemini e o portal usam as variáveis.
 6. **Importar** os fluxos de `fluxos/` e definir **Sistema · Tratamento de erros** como *Error workflow* dos outros.
-7. **Ativar** os fluxos só depois que as rotas `/api/n8n/*` do portal estiverem publicadas.
+7. **Publicar** (botão *Publish*; no n8n 2.x substitui o interruptor *Active*) os fluxos só depois que as rotas `/api/n8n/*` do portal estiverem no ar.
 
 ## Contrato com o portal
 
