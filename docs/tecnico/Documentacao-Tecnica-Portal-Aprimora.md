@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.1 |
+| Versão do documento | 1.2 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -101,7 +101,7 @@ Pipefy) e foi estruturado para receber as demais diretorias.
 | Comercial | Funil (kanban), Empresas e leads, Negócio, Anexos | EM PRODUÇÃO |
 | Comercial | Painel comercial (indicadores), Exportação xlsx/csv, Metas (automáticas e manuais) | EM PRODUÇÃO |
 | Comercial | Configurações do funil (fases, SLA, campos, cadastros auxiliares) | EM PRODUÇÃO |
-| Projetos, Marketing | Telas próprias | NÃO IMPLEMENTADO (aparecem como "Em breve") |
+| Projetos, Marketing | Telas próprias | FORA DO ESCOPO da v2 (diretorias mantidas no banco, sem telas) |
 | Integrações | n8n (ligações API4COM + Gemini + Drive; cadência de e-mail Gmail) | PRONTO, NÃO INSTALADO |
 | Integrações | Importação de dados do Pipefy | NÃO IMPLEMENTADO |
 
@@ -397,13 +397,16 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 
 # 9. Módulos funcionais
 
-Menu lateral (`src/components/app/menu-lateral.tsx`): **Painel, Agenda, Tarefas** (gerais) e seções retráteis por
-diretoria (Presidência, Vice-Presidência, Projetos, Comercial, Marketing). O menu recolhe para uma barra de ícones
+Menu lateral (`src/components/app/menu-lateral.tsx`): **Início, Agenda, Tarefas** (gerais) e seções retráteis:
+Comercial, Vice-Presidência (Membros, Pontuação, Painel geral) e Presidência (Auditoria, só diretores). Desde a v2 o
+portal é exclusivo do Comercial: Projetos e Marketing não aparecem no menu (as diretorias continuam no banco, sem
+evolução). Grupos sem itens não são exibidos. O menu recolhe para uma barra de ícones
 (preferência no `localStorage`). O sino de notificações fica no canto superior direito.
 
 | Código | Rota | Quem acessa | Funcionalidade | Status |
 |---|---|---|---|---|
-| F-GER-01 | `/painel` | todos | Painel geral: hoje na agenda, próximas R.I/R.G, minhas tarefas, minha pontuação, projetos ativos (aguarda Projetos) e um cartão por diretoria | EM PRODUÇÃO |
+| F-GER-01 | `/painel` | todos | **Início**: minhas tarefas e minha agenda de hoje (a fila do dia completa chega no PR 5 da Fase 0) | EM PRODUÇÃO |
+| F-GER-06 | `/vice-presidencia/painel-geral` | todos | Painel geral da v1 (agenda, R.I/R.G, tarefas, pontuação, cartões da Vice-Presidência e do Comercial), mantido para comparação; sem cartões "Em breve" | EM PRODUÇÃO |
 | F-GER-02 | `/agenda` | todos | Visão mês/lista, filtro por pessoa, criar/editar atividades, confirmar/realizar/cancelar; reuniões recorrentes somente leitura | EM PRODUÇÃO |
 | F-GER-03 | `/agenda/configuracoes` | diretores | Reuniões recorrentes (dia, horário, local, vigência) e tipos de atividade (cor, exige confirmação, ligada a lead) | EM PRODUÇÃO |
 | F-GER-04 | `/tarefas` | todos | Tarefas de todas as diretorias; diretor cria/edita/exclui; responsável muda o andamento; filtros | EM PRODUÇÃO |
@@ -584,7 +587,7 @@ trabalho, então trocar o n8n de servidor não exige mudar o portal.
 | L6 | Push só em produção | Não dá para testar push nas pré-visualizações | Aceitável |
 | L7 | Fuso fixo UTC−3 | Erra se o Brasil voltar a ter horário de verão | Usar `Intl` com `America/Sao_Paulo` em todo cálculo |
 | L8 | Integrações (n8n, API4COM, Gmail, Drive, Gemini) sem as rotas `/api/n8n/*` no portal | Ligações e cadência de e-mail ainda manuais | Implementar o contrato da Seção 12 |
-| L9 | Áreas de Projetos e Marketing sem telas | Painel geral mostra "Em breve" | Escopo de cada diretoria |
+| L9 | Áreas de Projetos e Marketing sem telas | Fora do escopo da v2 (PE-PA-002) | — |
 | L10 | Slug da Vice-Presidência continua `rh` | Só cosmético no código | Manter (trocar exige migrar referências) |
 | L11 | Proteção contra senhas vazadas desativada | Senhas fracas conhecidas são aceitas | Plano pago do Supabase |
 | L12 | Regras da pontuação incompletas (zerar por semestre, ações ao atingir 6 e 12) | Total acumula indefinidamente | Definir com a Vice-Presidência |
@@ -630,7 +633,8 @@ Escopo v1.0 (Seção 14).
 | F-GER-04 | Tarefas | 2 | EM PRODUÇÃO | `/tarefas` |
 | F-GER-05 | Notificações no app e push | 2 | EM PRODUÇÃO | sino, `/api/push` |
 | F-VP-03 | Transferência de carteira | 2 | EM PRODUÇÃO | `transferir_carteira` |
-| F-GER-01 | Painel geral por diretoria | 2b | EM PRODUÇÃO | `/painel` |
+| F-GER-01 | Início (Minhas tarefas) | v2 F0 | PARCIAL (fila do dia no PR 5) | `/painel` |
+| F-GER-06 | Painel geral da v1 (comparação) | 2b | EM PRODUÇÃO | `/vice-presidencia/painel-geral` |
 | F-VP-02 | Pontuação | 2b | EM PRODUÇÃO (regras L12 pendentes) | `/vice-presidencia/pontuacao` |
 | F-COM-01 | Indicadores do funil e atividades da equipe | 3 | EM PRODUÇÃO | `/comercial` |
 | F-COM-02 | Exportação xlsx/csv | 3 | EM PRODUÇÃO | `/comercial/exportar` |
@@ -650,6 +654,7 @@ Escopo v1.0 (Seção 14).
 |---|---|---|
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
+| 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
 
 **Manutenção:** ao mesclar mudanças relevantes, atualize as seções afetadas, a matriz (Seção 18) e este histórico.
 A fonte deste documento é `docs/tecnico/Documentacao-Tecnica-Portal-Aprimora.md`.

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
-  BarChart3, Building2, CalendarDays, ChevronDown, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
+  BarChart3, Building2, CalendarDays, ChevronDown, Gauge, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
   Settings, Target, Trophy, Users, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,21 +26,18 @@ export type DadosMenu = {
   diretorDe: string[];
 };
 
-/** Seções gerais (de toda a Aprimora) e as seções de cada diretoria. */
+/**
+ * Menu da v2 (portal exclusivo do Comercial): seções gerais, o Comercial e o que permanece das outras diretorias
+ * (Membros, Pontuação, Painel geral e Auditoria). Projetos e Marketing não têm telas.
+ */
 function montarMenu({ ehDiretor, diretorDe }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
   return {
     gerais: [
-      { href: "/painel", rotulo: "Painel", icone: LayoutDashboard },
+      { href: "/painel", rotulo: "Início", icone: LayoutDashboard },
       { href: "/agenda", rotulo: "Agenda", icone: CalendarDays },
       { href: "/tarefas", rotulo: "Tarefas", icone: ListChecks },
     ],
     grupos: [
-      { slug: "presidencia", itens: ehDiretor ? [{ href: "/auditoria", rotulo: "Auditoria", icone: History }] : [] },
-      { slug: "rh", itens: [
-        { href: "/membros", rotulo: "Membros", icone: Users },
-        { href: "/vice-presidencia/pontuacao", rotulo: "Pontuação", icone: Trophy },
-      ] },
-      { slug: "projetos", itens: [] },
       { slug: "comercial", itens: [
         { href: "/comercial", rotulo: "Painel comercial", icone: BarChart3 },
         { href: "/funil", rotulo: "Funil", icone: KanbanSquare },
@@ -48,8 +45,13 @@ function montarMenu({ ehDiretor, diretorDe }: DadosMenu): { gerais: Item[]; grup
         { href: "/metas", rotulo: "Metas", icone: Target },
         ...(diretorDe.includes("comercial") ? [{ href: "/funil/configuracoes", rotulo: "Config. do funil", icone: Settings }] : []),
       ] },
-      { slug: "marketing", itens: [] },
-    ],
+      { slug: "rh", itens: [
+        { href: "/membros", rotulo: "Membros", icone: Users },
+        { href: "/vice-presidencia/pontuacao", rotulo: "Pontuação", icone: Trophy },
+        { href: "/vice-presidencia/painel-geral", rotulo: "Painel geral", icone: Gauge },
+      ] },
+      { slug: "presidencia", itens: ehDiretor ? [{ href: "/auditoria", rotulo: "Auditoria", icone: History }] : [] },
+    ].filter((g) => g.itens.length > 0),
   };
 }
 
@@ -175,11 +177,9 @@ export function MenuLateral(dados: DadosMenu) {
                   <ChevronDown className={cn("h-4 w-4 transition-transform", !estaAberto && "-rotate-90")} />
                 </button>
                 {/* Recolhido: separador com o nome da diretoria no "title" e todos os ícones visíveis */}
-                {recolhido && g.itens.length > 0 && <div className="mx-2 my-2 hidden h-px bg-white/10 lg:block" title={nomeDe(g.slug)} />}
+                {recolhido && <div className="mx-2 my-2 hidden h-px bg-white/10 lg:block" title={nomeDe(g.slug)} />}
                 <div className={cn("space-y-1 pb-1", !estaAberto && (recolhido ? "hidden lg:block" : "hidden"))}>
-                  {g.itens.length
-                    ? g.itens.map((i) => linkItem(i, true))
-                    : <p className={cn("py-1.5 pl-6 text-xs italic text-menu-texto/60", so("lg:hidden"))}>Em breve</p>}
+                  {g.itens.map((i) => linkItem(i, true))}
                 </div>
               </div>
             );
