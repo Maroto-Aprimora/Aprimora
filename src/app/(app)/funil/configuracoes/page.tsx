@@ -6,7 +6,7 @@ import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { NOME_AREA } from "@/lib/crm";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
-import { CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm } from "./componentes";
+import { Cadencia, CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm } from "./componentes";
 
 export const metadata: Metadata = { title: "Configurações do funil" };
 
@@ -21,7 +21,7 @@ export default async function PaginaConfiguracoes() {
   const supabase = await criarClienteServidor();
   const { data: funil } = await supabase.from("funis").select("id").eq("diretoria", "comercial").eq("chave", "comercial").single();
   const [{ data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos },
-    { data: resultados }, { data: tiposAtividade }, { data: feriados }] = await Promise.all([
+    { data: resultados }, { data: tiposAtividade }, { data: feriados }, { data: passos }, { data: parametros }] = await Promise.all([
     supabase.from("fases").select("*").eq("funil_id", funil!.id).is("excluida_em", null).order("ordem"),
     supabase.from("fase_campos").select("*").order("ordem"),
     supabase.from("motivos").select("*").eq("diretoria", "comercial").order("ordem"),
@@ -31,6 +31,8 @@ export default async function PaginaConfiguracoes() {
     supabase.from("resultados_ligacao").select("*").eq("diretoria", "comercial").order("ordem"),
     supabase.from("tipos_atividade").select("id, nome").eq("diretoria", "comercial").eq("ativo", true).eq("ligada_a_lead", true).order("ordem"),
     supabase.from("feriados").select("*").order("data"),
+    supabase.from("cadencia_passos").select("*").eq("diretoria", "comercial").order("dia"),
+    supabase.from("parametros_comercial").select("*").eq("diretoria", "comercial").maybeSingle(),
   ]);
   const listaFases = fases ?? [];
   // Quantos negócios estão em cada fase (para pedir o destino ao excluir)
@@ -79,6 +81,8 @@ export default async function PaginaConfiguracoes() {
           ))}
         </div>
       </Cartao>
+
+      <Cadencia passos={passos ?? []} parametros={parametros} />
 
       <Cartao className="mb-6">
         <CabecalhoCartao titulo="Resultados de ligação"

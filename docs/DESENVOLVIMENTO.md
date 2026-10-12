@@ -140,6 +140,10 @@ precisa ativar de novo). As pré-visualizações têm proteção da Vercel, ent�
 | "Outro" exige comentário; "Pediu para não ser contatado" marca `nao_contatar` | `motivos.exige_comentario`, `motivos.marca_nao_contatar` |
 | Remarcar: a original fica `remarcada` (com a data original) e nasce outra na data nova | `public.remarcar_atividade` |
 | Valor por serviço: com algum valor preenchido, o valor do negócio é a soma | gatilho `somar_valor_servicos` |
+| Cadência: D0 = entrada em E-mail; cada toque de `cadencia_passos` vira tarefa no dia (dias corridos, ajustados para dia útil) | `privado.gerar_tarefas_diarias()` via pg_cron às 07h30 (Brasília) |
+| D21 sem contato efetivo (ligação cujo resultado não é só tentativa) → Reciclagem com retorno em 90 dias | idem; prazos em `parametros_comercial` |
+| Follow-up ao entrar em Oportunidade; "Retomar contato" ao voltar da Reciclagem | gatilho `tarefas_ao_mudar_fase` em `negocio_historico` |
+| Tarefa pessoal: qualquer membro cria para si (origem `manual`, `criado_por` = ele) e só ele é responsável | RLS de `tarefas`/`tarefa_responsaveis`, `privado.tarefa_pessoal` |
 
 **Testes de banco locais.** Há um Postgres 16 no ambiente de desenvolvimento. As migrações são testadas antes num
 banco local com imitações mínimas do Supabase (`auth.uid()`, `cron`, `net`, `storage`) e com roteiros de dados

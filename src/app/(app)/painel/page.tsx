@@ -5,28 +5,47 @@ import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
 import { COR_TIPO } from "@/lib/agenda";
 import { hojeBR, horaBR, somarDias } from "@/lib/datas";
-import { formatarData } from "@/lib/formatar";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
 import { cn } from "@/lib/utils";
+import { LinhaFila, type ItemFila } from "./fila";
 
 export const metadata: Metadata = { title: "Início" };
 
-/** Início: o dia de quem está logado (agenda e tarefas). A fila completa do dia chega no PR 5 da Fase 0. */
+/**
+ * Início (Minhas tarefas), PE-PA-002 Seção 6: a fila do dia de quem está logado — tarefas do diretor, do sistema
+ * e dos agentes —, com ações em um toque, e os compromissos de hoje.
+ */
 export default async function PaginaInicio() {
   const [usuario, supabase] = await Promise.all([obterUsuario(), criarClienteServidor()]);
   const hoje = hojeBR();
+  const limiteProximos = somarDias(hoje, 7);
   const inicioHoje = new Date(`${hoje}T00:00:00-03:00`).toISOString();
   const inicioAmanha = new Date(`${somarDias(hoje, 1)}T00:00:00-03:00`).toISOString();
 
-  const [{ data: atividadesHoje }, { data: tarefas }, { data: tipos }] = await Promise.all([
+  const [{ data: atividadesHoje }, { data: tarefas }, { data: tipos }, { data: resultados }] = await Promise.all([
     supabase.from("atividades").select("id, titulo, inicio, tipo_id, responsavel_id, negocio_id, status, atividade_participantes(membro_id)")
-      .gte("inicio", inicioHoje).lt("inicio", inicioAmanha).neq("status", "cancelada").order("inicio"),
-    supabase.from("tarefas").select("id, titulo, prazo, status, negocio_id, tarefa_responsaveis!inner(membro_id)")
+      .gte("inicio", inicioHoje).lt("inicio", inicioAmanha).in("status", ["pendente", "confirmada", "realizada"]).order("inicio"),
+    supabase.from("tarefas")
+      .select("id, titulo, descricao, prazo, prioridade, origem, tarefa_responsaveis!inner(membro_id), negocios(id, titulo, contato_id, encerrado_em)")
       .eq("tarefa_responsaveis.membro_id", usuario.id).neq("status", "concluida")
-      .order("prazo", { ascending: true, nullsFirst: false }).limit(50),
+      .order("prazo", { ascending: true, nullsFirst: false }).order("prioridade", { ascending: false }).limit(200),
     supabase.from("tipos_atividade").select("id, cor"),
+    supabase.from("resultados_ligacao").select("*").eq("diretoria", "comercial").eq("ativo", true).order("ordem"),
   ]);
+
+  const fila: ItemFila[] = (tarefas ?? []).map((t) => ({
+    id: t.id, titulo: t.titulo, descricao: t.descricao, prazo: t.prazo, prioridade: t.prioridade, origem: t.origem,
+    negocio: t.negocios ? { id: t.negocios.id, titulo: t.negocios.titulo, contatoId: t.negocios.contato_id, aberto: !t.negocios.encerrado_em } : null,
+  }));
+  const grupos: { titulo: string; itens: ItemFila[]; tom?: "perigo" }[] = [
+    { titulo: "Atrasadas", itens: fila.filter((t) => t.prazo && t.prazo < hoje), tom: "perigo" },
+    { titulo: "Hoje", itens: fila.filter((t) => t.prazo === hoje) },
+    { titulo: "Próximos 7 dias", itens: fila.filter((t) => t.prazo && t.prazo > hoje && t.prazo <= limiteProximos) },
+    { titulo: "Sem prazo", itens: fila.filter((t) => !t.prazo) },
+  ];
+  const depois = fila.filter((t) => t.prazo && t.prazo > limiteProximos).length;
+  const paraHoje = grupos[0].itens.length + grupos[1].itens.length;
 
   const minhasAtividades = (atividadesHoje ?? []).filter((a) =>
     a.responsavel_id === usuario.id || a.atividade_participantes.some((p) => p.membro_id === usuario.id));
@@ -34,31 +53,34 @@ export default async function PaginaInicio() {
 
   return (
     <>
-      <TituloPagina titulo={`Olá, ${usuario.nome.split(" ")[0]}!`} descricao="Suas tarefas e compromissos de hoje." />
+      <TituloPagina
+        titulo={`Olá, ${usuario.nome.split(" ")[0]}!`}
+        descricao={paraHoje ? `${paraHoje} ${paraHoje === 1 ? "tarefa" : "tarefas"} para hoje.` : "Nada pendente para hoje."}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Cartao>
-          <CabecalhoCartao titulo="Minhas tarefas" acoes={<LinkCartao href="/tarefas" icone={ListChecks}>Tarefas</LinkCartao>} />
-          <ul className="divide-y divide-borda">
-            {(tarefas ?? []).map((t) => {
-              const atrasada = t.prazo && t.prazo < hoje;
-              return (
-                <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-                  {t.negocio_id ? <Link href={`/negocios/${t.negocio_id}`} className="min-w-0 truncate hover:text-destaque">{t.titulo}</Link>
-                    : <span className="min-w-0 truncate">{t.titulo}</span>}
-                  {t.prazo ? (
-                    <Selo tom={atrasada ? "perigo" : t.prazo === hoje ? "destaque" : "neutro"}>
-                      {atrasada ? "Atrasada" : t.prazo === hoje ? "Vence hoje" : formatarData(t.prazo)}
-                    </Selo>
-                  ) : <Selo>Sem prazo</Selo>}
-                </li>
-              );
-            })}
-            {(tarefas ?? []).length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhuma tarefa aberta com você.</li>}
-          </ul>
+          <CabecalhoCartao titulo="Minhas tarefas" acoes={<LinkCartao href="/tarefas" icone={ListChecks}>Todas</LinkCartao>} />
+          {grupos.filter((g) => g.itens.length > 0).map((g) => (
+            <section key={g.titulo}>
+              <h2 className={cn("border-y border-borda bg-superficie-2 px-5 py-1.5 text-xs font-bold uppercase tracking-wider",
+                g.tom === "perigo" ? "text-perigo" : "text-texto-suave")}>
+                {g.titulo} · {g.itens.length}
+              </h2>
+              <ul className="divide-y divide-borda">
+                {g.itens.map((t) => <LinhaFila key={t.id} item={t} hoje={hoje} resultados={resultados ?? []} />)}
+              </ul>
+            </section>
+          ))}
+          {fila.length === 0 && <p className="px-5 py-6 text-sm text-texto-suave">Nenhuma tarefa aberta com você.</p>}
+          {depois > 0 && (
+            <p className="border-t border-borda px-5 py-3 text-sm text-texto-suave">
+              E mais {depois} com prazo depois de 7 dias. <Link href="/tarefas" className="font-semibold text-marca hover:text-destaque">Ver todas</Link>
+            </p>
+          )}
         </Cartao>
 
-        <Cartao>
+        <Cartao className="self-start">
           <CabecalhoCartao titulo="Hoje na agenda" acoes={<LinkCartao href="/agenda?pessoa=eu" icone={CalendarDays}>Agenda</LinkCartao>} />
           <ul className="divide-y divide-borda">
             {minhasAtividades.map((a) => (
@@ -68,9 +90,10 @@ export default async function PaginaInicio() {
                 {a.negocio_id ? <Link href={`/negocios/${a.negocio_id}`} className="min-w-0 flex-1 truncate hover:text-destaque">{a.titulo}</Link>
                   : <span className="min-w-0 flex-1 truncate">{a.titulo}</span>}
                 {a.status === "pendente" && <Selo>a confirmar</Selo>}
+                {a.status === "realizada" && <Selo tom="sucesso">realizada</Selo>}
               </li>
             ))}
-            {minhasAtividades.length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhuma atividade sua hoje.</li>}
+            {minhasAtividades.length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhum compromisso seu hoje.</li>}
           </ul>
         </Cartao>
       </div>

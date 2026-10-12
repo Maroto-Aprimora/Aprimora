@@ -257,6 +257,53 @@ export type Database = {
         }
         Relationships: []
       }
+      cadencia_passos: {
+        Row: {
+          ativo: boolean
+          canal: Database["public"]["Enums"]["canal_cadencia"]
+          created_at: string
+          descricao: string | null
+          dia: number
+          diretoria: string
+          id: string
+          so_sem_contato: boolean
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          canal: Database["public"]["Enums"]["canal_cadencia"]
+          created_at?: string
+          descricao?: string | null
+          dia: number
+          diretoria?: string
+          id?: string
+          so_sem_contato?: boolean
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          canal?: Database["public"]["Enums"]["canal_cadencia"]
+          created_at?: string
+          descricao?: string | null
+          dia?: number
+          diretoria?: string
+          id?: string
+          so_sem_contato?: boolean
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadencia_passos_diretoria_fkey"
+            columns: ["diretoria"]
+            isOneToOne: false
+            referencedRelation: "diretorias"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       contatos: {
         Row: {
           cargo: string | null
@@ -1264,6 +1311,35 @@ export type Database = {
           },
         ]
       }
+      parametros_comercial: {
+        Row: {
+          cadencia_dias_reciclagem: number
+          diretoria: string
+          reciclagem_retorno_dias: number
+          updated_at: string
+        }
+        Insert: {
+          cadencia_dias_reciclagem?: number
+          diretoria: string
+          reciclagem_retorno_dias?: number
+          updated_at?: string
+        }
+        Update: {
+          cadencia_dias_reciclagem?: number
+          diretoria?: string
+          reciclagem_retorno_dias?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parametros_comercial_diretoria_fkey"
+            columns: ["diretoria"]
+            isOneToOne: true
+            referencedRelation: "diretorias"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       pontuacoes: {
         Row: {
           cancelado_em: string | null
@@ -1919,6 +1995,7 @@ export type Database = {
     Enums: {
       acao_sla: "alertar" | "mover"
       area_servico: "negocios" | "producao" | "qualidade"
+      canal_cadencia: "email" | "ligacao"
       cargo: "diretor" | "assessor" | "trainee"
       macroetapa:
         | "prospeccao"
@@ -2084,6 +2161,7 @@ export const Constants = {
     Enums: {
       acao_sla: ["alertar", "mover"],
       area_servico: ["negocios", "producao", "qualidade"],
+      canal_cadencia: ["email", "ligacao"],
       cargo: ["diretor", "assessor", "trainee"],
       macroetapa: [
         "prospeccao",

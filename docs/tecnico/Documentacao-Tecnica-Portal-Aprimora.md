@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.3 |
+| Versão do documento | 1.4 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -278,7 +278,7 @@ Resumo das regras:
 | Histórico de negócio | membros ativos | só gatilhos | — | — |
 | Configurações (fases, campos, motivos, origens, segmentos, serviços, metas, tipos de atividade, reuniões) | membros ativos | diretor da diretoria | diretor da diretoria | diretor da diretoria |
 | Atividades | membros ativos | membros da diretoria do tipo (R.G: só diretores) | participante ou diretor | idem, exceto trainee |
-| Tarefas | diretoria, diretores e responsáveis | diretor | diretor (tudo) ou responsável (só `status`) | diretor |
+| Tarefas | diretoria, diretores e responsáveis | diretor; qualquer membro cria tarefa pessoal (manual, para si); sistema e agentes via `privado.criar_tarefa` | diretor (tudo), autor da tarefa pessoal (tudo) ou responsável (só `status`) | diretor ou autor da tarefa pessoal |
 | Notificações | só as próprias | só gatilhos | só `lida_em` | só as próprias |
 | Pontuação | o próprio; diretores veem todas | diretor da Vice-Presidência (`rh`) | só cancelamento, pela Vice-Presidência | não existe exclusão |
 | Auditoria | diretores | só funções internas | — | — |
@@ -340,6 +340,8 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `segmentos`, `origens`, `servicos`, `motivos` | diretoria, nome, ativo (+ tipo/área/ordem); `origens.chave`, `motivos.chave`, `motivos.exige_comentario`, `motivos.marca_nao_contatar` | Cadastros auxiliares configuráveis. Listas de motivos e origens da v2 (PE-PA-002, 3.3 e 3.4) |
 | `resultados_ligacao` | chave, nome, ordem, ativo, fase_destino_id, motivo_id, conta_tentativa, exige_retorno, registra_decisor, marca_telefone_invalido, tipo_atividade_id, tarefa_titulo, tarefa_prazo | Lista fechada de resultados de ligação e a ação de cada um (9 resultados iniciais) |
 | `ligacoes` | negocio_id, contato_id, membro_id, inicio, duracao_seg, resultado_id, proximo_passo, retorno_em, compromisso_em, decisor_nome, decisor_melhor_horario, comentario, origem, resultado_aplicado_em; reservadas para a Fase 2: api4com_id, gravacao_url, transcricao, resumo | Registro de cada ligação |
+| `cadencia_passos` | dia (D0 = entrada em E-mail), canal (email/ligacao), titulo, descricao, so_sem_contato, ativo | Cadência padrão (PE-PA-002, 3.2): cada toque vira tarefa no dia |
+| `parametros_comercial` | cadencia_dias_reciclagem (21), reciclagem_retorno_dias (90) | Prazos da cadência, editáveis pelo diretor |
 | `feriados` | data, nome | Dias não úteis (nacionais 2026–2027 e aniversário de Londrina); tarefas automáticas pulam fins de semana e feriados |
 | `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
 | `anexos` | negocio_id, nome, caminho, tamanho (≤ 10 MB), tipo_mime, enviado_por | Metadados dos arquivos do bucket `anexos` |
@@ -384,6 +386,8 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `aplicar_resultado_ligacao` (`ligacoes`) | após inserir / mudar `resultado_id` | Uma vez por ligação: conclui as tarefas de ligação abertas do negócio; move a fase (só para a frente, perdas e pausas sempre, nunca reabre encerrado; motivo do resultado); grava `retorno_em`; marca telefone inválido (contato ou empresa); cria o compromisso na agenda (90 min) e a tarefa do resultado com prazo em dia útil |
 | `notificar_tarefa_atribuida` (`tarefa_responsaveis`) | após inserir | Notifica (sino + push) toda tarefa atribuída, exceto a manual criada para si mesmo |
 | `a_validar_motivo_negocio` / `aplicar_motivo_negocio` (`negocios`) | antes / após salvar motivo | Motivo com `exige_comentario` ("Outro") exige `motivo_detalhe`; motivo com `marca_nao_contatar` marca o contato do negócio (ou todos da empresa) |
+| `tarefas_ao_mudar_fase` (`negocio_historico`) | após inserir | Ao sair da cadência conclui as tarefas de cadência; ao entrar em Oportunidade cria o follow-up para marcar o diagnóstico; ao voltar da Reciclagem (automático) cria "Retomar contato" |
+| `concluir_tarefas_da_atividade` (`atividades`) | após mudar status | Compromisso realizado, cancelado ou remarcado conclui a tarefa "Hoje às…" ligada a ele |
 | `somar_valor_servicos` (`negocio_servicos`) | após inserir/atualizar/excluir | Quando algum serviço tem valor, `negocios.valor` = soma dos valores |
 | `*_updated_at` | antes de atualizar | Atualiza `updated_at` |
 
@@ -404,6 +408,7 @@ Funções internas (schema `privado`): `criar_tarefa(...)` (tarefa do sistema/ag
 | Job | Horário | Função | O que faz |
 |---|---|---|---|
 | `aplicar-slas-diario` | 11:05 UTC (08:05 Brasília) | `privado.aplicar_slas()` | Move negócios com SLA estourado em fases com ação "mover" (Oportunidade: 15 dias → E-mail); devolve ao funil os da Reciclagem com data de retorno vencida |
+| `tarefas-diarias` | 10:30 UTC (07:30 Brasília) | `privado.gerar_tarefas_diarias()` | Só em dia útil: tarefas dos toques da cadência que vencem no dia (ou nos dias não úteis anteriores), sem duplicar ligação já marcada por um resultado; D21 sem contato efetivo → Reciclagem com retorno em 90 dias; tarefa "Hoje às…" para cada compromisso ligado a lead |
 | `notificacoes-diarias` | 11:10 UTC (08:10 Brasília) | `privado.gerar_notificacoes_diarias()` | SLA a 80% (`sla_proximo`) e estourado (`sla_estourado`); tarefa vencendo hoje (`tarefa_hoje`); R.I/R.G do dia (`reuniao_hoje`); atividade de amanhã ainda não confirmada, para os diretores (`atividade_sem_confirmacao`) |
 
 ---
@@ -418,11 +423,11 @@ evolução). Grupos sem itens não são exibidos. O menu recolhe para uma barra 
 
 | Código | Rota | Quem acessa | Funcionalidade | Status |
 |---|---|---|---|---|
-| F-GER-01 | `/painel` | todos | **Início**: minhas tarefas e minha agenda de hoje (a fila do dia completa chega no PR 5 da Fase 0) | EM PRODUÇÃO |
+| F-GER-01 | `/painel` | todos | **Início (Minhas tarefas)**: fila do dia (atrasadas, hoje, próximos 7 dias, sem prazo) com concluir, registrar ligação e abrir o negócio em um toque; compromissos de hoje | EM PRODUÇÃO |
 | F-GER-06 | `/vice-presidencia/painel-geral` | todos | Painel geral da v1 (agenda, R.I/R.G, tarefas, pontuação, cartões da Vice-Presidência e do Comercial), mantido para comparação; sem cartões "Em breve" | EM PRODUÇÃO |
 | F-GER-02 | `/agenda` | todos | Visão mês/lista, filtro por pessoa, criar/editar atividades, confirmar/realizar/**remarcar**/cancelar; reuniões recorrentes somente leitura | EM PRODUÇÃO |
 | F-GER-03 | `/agenda/configuracoes` | diretores | Reuniões recorrentes (dia, horário, local, vigência) e tipos de atividade (cor, exige confirmação, ligada a lead) | EM PRODUÇÃO |
-| F-GER-04 | `/tarefas` | todos | Tarefas de todas as diretorias; diretor cria/edita/exclui; responsável muda o andamento; filtros | EM PRODUÇÃO |
+| F-GER-04 | `/tarefas` | todos | Tarefas de todas as diretorias; diretor cria/edita/exclui; qualquer membro cria tarefas pessoais; responsável muda o andamento; selo de tarefa automática; filtros | EM PRODUÇÃO |
 | F-GER-05 | sino + `/api/push` | todos | Notificações no app e push no aparelho | EM PRODUÇÃO (push só em produção) |
 | F-PRE-01 | `/auditoria` | diretores | Últimas 200 ações sensíveis com filtro por tipo | EM PRODUÇÃO |
 | F-VP-01 | `/membros` | todos (gestão: diretores) | Pré-cadastro e convite, cargos, rodízio, ativação, data de entrada, transferência de carteira, processos seletivos | EM PRODUÇÃO |
@@ -430,7 +435,7 @@ evolução). Grupos sem itens não são exibidos. O menu recolhe para uma barra 
 | F-COM-01 | `/comercial` | todos | Painel comercial com indicadores do período (Seção 10), SLA estourado e, só para o diretor, lista das atividades da equipe com filtro por membro e tipo | EM PRODUÇÃO |
 | F-COM-02 | `/comercial/exportar` | todos | Exporta indicadores (várias abas) ou lista de negócios em .xlsx/.csv, com os filtros da tela | EM PRODUÇÃO |
 | F-COM-03 | `/funil` | todos | Kanban com arrastar e soltar; filtros retráteis (busca, responsável, origem, segmento); destaque de SLA; diálogo de motivo nas perdas (comentário obrigatório no "Outro"); selo da última ligação e registro rápido de ligação no card | EM PRODUÇÃO |
-| F-COM-04 | `/funil/configuracoes` | diretor comercial | Fases (nome, SLA, ação, destino, probabilidade, rodízio, ativa, **excluir**), campos por fase, **resultados de ligação** (ação no card e tarefa), motivos, origens, segmentos, serviços, **feriados** | EM PRODUÇÃO |
+| F-COM-04 | `/funil/configuracoes` | diretor comercial | Fases (nome, SLA, ação, destino, probabilidade, rodízio, ativa, **excluir**), campos por fase, **cadência** (toques e prazos), **resultados de ligação** (ação no card e tarefa), motivos, origens, segmentos, serviços, **feriados** | EM PRODUÇÃO |
 | F-COM-05 | `/empresas`, `/empresas/novo`, `/empresas/[id]` | todos | Busca por nome/CNPJ/telefone; novo lead com aviso de duplicidade; contatos | EM PRODUÇÃO |
 | F-COM-06 | `/negocios/[id]` | todos (edição conforme RLS) | Dados do negócio, campos de cada fase, serviços com valor por serviço, participantes, histórico, atividades do negócio, anexos, **registro e histórico de ligações**; selos de telefone inválido e não contatar nos contatos | EM PRODUÇÃO |
 | F-COM-07 | `/metas`, `/metas/configuracoes` | todos (configurar: diretor) | OKRs por trimestre; metas automáticas ou manuais; criar trimestre copiando outro | EM PRODUÇÃO |
@@ -646,7 +651,7 @@ Escopo v1.0 (Seção 14).
 | F-GER-04 | Tarefas | 2 | EM PRODUÇÃO | `/tarefas` |
 | F-GER-05 | Notificações no app e push | 2 | EM PRODUÇÃO | sino, `/api/push` |
 | F-VP-03 | Transferência de carteira | 2 | EM PRODUÇÃO | `transferir_carteira` |
-| F-GER-01 | Início (Minhas tarefas) | v2 F0 | PARCIAL (fila do dia no PR 5) | `/painel` |
+| F-GER-01 | Início (Minhas tarefas) | v2 F0 | EM PRODUÇÃO | `/painel` |
 | F-GER-06 | Painel geral da v1 (comparação) | 2b | EM PRODUÇÃO | `/vice-presidencia/painel-geral` |
 | F-VP-02 | Pontuação | 2b | EM PRODUÇÃO (regras L12 pendentes) | `/vice-presidencia/pontuacao` |
 | F-COM-01 | Indicadores do funil e atividades da equipe | 3 | EM PRODUÇÃO | `/comercial` |
@@ -655,7 +660,7 @@ Escopo v1.0 (Seção 14).
 | F-V2-01 | Resultado de ligação (lista fechada, ação no card, tarefa automática) | v2 F0 | EM PRODUÇÃO | `ligacoes`, `resultados_ligacao`, `components/crm/registrar-ligacao.tsx` |
 | F-V2-02 | Motivos e origens da v2; comentário obrigatório no "Outro"; "não contatar" | v2 F0 | EM PRODUÇÃO | `motivos`, `origens` |
 | F-V2-03 | Proposta remarcada e valor por serviço | v2 F0 | EM PRODUÇÃO | `remarcar_atividade`, `negocio_servicos.valor` |
-| F-V2-04 | Base de tarefas automáticas (origem, chave, dias úteis, feriados, notificação de toda tarefa) | v2 F0 | PARCIAL (cadência e job diário no PR 5) | `privado.criar_tarefa`, `feriados` |
+| F-V2-04 | Tarefas automáticas (resultados de ligação, cadência, Oportunidade, Reciclagem, compromissos), dias úteis, feriados e notificação de toda tarefa | v2 F0 | EM PRODUÇÃO | `privado.criar_tarefa`, `privado.gerar_tarefas_diarias`, `cadencia_passos` |
 | F-INT-01 | n8n: instância e fluxos | 4 | PRONTO, NÃO INSTALADO | `n8n/` |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
 | F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
@@ -672,6 +677,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.4 | 12/10/2026 | v2 Fase 0, PR 5: tarefas automáticas (cadência, D21 → Reciclagem, Oportunidade, retorno da Reciclagem, compromissos), job das 07h30, tarefas pessoais e Início com a fila do dia |
 | 1.3 | 12/10/2026 | v2 Fase 0, PRs 2 a 4: ligações e resultados, motivos e origens novos, remarcação, valor por serviço, base de tarefas automáticas e feriados |
 
 **Manutenção:** ao mesclar mudanças relevantes, atualize as seções afetadas, a matriz (Seção 18) e este histórico.

@@ -167,3 +167,50 @@ export async function excluirFeriado(dia: string): Promise<Resultado> {
   revalidar();
   return { ok: true };
 }
+
+const esquemaPasso = z.object({
+  dia: z.number().int().min(0, "O dia não pode ser negativo.").max(120),
+  canal: z.enum(["email", "ligacao"]),
+  titulo: z.string().trim().min(2, "Informe o título do toque."),
+  so_sem_contato: z.boolean(),
+  ativo: z.boolean(),
+});
+
+/** Passos da cadência (PE-PA-002, Seção 3.2): cada um vira uma tarefa para o responsável no dia. */
+export async function salvarPassoCadencia(id: string | null, dados: z.input<typeof esquemaPasso>): Promise<Resultado> {
+  const v = esquemaPasso.safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const q = id
+    ? supabase.from("cadencia_passos").update(v.data).eq("id", id).select("id")
+    : supabase.from("cadencia_passos").insert({ ...v.data, diretoria: "comercial" }).select("id");
+  const { data, error } = await q;
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera a cadência." };
+  revalidar();
+  return { ok: true };
+}
+
+export async function excluirPassoCadencia(id: string): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("cadencia_passos").delete().eq("id", id).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera a cadência." };
+  revalidar();
+  return { ok: true };
+}
+
+export async function salvarParametrosCadencia(dados: { cadencia_dias_reciclagem: number; reciclagem_retorno_dias: number }): Promise<Resultado> {
+  const v = z.object({
+    cadencia_dias_reciclagem: z.number().int().min(1, "Informe os dias até a Reciclagem.").max(180),
+    reciclagem_retorno_dias: z.number().int().min(1, "Informe os dias de retorno.").max(730),
+  }).safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("parametros_comercial").update({ ...v.data, updated_at: new Date().toISOString() })
+    .eq("diretoria", "comercial").select("diretoria");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera a cadência." };
+  revalidar();
+  return { ok: true };
+}

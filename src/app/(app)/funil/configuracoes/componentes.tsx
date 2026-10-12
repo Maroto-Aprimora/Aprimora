@@ -11,7 +11,10 @@ import { Selo } from "@/components/ui/selo";
 import type { Tables } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { NOME_PRAZO_TAREFA } from "@/lib/crm";
-import { excluirCampo, excluirFase, excluirFeriado, salvarCampo, salvarFase, salvarFeriado, salvarItem, salvarResultadoLigacao } from "./acoes";
+import {
+  excluirCampo, excluirFase, excluirFeriado, excluirPassoCadencia, salvarCampo, salvarFase, salvarFeriado, salvarItem,
+  salvarParametrosCadencia, salvarPassoCadencia, salvarResultadoLigacao,
+} from "./acoes";
 
 const NOME_TIPO: Record<string, string> = {
   texto: "Texto", texto_longo: "Texto longo", data: "Data", numero: "Número", moeda: "Moeda", membros: "Membros",
@@ -315,6 +318,76 @@ export function ListaFeriados({ feriados }: { feriados: Tables<"feriados">[] }) 
         <Entrada name="nome" placeholder="Nome" required className="h-9" />
         <Botao type="submit" tamanho="sm" carregando={pendente}><Plus className="h-3.5 w-3.5" /> Adicionar</Botao>
       </form>
+    </Cartao>
+  );
+}
+
+/** Cadência padrão: os toques (dia, canal) e o prazo até a Reciclagem. */
+export function Cadencia({ passos, parametros }: {
+  passos: Tables<"cadencia_passos">[]; parametros: Tables<"parametros_comercial"> | null;
+}) {
+  const [pendente, iniciar] = useTransition();
+  const linha = (p: Tables<"cadencia_passos"> | null) => (
+    <form key={p?.id ?? "novo"} className={cn("grid items-center gap-2 px-5 py-2 sm:grid-cols-[80px_130px_1fr_auto_auto]", p && !p.ativo && "opacity-60")}
+      action={(form) => iniciar(async () => {
+        const r = await salvarPassoCadencia(p?.id ?? null, {
+          dia: Number(form.get("dia") ?? 0), canal: String(form.get("canal")) as "email",
+          titulo: String(form.get("titulo") ?? ""), so_sem_contato: form.get("so_sem_contato") === "on",
+          ativo: p ? form.get("ativo") === "on" : true,
+        });
+        if (r.ok) toast.success(p ? "Toque salvo." : "Toque adicionado.");
+        else toast.error(r.erro);
+      })}>
+      <div className="flex items-center gap-1"><span className="text-sm font-semibold text-texto-suave">D</span>
+        <Entrada name="dia" type="number" min={0} defaultValue={p?.dia ?? ""} required className="h-9" aria-label="Dia" /></div>
+      <Selecao name="canal" defaultValue={p?.canal ?? "email"} className="h-9" aria-label="Canal">
+        <option value="email">E-mail</option>
+        <option value="ligacao">Ligação</option>
+      </Selecao>
+      <Entrada name="titulo" defaultValue={p?.titulo ?? ""} placeholder="Título da tarefa" required className="h-9" />
+      <div className="flex gap-3">
+        <label className="flex items-center gap-1 text-xs" title="Só cria a tarefa se ainda não houve contato efetivo">
+          <input type="checkbox" name="so_sem_contato" defaultChecked={p?.so_sem_contato} /> só sem contato</label>
+        {p && <label className="flex items-center gap-1 text-xs"><input type="checkbox" name="ativo" defaultChecked={p.ativo} /> ativo</label>}
+      </div>
+      <div className="flex items-center gap-1">
+        <Botao type="submit" tamanho="sm" variante="secundario" carregando={pendente}>{p ? "Salvar" : <><Plus className="h-3.5 w-3.5" /> Adicionar</>}</Botao>
+        {p && (
+          <button type="button" aria-label="Excluir toque" className="p-1 text-texto-suave hover:text-perigo" disabled={pendente}
+            onClick={() => confirm(`Excluir o toque D${p.dia}?`) && iniciar(async () => { const r = await excluirPassoCadencia(p.id); if (!r.ok) toast.error(r.erro); })}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </form>
+  );
+
+  return (
+    <Cartao className="mb-6">
+      <CabecalhoCartao titulo="Cadência padrão"
+        descricao="D0 é a entrada do card em E-mail. Todo dia útil às 7h30 o responsável recebe as tarefas dos toques do dia (fim de semana e feriado vão para o próximo dia útil). Contato efetivo numa ligação pausa a contagem." />
+      <div className="divide-y divide-borda">
+        {passos.map((p) => linha(p))}
+        {linha(null)}
+      </div>
+      {parametros && (
+        <form className="flex flex-wrap items-end gap-3 border-t border-borda px-5 py-3 text-sm"
+          action={(form) => iniciar(async () => {
+            const r = await salvarParametrosCadencia({
+              cadencia_dias_reciclagem: Number(form.get("cadencia_dias_reciclagem")), reciclagem_retorno_dias: Number(form.get("reciclagem_retorno_dias")),
+            });
+            if (r.ok) toast.success("Prazos salvos.");
+            else toast.error(r.erro);
+          })}>
+          <Campo rotulo="Sem resposta, vai para Reciclagem no dia">
+            <Entrada name="cadencia_dias_reciclagem" type="number" min={1} defaultValue={parametros.cadencia_dias_reciclagem} className="h-9 w-28" />
+          </Campo>
+          <Campo rotulo="Retorno da Reciclagem em (dias)">
+            <Entrada name="reciclagem_retorno_dias" type="number" min={1} defaultValue={parametros.reciclagem_retorno_dias} className="h-9 w-28" />
+          </Campo>
+          <Botao type="submit" tamanho="sm" variante="secundario" carregando={pendente}>Salvar prazos</Botao>
+        </form>
+      )}
     </Cartao>
   );
 }

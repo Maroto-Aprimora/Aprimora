@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemDeErro } from "@/lib/erros";
+import { obterUsuario } from "@/lib/usuario";
 
 export type Resultado = { ok: true } | { ok: false; erro: string };
 const nulo = (v: unknown) => (typeof v === "string" && v.trim() === "" ? null : typeof v === "string" ? v.trim() : v);
@@ -22,12 +23,17 @@ function revalidar() {
   revalidatePath("/painel");
 }
 
-/** Só o diretor cria e edita tarefas (o banco garante). A diretoria indica quem pode gerir a tarefa. */
+/**
+ * O diretor cria e edita tarefas para qualquer pessoa; os demais, só tarefas pessoais (para si mesmos).
+ * O banco garante as duas regras (RLS e gatilho proteger_tarefa).
+ */
 export async function salvarTarefa(id: string | null, dados: Record<string, unknown>, responsaveis: string[]): Promise<Resultado> {
   const v = esquema.safeParse(dados);
   if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const [usuario, supabase] = await Promise.all([obterUsuario(), criarClienteServidor()]);
+  // Tarefa pessoal: o único responsável é quem cria
+  if (!usuario.ehDiretorDe(v.data.diretoria)) responsaveis = [usuario.id];
   if (responsaveis.length === 0) return { ok: false, erro: "Escolha pelo menos um responsável." };
-  const supabase = await criarClienteServidor();
 
   let tarefaId = id;
   if (id) {
@@ -35,9 +41,9 @@ export async function salvarTarefa(id: string | null, dados: Record<string, unkn
     void _ignorada;
     const { data, error } = await supabase.from("tarefas").update(campos).eq("id", id).select("id");
     if (error) return { ok: false, erro: mensagemDeErro(error) };
-    if (!data?.length) return { ok: false, erro: "Só o diretor edita tarefas." };
+    if (!data?.length) return { ok: false, erro: "Você só pode editar as tarefas que criou para si." };
   } else {
-    const { data, error } = await supabase.from("tarefas").insert(v.data).select("id").single();
+    const { data, error } = await supabase.from("tarefas").insert({ ...v.data, origem: "manual", criado_por: usuario.id }).select("id").single();
     if (error) return { ok: false, erro: mensagemDeErro(error) };
     tarefaId = data.id;
   }
@@ -70,7 +76,7 @@ export async function excluirTarefa(id: string): Promise<Resultado> {
   const supabase = await criarClienteServidor();
   const { data, error } = await supabase.from("tarefas").delete().eq("id", id).select("id");
   if (error) return { ok: false, erro: mensagemDeErro(error) };
-  if (!data?.length) return { ok: false, erro: "Só o diretor exclui tarefas." };
+  if (!data?.length) return { ok: false, erro: "Você só pode excluir as tarefas que criou para si." };
   revalidar();
   return { ok: true };
 }

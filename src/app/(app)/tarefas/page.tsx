@@ -22,10 +22,13 @@ export default async function PaginaTarefas({ searchParams }: PageProps<"/tarefa
   const lista = (tarefas ?? []).map((t) => ({
     id: t.id, titulo: t.titulo, descricao: t.descricao, prazo: t.prazo, prioridade: t.prioridade, status: t.status,
     negocioId: t.negocio_id, negocioTitulo: t.negocios?.titulo ?? null, responsaveis: t.tarefa_responsaveis.map((r) => r.membro_id),
-    diretoria: t.diretoria, podeGerir: usuario.ehDiretorDe(t.diretoria),
+    diretoria: t.diretoria, origem: t.origem,
+    podeGerir: usuario.ehDiretorDe(t.diretoria) || (t.origem === "manual" && t.criado_por === usuario.id),
   }));
   const ehDiretor = usuario.ehDiretor;
-  const minhasDiretorias = (diretorias ?? []).filter((d) => usuario.ehDiretorDe(d.slug));
+  // Onde a pessoa pode criar: as diretorias que dirige; quem não é diretor cria tarefas pessoais no Comercial
+  const dirigidas = (diretorias ?? []).filter((d) => usuario.ehDiretorDe(d.slug));
+  const minhasDiretorias = dirigidas.length ? dirigidas : (diretorias ?? []).filter((d) => d.slug === "comercial");
   const visiveis = filtro === "todas" ? lista
     : filtro === "concluidas" ? lista.filter((t) => t.status === "concluida")
     : lista.filter((t) => t.status !== "concluida" && (filtro === "abertas" || t.responsaveis.includes(usuario.id)));
@@ -34,7 +37,7 @@ export default async function PaginaTarefas({ searchParams }: PageProps<"/tarefa
     <>
       <TituloPagina
         titulo="Tarefas"
-        descricao={ehDiretor ? "Distribua tarefas para a equipe e acompanhe o andamento." : "Tarefas de todas as diretorias atribuídas a você. Atualize o andamento conforme avança."}
+        descricao={ehDiretor ? "Distribua tarefas para a equipe e acompanhe o andamento." : "Suas tarefas: as do diretor, as criadas pelo sistema e as que você cria para si."}
       />
       <ListaTarefas
         tarefas={visiveis}

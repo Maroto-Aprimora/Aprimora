@@ -18,7 +18,7 @@ import { excluirTarefa, mudarStatusTarefa, salvarTarefa } from "./acoes";
 type Tarefa = {
   id: string; titulo: string; descricao: string | null; prazo: string | null; prioridade: "baixa" | "media" | "alta";
   status: "pendente" | "em_andamento" | "concluida"; negocioId: string | null; negocioTitulo: string | null; responsaveis: string[];
-  diretoria: string; podeGerir: boolean;
+  diretoria: string; origem: "manual" | "sistema" | "agente"; podeGerir: boolean;
 };
 
 const NOME_PRIORIDADE = { alta: "Alta", media: "Média", baixa: "Baixa" } as const;
@@ -49,7 +49,7 @@ export function ListaTarefas({
             </button>
           ))}
         </div>
-        {ehDiretor && <Botao variante="destaque" onClick={() => setEditando("nova")}><Plus className="h-4 w-4" /> Nova tarefa</Botao>}
+        <Botao variante="destaque" onClick={() => setEditando("nova")}><Plus className="h-4 w-4" /> {ehDiretor ? "Nova tarefa" : "Nova tarefa pessoal"}</Botao>
       </div>
 
       <Cartao>
@@ -75,6 +75,7 @@ export function ListaTarefas({
                       {t.prazo && <Selo tom={atrasada ? "perigo" : t.prazo === hoje ? "destaque" : "neutro"}>{atrasada ? "Atrasada · " : t.prazo === hoje ? "Hoje · " : ""}{formatarData(t.prazo)}</Selo>}
                       <Selo tom={t.prioridade === "alta" ? "destaque" : "neutro"}>{NOME_PRIORIDADE[t.prioridade]}</Selo>
                       <Selo>{nomesDiretorias[t.diretoria] ?? t.diretoria}</Selo>
+                      {t.origem !== "manual" && <Selo title="Criada automaticamente">{t.origem === "agente" ? "Agente" : "Automática"}</Selo>}
                       {t.negocioId && <Link href={`/negocios/${t.negocioId}`}><Selo tom="marca">{t.negocioTitulo}</Selo></Link>}
                     </div>
                   </div>
@@ -149,7 +150,7 @@ export function ListaTarefas({
                       {negocios.map((n) => <option key={n.id} value={n.id}>{n.titulo}</option>)}
                     </Selecao>
                   </Campo>
-                  <div className="sm:col-span-2">
+                  {ehDiretor ? <div className="sm:col-span-2">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-texto-suave">Responsáveis <span className="text-destaque">*</span></p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                       {membros.map((m) => (
@@ -159,7 +160,7 @@ export function ListaTarefas({
                         </label>
                       ))}
                     </div>
-                  </div>
+                  </div> : <p className="text-sm text-texto-suave sm:col-span-2">Tarefa pessoal: você é o responsável. <input type="hidden" name="responsaveis" value={usuarioId} /></p>}
                   <div className="flex justify-end gap-2 sm:col-span-2">
                     <Botao type="button" variante="secundario" onClick={() => setEditando(null)}>Cancelar</Botao>
                     <Botao type="submit" carregando={pendente}>Salvar</Botao>
