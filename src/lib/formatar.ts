@@ -33,3 +33,8 @@ export function iniciais(nome: string | null | undefined) {
 }
 
 export const NOME_CARGO = { diretor: "Diretor", assessor: "Assessor", trainee: "Trainee" } as const;
+
+/** Minutos desde um instante (ISO); nulo se não houver data. */
+export function minutosDesde(iso: string | null | undefined): number | null {
+  return iso ? Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)) : null;
+}

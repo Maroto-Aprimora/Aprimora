@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      agentes: {
+        Row: {
+          ativo: boolean
+          atualizado_por: string | null
+          chave: string
+          codigo: string | null
+          descricao: string | null
+          fase_roadmap: number | null
+          nome: string
+          ordem: number
+          prioridade: number | null
+          quem_aprova: string | null
+          tipo: Database["public"]["Enums"]["tipo_agente"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_por?: string | null
+          chave: string
+          codigo?: string | null
+          descricao?: string | null
+          fase_roadmap?: number | null
+          nome: string
+          ordem?: number
+          prioridade?: number | null
+          quem_aprova?: string | null
+          tipo: Database["public"]["Enums"]["tipo_agente"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_por?: string | null
+          chave?: string
+          codigo?: string | null
+          descricao?: string | null
+          fase_roadmap?: number | null
+          nome?: string
+          ordem?: number
+          prioridade?: number | null
+          quem_aprova?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_agente"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agentes_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       anexos: {
         Row: {
           caminho: string
@@ -58,6 +111,99 @@ export type Database = {
             columns: ["negocio_id"]
             isOneToOne: false
             referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aprovacoes: {
+        Row: {
+          agente: string
+          comentario: string | null
+          conteudo: Json
+          conteudo_original: Json | null
+          created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          id: string
+          negocio_id: string | null
+          responsavel_id: string | null
+          resumo: string | null
+          status: Database["public"]["Enums"]["status_aprovacao"]
+          tipo: string
+          titulo: string
+          trabalho_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          agente: string
+          comentario?: string | null
+          conteudo?: Json
+          conteudo_original?: Json | null
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          id?: string
+          negocio_id?: string | null
+          responsavel_id?: string | null
+          resumo?: string | null
+          status?: Database["public"]["Enums"]["status_aprovacao"]
+          tipo: string
+          titulo: string
+          trabalho_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agente?: string
+          comentario?: string | null
+          conteudo?: Json
+          conteudo_original?: Json | null
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          id?: string
+          negocio_id?: string | null
+          responsavel_id?: string | null
+          resumo?: string | null
+          status?: Database["public"]["Enums"]["status_aprovacao"]
+          tipo?: string
+          titulo?: string
+          trabalho_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aprovacoes_agente_fkey"
+            columns: ["agente"]
+            isOneToOne: false
+            referencedRelation: "agentes"
+            referencedColumns: ["chave"]
+          },
+          {
+            foreignKeyName: "aprovacoes_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aprovacoes_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aprovacoes_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aprovacoes_trabalho_id_fkey"
+            columns: ["trabalho_id"]
+            isOneToOne: false
+            referencedRelation: "trabalhos"
             referencedColumns: ["id"]
           },
         ]
@@ -1950,6 +2096,88 @@ export type Database = {
           },
         ]
       }
+      trabalhos: {
+        Row: {
+          agente: string
+          chave: string | null
+          concluido_em: string | null
+          created_at: string
+          criado_por: string | null
+          erro: string | null
+          id: string
+          max_tentativas: number
+          negocio_id: string | null
+          payload: Json
+          proximo_em: string
+          reservado_em: string | null
+          resultado: Json | null
+          status: Database["public"]["Enums"]["status_trabalho"]
+          tentativas: number
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          agente: string
+          chave?: string | null
+          concluido_em?: string | null
+          created_at?: string
+          criado_por?: string | null
+          erro?: string | null
+          id?: string
+          max_tentativas?: number
+          negocio_id?: string | null
+          payload?: Json
+          proximo_em?: string
+          reservado_em?: string | null
+          resultado?: Json | null
+          status?: Database["public"]["Enums"]["status_trabalho"]
+          tentativas?: number
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          agente?: string
+          chave?: string | null
+          concluido_em?: string | null
+          created_at?: string
+          criado_por?: string | null
+          erro?: string | null
+          id?: string
+          max_tentativas?: number
+          negocio_id?: string | null
+          payload?: Json
+          proximo_em?: string
+          reservado_em?: string | null
+          resultado?: Json | null
+          status?: Database["public"]["Enums"]["status_trabalho"]
+          tentativas?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trabalhos_agente_fkey"
+            columns: ["agente"]
+            isOneToOne: false
+            referencedRelation: "agentes"
+            referencedColumns: ["chave"]
+          },
+          {
+            foreignKeyName: "trabalhos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trabalhos_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1971,6 +2199,7 @@ export type Database = {
           semelhanca: number
         }[]
       }
+      enviar_trabalho_teste: { Args: never; Returns: string }
       excluir_fase: {
         Args: { _destino?: string; _fase: string }
         Returns: Json
@@ -1990,6 +2219,39 @@ export type Database = {
         }
         Returns: undefined
       }
+      n8n_alerta: {
+        Args: { _detalhes?: Json; _segredo: string; _tipo: string }
+        Returns: Json
+      }
+      n8n_concluir: {
+        Args: { _id: string; _resultado?: Json; _segredo: string }
+        Returns: Json
+      }
+      n8n_erro: {
+        Args: {
+          _execucao_id?: string
+          _execucao_url?: string
+          _fluxo: string
+          _mensagem?: string
+          _no?: string
+          _segredo: string
+        }
+        Returns: Json
+      }
+      n8n_falhar: {
+        Args: {
+          _etapa?: string
+          _id: string
+          _mensagem?: string
+          _segredo: string
+        }
+        Returns: Json
+      }
+      n8n_reservar: {
+        Args: { _agente?: string; _limite?: number; _segredo: string }
+        Returns: Json
+      }
+      n8n_saude: { Args: { _segredo: string }; Returns: Json }
       normalizar: { Args: { _t: string }; Returns: string }
       remarcar_atividade: {
         Args: {
@@ -2000,6 +2262,7 @@ export type Database = {
         }
         Returns: string
       }
+      saude_fila: { Args: never; Returns: Json }
       so_digitos: { Args: { _t: string }; Returns: string }
       transferir_carteira: {
         Args: { _de: string; _diretoria: string; _para: string }
@@ -2031,6 +2294,7 @@ export type Database = {
         | "data_retorno"
         | "vespera_compromisso"
       prioridade: "baixa" | "media" | "alta"
+      status_aprovacao: "pendente" | "aprovada" | "descartada"
       status_atividade:
         | "pendente"
         | "confirmada"
@@ -2038,6 +2302,13 @@ export type Database = {
         | "remarcada"
         | "cancelada"
       status_tarefa: "pendente" | "em_andamento" | "concluida"
+      status_trabalho:
+        | "pendente"
+        | "processando"
+        | "concluido"
+        | "erro"
+        | "cancelado"
+      tipo_agente: "ia" | "regra" | "regra_ia" | "sistema"
       tipo_campo:
         | "texto"
         | "texto_longo"
@@ -2199,6 +2470,7 @@ export const Constants = {
         "vespera_compromisso",
       ],
       prioridade: ["baixa", "media", "alta"],
+      status_aprovacao: ["pendente", "aprovada", "descartada"],
       status_atividade: [
         "pendente",
         "confirmada",
@@ -2207,6 +2479,14 @@ export const Constants = {
         "cancelada",
       ],
       status_tarefa: ["pendente", "em_andamento", "concluida"],
+      status_trabalho: [
+        "pendente",
+        "processando",
+        "concluido",
+        "erro",
+        "cancelado",
+      ],
+      tipo_agente: ["ia", "regra", "regra_ia", "sistema"],
       tipo_campo: [
         "texto",
         "texto_longo",

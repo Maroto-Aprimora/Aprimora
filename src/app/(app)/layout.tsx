@@ -6,7 +6,10 @@ import { obterUsuario } from "@/lib/usuario";
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const [usuario, supabase] = await Promise.all([obterUsuario(), criarClienteServidor()]);
-  const { data: diretorias } = await supabase.from("diretorias").select("slug, nome").order("ordem");
+  const [{ data: diretorias }, { count: aprovacoes }] = await Promise.all([
+    supabase.from("diretorias").select("slug, nome").order("ordem"),
+    supabase.from("aprovacoes").select("id", { count: "exact", head: true }).eq("status", "pendente").eq("responsavel_id", usuario.id),
+  ]);
   const principal = usuario.cargos.find((c) => c.diretoria === "comercial") ?? usuario.cargos[0];
   const descricao = principal
     ? `${NOME_CARGO[principal.cargo]} · ${diretorias?.find((d) => d.slug === principal.diretoria)?.nome ?? principal.diretoria}`
@@ -21,6 +24,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         minhasDiretorias={usuario.cargos.map((c) => c.diretoria)}
         ehDiretor={usuario.ehDiretor}
         diretorDe={usuario.cargos.filter((c) => c.cargo === "diretor").map((c) => c.diretoria)}
+        aprovacoesPendentes={aprovacoes ?? 0}
       />
       <div className="min-w-0 flex-1">
         {/* No computador, o sino fica no canto superior direito; no celular ele está na barra do topo */}

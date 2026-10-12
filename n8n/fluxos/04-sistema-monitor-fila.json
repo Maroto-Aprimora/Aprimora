@@ -11,7 +11,7 @@
         -300
       ],
       "parameters": {
-        "content": "## APRIMORA | Sistema | Monitor da fila\nDe hora em hora (7h–21h) consulta a saúde da fila no portal. Se houver **mais de 30 ligações esperando**, a mais antiga esperando **há mais de 3 h**, ou **mais de 5 erros nas últimas 24 h**, o portal avisa os diretores pelo sino e por push. Sinal de que o n8n parou ou o Gemini está limitando.",
+        "content": "## APRIMORA | Sistema | Monitor da fila\nDe hora em hora (7h–21h) consulta a saúde da fila no portal. Se houver **mais de 30 trabalhos esperando**, a mais antiga esperando **há mais de 3 h**, ou **mais de 5 erros nas últimas 24 h**, o portal avisa os diretores pelo sino e por push. Sinal de que o n8n parou ou o Gemini está limitando.",
         "width": 600,
         "height": 180,
         "color": 4
@@ -86,7 +86,7 @@
           "conditions": [
             {
               "id": "968374fd-1397-5d10-8390-8b920a31a66a",
-              "leftValue": "={{ $json.ligacoes_pendentes }}",
+              "leftValue": "={{ $json.pendentes }}",
               "rightValue": 30,
               "operator": {
                 "type": "number",

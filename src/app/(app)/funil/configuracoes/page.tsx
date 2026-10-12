@@ -6,7 +6,7 @@ import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { NOME_AREA } from "@/lib/crm";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
-import { Cadencia, CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm } from "./componentes";
+import { Agentes, Cadencia, CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm } from "./componentes";
 
 export const metadata: Metadata = { title: "Configurações do funil" };
 
@@ -21,7 +21,8 @@ export default async function PaginaConfiguracoes() {
   const supabase = await criarClienteServidor();
   const { data: funil } = await supabase.from("funis").select("id").eq("diretoria", "comercial").eq("chave", "comercial").single();
   const [{ data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos },
-    { data: resultados }, { data: tiposAtividade }, { data: feriados }, { data: passos }, { data: parametros }] = await Promise.all([
+    { data: resultados }, { data: tiposAtividade }, { data: feriados }, { data: passos }, { data: parametros },
+    { data: agentes }, { data: saude }, { data: trabalhos }] = await Promise.all([
     supabase.from("fases").select("*").eq("funil_id", funil!.id).is("excluida_em", null).order("ordem"),
     supabase.from("fase_campos").select("*").order("ordem"),
     supabase.from("motivos").select("*").eq("diretoria", "comercial").order("ordem"),
@@ -33,6 +34,9 @@ export default async function PaginaConfiguracoes() {
     supabase.from("feriados").select("*").order("data"),
     supabase.from("cadencia_passos").select("*").eq("diretoria", "comercial").order("dia"),
     supabase.from("parametros_comercial").select("*").eq("diretoria", "comercial").maybeSingle(),
+    supabase.from("agentes").select("*").order("ordem"),
+    supabase.rpc("saude_fila"),
+    supabase.from("trabalhos").select("id, agente, tipo, status, tentativas, erro, created_at, concluido_em").order("created_at", { ascending: false }).limit(8),
   ]);
   const listaFases = fases ?? [];
   // Quantos negócios estão em cada fase (para pedir o destino ao excluir)
@@ -81,6 +85,8 @@ export default async function PaginaConfiguracoes() {
           ))}
         </div>
       </Cartao>
+
+      <Agentes agentes={agentes ?? []} saude={saude as Parameters<typeof Agentes>[0]["saude"]} trabalhos={trabalhos ?? []} />
 
       <Cadencia passos={passos ?? []} parametros={parametros} />
 

@@ -214,3 +214,24 @@ export async function salvarParametrosCadencia(dados: { cadencia_dias_reciclagem
   revalidar();
   return { ok: true };
 }
+
+/** Liga ou desliga um agente. Desligado, ele não recebe trabalho na fila. */
+export async function alternarAgente(chave: string, ativo: boolean): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase.from("agentes")
+    .update({ ativo, atualizado_por: user?.id ?? null, updated_at: new Date().toISOString() }).eq("chave", chave).select("chave");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial liga e desliga agentes." };
+  revalidar();
+  return { ok: true };
+}
+
+/** Coloca um trabalho de teste na fila (portão da Fase 1): o n8n deve pegá-lo e devolvê-lo em até 2 minutos. */
+export async function enviarTrabalhoTeste(): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("enviar_trabalho_teste");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  revalidar();
+  return { ok: true };
+}

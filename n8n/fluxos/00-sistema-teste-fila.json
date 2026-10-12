@@ -1,0 +1,168 @@
+{
+  "name": "APRIMORA | Sistema | Teste da fila",
+  "nodes": [
+    {
+      "id": "31f246d9-afef-5e11-a5f8-e77afb6e90a5",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -320
+      ],
+      "parameters": {
+        "content": "## APRIMORA | Sistema | Teste da fila\nPortão da Fase 1. A cada 2 minutos reserva os trabalhos do agente **Teste da fila** no portal e devolve cada um como concluído, com a mensagem recebida (eco). No portal: Config. do funil → Agentes e fila → **Enviar trabalho de teste**; em até 2 minutos ele aparece como **Concluído**.",
+        "width": 620,
+        "height": 180,
+        "color": 4
+      }
+    },
+    {
+      "id": "f3a2c246-e823-5c7c-84bf-34be2dd01f44",
+      "name": "A cada 2 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "98118a1a-72ef-5c18-afb9-940d43675f9a",
+      "name": "Reservar trabalhos de teste",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/reservar",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agente: 'teste', limite: 5 }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "ea391ff6-75dc-5681-8ffd-38ebfcdaccb2",
+      "name": "Separar trabalhos",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "trabalhos",
+        "options": {}
+      }
+    },
+    {
+      "id": "4bb94d70-21ee-51b2-a603-b2168cbf1469",
+      "name": "Devolver resultado ao portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $json.id }}/resultado",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-segredo",
+              "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ resultado: { eco: $json.payload.mensagem, processado_em: $now.toISO(), execucao: $execution.id } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "A cada 2 minutos": {
+      "main": [
+        [
+          {
+            "node": "Reservar trabalhos de teste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservar trabalhos de teste": {
+      "main": [
+        [
+          {
+            "node": "Separar trabalhos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar trabalhos": {
+      "main": [
+        [
+          {
+            "node": "Devolver resultado ao portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "America/Sao_Paulo",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

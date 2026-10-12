@@ -11,8 +11,9 @@ import { Selo } from "@/components/ui/selo";
 import type { Tables } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { NOME_PRAZO_TAREFA } from "@/lib/crm";
+import { minutosDesde } from "@/lib/formatar";
 import {
-  excluirCampo, excluirFase, excluirFeriado, excluirPassoCadencia, salvarCampo, salvarFase, salvarFeriado, salvarItem,
+  alternarAgente, enviarTrabalhoTeste, excluirCampo, excluirFase, excluirFeriado, excluirPassoCadencia, salvarCampo, salvarFase, salvarFeriado, salvarItem,
   salvarParametrosCadencia, salvarPassoCadencia, salvarResultadoLigacao,
 } from "./acoes";
 
@@ -389,5 +390,100 @@ export function Cadencia({ passos, parametros }: {
         </form>
       )}
     </Cartao>
+  );
+}
+
+type Saude = { pendentes: number; processando: number; mais_antiga_minutos: number; erros_24h: number; concluidos_24h: number;
+  ultimo_concluido_em: string | null; aprovacoes_pendentes: number };
+const NOME_STATUS_TRABALHO = { pendente: "Na fila", processando: "Processando", concluido: "Concluído", erro: "Erro", cancelado: "Cancelado" } as const;
+const NOME_FASE_ROADMAP: Record<number, string> = { 1: "Fase 1 · Infraestrutura", 2: "Fase 2 · Agentes prioritários", 3: "Fase 3 · Cadência de e-mail",
+  4: "Fase 4 · Da oportunidade à venda", 5: "Fase 5 · Inteligência" };
+
+/** Agentes: liga/desliga, saúde da fila e últimos trabalhos (PE-PA-002, Seções 5 e 6). */
+export function Agentes({ agentes, saude, trabalhos }: {
+  agentes: Tables<"agentes">[]; saude: Saude | null;
+  trabalhos: (Pick<Tables<"trabalhos">, "id" | "agente" | "tipo" | "status" | "tentativas" | "erro" | "created_at" | "concluido_em">)[];
+}) {
+  const [pendente, iniciar] = useTransition();
+  const nomeAgente = (chave: string) => agentes.find((a) => a.chave === chave)?.nome ?? chave;
+  const fases = [...new Set(agentes.map((a) => a.fase_roadmap ?? 0))].sort();
+  const ultimo = minutosDesde(saude?.ultimo_concluido_em);
+
+  return (
+    <Cartao className="mb-6" id="agentes">
+      <CabecalhoCartao titulo="Agentes e fila"
+        descricao="Agente desligado não recebe trabalho. O n8n busca a fila a cada poucos minutos; se ele ficar fora do ar, os trabalhos esperam e nada se perde."
+        acoes={
+          <Botao tamanho="sm" variante="secundario" carregando={pendente} onClick={() => iniciar(async () => {
+            const r = await enviarTrabalhoTeste();
+            if (r.ok) toast.success("Trabalho de teste na fila. O n8n deve concluí-lo em até 2 minutos; atualize a página.");
+            else toast.error(r.erro);
+          })}>Enviar trabalho de teste</Botao>
+        } />
+      {saude && (
+        <div className="grid grid-cols-2 gap-3 border-b border-borda px-5 py-4 text-sm sm:grid-cols-5">
+          <Indicador rotulo="Na fila" valor={saude.pendentes} alerta={saude.pendentes > 30} />
+          <Indicador rotulo="Processando" valor={saude.processando} />
+          <Indicador rotulo="Mais antiga (min)" valor={saude.mais_antiga_minutos} alerta={saude.mais_antiga_minutos > 180} />
+          <Indicador rotulo="Erros em 24 h" valor={saude.erros_24h} alerta={saude.erros_24h > 0} />
+          <Indicador rotulo="Concluídos em 24 h" valor={saude.concluidos_24h}
+            detalhe={ultimo == null ? "nenhum ainda" : `último há ${ultimo < 60 ? `${ultimo} min` : `${Math.round(ultimo / 60)} h`}`} />
+        </div>
+      )}
+      <div className="divide-y divide-borda">
+        {fases.map((f) => (
+          <div key={f} className="px-5 py-3">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-texto-suave">{NOME_FASE_ROADMAP[f] ?? "Sistema"}</p>
+            <ul className="grid gap-2 md:grid-cols-2">
+              {agentes.filter((a) => (a.fase_roadmap ?? 0) === f).map((a) => (
+                <li key={a.chave} className="flex items-start gap-3 rounded-md border border-borda px-3 py-2">
+                  <label className="mt-0.5 flex cursor-pointer items-center" title={a.ativo ? "Desligar" : "Ligar"}>
+                    <input type="checkbox" className="h-4 w-4" checked={a.ativo} disabled={pendente}
+                      onChange={(e) => iniciar(async () => {
+                        const r = await alternarAgente(a.chave, e.target.checked);
+                        if (r.ok) toast.success(`${a.nome} ${e.target.checked ? "ligado" : "desligado"}.`);
+                        else toast.error(r.erro);
+                      })} />
+                  </label>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">{a.codigo ? `${a.codigo} · ` : ""}{a.nome} {a.ativo ? <Selo tom="sucesso">ligado</Selo> : <Selo>desligado</Selo>}</p>
+                    <p className="text-xs text-texto-suave">{a.descricao}</p>
+                    {a.quem_aprova && <p className="text-xs text-texto-suave">Aprova: {a.quem_aprova}</p>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-borda px-5 py-3">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-texto-suave">Últimos trabalhos</p>
+        {trabalhos.length === 0 ? <p className="text-sm text-texto-suave">Nenhum trabalho ainda.</p> : (
+          <ul className="space-y-1.5 text-sm">
+            {trabalhos.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center gap-2">
+                <Selo tom={t.status === "concluido" ? "sucesso" : t.status === "erro" ? "perigo" : t.status === "processando" ? "destaque" : "neutro"}>
+                  {NOME_STATUS_TRABALHO[t.status]}
+                </Selo>
+                <span className="font-semibold">{nomeAgente(t.agente)}</span>
+                <span className="text-texto-suave">{t.tipo} · {new Date(t.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}
+                  {t.tentativas > 1 ? ` · ${t.tentativas} tentativas` : ""}</span>
+                {t.erro && <span className="w-full text-xs text-perigo">{t.erro}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Cartao>
+  );
+}
+
+function Indicador({ rotulo, valor, alerta, detalhe }: { rotulo: string; valor: number; alerta?: boolean; detalhe?: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-texto-suave">{rotulo}</p>
+      <p className={cn("font-titulo text-xl font-bold", alerta ? "text-perigo" : "text-marca")}>{valor}</p>
+      {detalhe && <p className="text-xs text-texto-suave">{detalhe}</p>}
+    </div>
   );
 }

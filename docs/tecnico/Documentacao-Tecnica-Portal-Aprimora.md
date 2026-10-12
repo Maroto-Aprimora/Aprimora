@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.7 |
+| Versão do documento | 1.8 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -247,7 +247,7 @@ O cargo nunca vem do navegador: só do pré-cadastro feito por um diretor.
 
 - Cookies gerenciados por `@supabase/ssr`. `src/proxy.ts` chama `atualizarSessao()` (`src/lib/supabase/sessao.ts`) em
   toda requisição, valida com `auth.getClaims()` e redireciona para `/entrar?voltar=…` quem não está logado.
-- Rotas públicas: `/entrar`, `/primeiro-acesso`, `/esqueci-senha`, `/auth/*`, `/api/push`.
+- Rotas públicas: `/entrar`, `/primeiro-acesso`, `/esqueci-senha`, `/auth/*`, `/api/push` e `/api/n8n/*` (protegidas por segredo).
 - `/auth/confirmar` trata os três formatos de link do Supabase (fragmento `#access_token`, `token_hash` e `code`).
 - `obterUsuario()` (`src/lib/usuario.ts`) carrega o membro e seus cargos uma vez por requisição e expõe `cargoEm()`,
   `ehDiretorDe()` e `ehDiretor`. Membro desativado é mandado de volta ao login.
@@ -342,6 +342,9 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `ligacoes` | negocio_id, contato_id, membro_id, inicio, duracao_seg, resultado_id, proximo_passo, retorno_em, compromisso_em, decisor_nome, decisor_melhor_horario, comentario, origem, resultado_aplicado_em; reservadas para a Fase 2: api4com_id, gravacao_url, transcricao, resumo | Registro de cada ligação |
 | `cadencia_passos` | dia (D0 = entrada em E-mail), canal (email/ligacao), titulo, descricao, so_sem_contato, ativo | Cadência padrão (PE-PA-002, 3.2): cada toque vira tarefa no dia |
 | `parametros_comercial` | cadencia_dias_reciclagem (21), reciclagem_retorno_dias (90) | Prazos da cadência, editáveis pelo diretor |
+| `agentes` | chave, codigo (A1…A12), nome, descricao, tipo, prioridade, fase_roadmap, quem_aprova, ativo | Os 12 agentes do PE-PA-002 + "Teste da fila"; liga/desliga em Config. do funil |
+| `trabalhos` | agente, tipo, negocio_id, payload, status (pendente/processando/concluido/erro/cancelado), tentativas, max_tentativas, proximo_em, reservado_em, resultado, erro, chave | Fila que o n8n consome; só funções internas escrevem |
+| `aprovacoes` | agente, tipo, trabalho_id, negocio_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação |
 | `feriados` | data, nome | Dias não úteis (nacionais 2026–2027 e aniversário de Londrina); tarefas automáticas pulam fins de semana e feriados |
 | `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
 | `anexos` | negocio_id, nome, caminho, tamanho (≤ 10 MB), tipo_mime, enviado_por | Metadados dos arquivos do bucket `anexos` |
@@ -551,6 +554,11 @@ trabalho, então trocar o n8n de servidor não exige mudar o portal.
   (`VAPID_PRIVATE_KEY`, `PUSH_SEGREDO` como *sensitive*) e em `privado.config` (`push_segredo`).
 - **Storage:** bucket `anexos` privado; download por link assinado de 60 s; políticas por pasta
   `negocios/<negocio_id>/`.
+- **Rotas do n8n:** `/api/n8n/*` não usam sessão; exigem `x-n8n-segredo` (= `N8N_SEGREDO`, comparação em tempo
+  constante) e chamam funções `n8n_*` (security definer) que conferem o mesmo segredo pelo hash SHA-256 em
+  `privado.config.n8n_segredo_hash`. O Security Advisor lista essas funções como "executáveis por anon": é
+  intencional, pois sem o segredo elas recusam tudo. Para trocar o segredo: novo valor na Vercel (`N8N_SEGREDO`) e no
+  projeto da VPS (`PORTAL_N8N_SEGREDO`), e o novo hash em `privado.config`.
 - **Pendências de segurança:** proteção contra senhas vazadas desativada (exige plano pago do Supabase); SMTP próprio
   não configurado.
 - **Dados de clientes:** planilhas reais do Pipefy não são versionadas (pasta `dados-reais/` no `.gitignore`).
@@ -673,7 +681,10 @@ Escopo v1.0 (Seção 14).
 | F-V2-03 | Proposta remarcada e valor por serviço | v2 F0 | EM PRODUÇÃO | `remarcar_atividade`, `negocio_servicos.valor` |
 | F-V2-04 | Tarefas automáticas (resultados de ligação, cadência, Oportunidade, Reciclagem, compromissos), dias úteis, feriados e notificação de toda tarefa | v2 F0 | EM PRODUÇÃO | `privado.criar_tarefa`, `privado.gerar_tarefas_diarias`, `cadencia_passos` |
 | F-V2-05 | Indicadores no banco, pelo responsável da época, e indicadores novos da Seção 7 | v2 F0 | EM PRODUÇÃO | `indicadores_comerciais`, `valor_indicador_meta` |
-| F-INT-01 | n8n: instância e fluxos | v2 F1 | PARCIAL (instância no ar; rotas e fluxos na Fase 1) | `n8n/`, VPS Hostinger |
+| F-INT-01 | n8n: instância e fluxos | v2 F1 | EM PRODUÇÃO (fila e fluxo de teste; agentes nas Fases 2+) | `n8n/`, VPS Hostinger |
+| F-V2-06 | Fila de trabalhos e rotas `/api/n8n/*` | v2 F1 | EM PRODUÇÃO | `trabalhos`, `n8n_*`, `src/app/api/n8n` |
+| F-V2-07 | Caixa de aprovação | v2 F1 | EM PRODUÇÃO (itens chegam na Fase 2) | `/aprovacoes`, `aprovacoes` |
+| F-V2-08 | Liga/desliga de agentes e saúde da fila | v2 F1 | EM PRODUÇÃO | Config. do funil → Agentes e fila |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
 | F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
 | F-INT-04 | Resumo semanal e passagem do ganho para Projetos/Presidência | 4 | NÃO IMPLEMENTADO | — |
@@ -689,6 +700,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.8 | 12/10/2026 | v2 Fase 1: fila de trabalhos, rotas `/api/n8n/*`, Caixa de aprovação, liga/desliga dos agentes e fluxo de teste |
 | 1.7 | 12/10/2026 | v2 Fase 1: n8n instalado na VPS da Hostinger (https://srv2043014.hstgr.cloud) com Caddy |
 | 1.6 | 12/10/2026 | Portão da Fase 0 aprovado; listas antigas de motivos e origens apagadas |
 | 1.5 | 12/10/2026 | v2 Fase 0, PR 6: indicadores no banco, responsável da época no histórico, indicadores novos e visão por membro só do diretor |

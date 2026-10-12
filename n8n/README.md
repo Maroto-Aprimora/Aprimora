@@ -30,6 +30,7 @@ Padrão de nome: `APRIMORA | Área | Ação`. Coloque a etiqueta `aprimora` em t
 
 | Arquivo | Fluxo | Quando roda | O que faz |
 |---|---|---|---|
+| `00-sistema-teste-fila.json` | Sistema · Teste da fila | A cada 2 min | Reserva os trabalhos do agente "Teste da fila" e devolve cada um como concluído (portão da Fase 1) |
 | `01-ligacoes-processar-fila.json` | Ligações · Processar fila | A cada 2 min | Reserva até 3 ligações, processa uma por vez com 20 s de pausa: cria a pasta do lead no Drive (se não existir), baixa a gravação, salva no Drive, pede ao Gemini transcrição e avaliação pelos critérios do diretor e devolve ao portal |
 | `02-email-enviar-cadencia.json` | E-mail · Enviar cadência | Dias úteis, 8h–18h, a cada 10 min | Reserva até 10 e-mails **aprovados** e com envio vencido; envia um a cada 30 s pelo Gmail |
 | `03-email-monitorar-respostas.json` | E-mail · Monitorar respostas | A cada 5 min | Para cada e-mail novo, pergunta ao portal se é resposta de lead; se for, o Gemini classifica e o portal atualiza o card |
@@ -91,27 +92,25 @@ Ajuste em `deploy.resources.limits` conforme a folga do VPS.
 6. **Importar** os fluxos de `fluxos/` e definir **Sistema · Tratamento de erros** como *Error workflow* dos outros.
 7. **Ativar** os fluxos só depois que as rotas `/api/n8n/*` do portal estiverem publicadas.
 
-## Contrato com o portal (rotas a implementar no portal)
+## Contrato com o portal
 
-Todas exigem o cabeçalho `x-n8n-segredo` e respondem JSON.
+Todas as rotas exigem o cabeçalho `x-n8n-segredo` (= `N8N_SEGREDO` na Vercel) e respondem JSON. Por trás, cada rota
+chama uma função `n8n_*` do banco, que confere o segredo de novo (hash em `privado.config`).
+
+**Fila genérica (Fase 1, publicada)**
 
 | Rota | Entrada | Resposta |
 |---|---|---|
-| `POST /api/n8n/ligacoes/reservar` | `{ limite }` | `{ ligacoes: [{ id, negocio_id, gravacao_url, nome_arquivo, nome_pasta, drive_pasta_id, empresa, membro, fase, objetivo, criterios: [texto] }] }` (marca como "processando") |
-| `POST /api/n8n/negocios/:id/pasta-drive` | `{ pasta_id }` | `{ pasta_id }` |
-| `POST /api/n8n/ligacoes/:id/resultado` | `{ drive_arquivo_id, drive_link, transcricao, resumo, nota, criterios[], pontos_fortes[], melhorias[], objecoes[], falou_com_decisor, interesse_cliente, proximo_passo, modelo, tokens }` | `{ ok }` |
-| `POST /api/n8n/ligacoes/:id/falha` | `{ etapa, mensagem }` | `{ ok, tentativas }` |
-| `POST /api/n8n/emails/reservar` | `{ limite }` | `{ emails: [{ id, para, assunto, corpo_html, remetente_nome, responder_para }] }` |
-| `POST /api/n8n/emails/:id/enviado` | `{ gmail_id, thread_id }` | `{ ok }` |
-| `POST /api/n8n/emails/:id/falha` | `{ mensagem }` | `{ ok }` |
-| `POST /api/n8n/emails/resposta` | `{ message_id, thread_id, de, assunto, trecho, recebido_em }` | `{ lead: true, email_id, texto_resposta, ultimo_enviado }` ou `{ lead: false }` |
-| `POST /api/n8n/emails/:id/classificacao` | `{ classificacao, resumo, proximo_passo, retorno_em? }` | `{ ok }` |
-| `GET /api/n8n/saude` | — | `{ ligacoes_pendentes, mais_antiga_minutos, erros_24h, emails_pendentes }` |
-| `POST /api/n8n/alerta` | `{ tipo, detalhes }` | `{ ok }` (notifica os diretores) |
+| `POST /api/n8n/trabalhos/reservar` | `{ agente?, limite? }` (até 20) | `{ trabalhos: [{ id, agente, tipo, negocio_id, payload, tentativa }] }` — marca como "processando"; só agentes ligados; o que ficar processando por mais de 30 min volta à fila |
+| `POST /api/n8n/trabalhos/:id/resultado` | `{ resultado: { …, aprovacao?: { tipo, titulo, resumo?, conteudo: {campo: texto}, responsavel_id? } } }` | `{ ok }` — com `aprovacao`, o item vai para a Caixa de aprovação do responsável do negócio |
+| `POST /api/n8n/trabalhos/:id/falha` | `{ etapa?, mensagem? }` | `{ ok, tentativas, max_tentativas, status }` — volta à fila em 5/10 min; na 3ª falha fica com erro e avisa os diretores |
+| `GET /api/n8n/saude` | — | `{ pendentes, processando, mais_antiga_minutos, erros_24h, concluidos_24h, ultimo_concluido_em, aprovacoes_pendentes }` |
+| `POST /api/n8n/alerta` | `{ tipo, detalhes }` | `{ ok }` (auditoria + notificação aos diretores) |
 | `POST /api/n8n/erro` | `{ fluxo, execucao_id, execucao_url, no, mensagem }` | `{ ok }` (auditoria + notificação) |
 
-E a rota que a API4COM chama: `POST /api/integracoes/api4com?token=…` (formato do evento a confirmar na documentação
-da API4COM). Ela grava a ligação e só a coloca na fila se foi **atendida, tem gravação e durou mais de 30 s**.
+**Rotas específicas previstas** (fluxos 01 a 03, entram nas Fases 2 e 3 sobre a mesma fila):
+`/api/n8n/ligacoes/*`, `/api/n8n/negocios/:id/pasta-drive`, `/api/n8n/emails/*` e a rota da API4COM
+`POST /api/integracoes/api4com?token=…`. Até lá, **não ative os fluxos 01, 02 e 03**.
 
 ## Limites e cuidados conhecidos
 

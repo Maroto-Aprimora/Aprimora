@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
-  BarChart3, Building2, CalendarDays, ChevronDown, Gauge, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
+  BarChart3, Building2, CalendarDays, ChevronDown, Gauge, Inbox, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
   Settings, Target, Trophy, Users, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ import { AlternarTema } from "./alternar-tema";
 import { Sino } from "./sino";
 
 type Icone = React.ComponentType<{ className?: string }>;
-type Item = { href: string; rotulo: string; icone: Icone };
+type Item = { href: string; rotulo: string; icone: Icone; contador?: number };
 type Grupo = { slug: string; itens: Item[] };
 
 export type DadosMenu = {
@@ -24,16 +24,18 @@ export type DadosMenu = {
   minhasDiretorias: string[];
   ehDiretor: boolean;
   diretorDe: string[];
+  aprovacoesPendentes: number;
 };
 
 /**
  * Menu da v2 (portal exclusivo do Comercial): seções gerais, o Comercial e o que permanece das outras diretorias
  * (Membros, Pontuação, Painel geral e Auditoria). Projetos e Marketing não têm telas.
  */
-function montarMenu({ ehDiretor, diretorDe }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
+function montarMenu({ ehDiretor, diretorDe, aprovacoesPendentes }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
   return {
     gerais: [
       { href: "/painel", rotulo: "Início", icone: LayoutDashboard },
+      { href: "/aprovacoes", rotulo: "Caixa de aprovação", icone: Inbox, contador: aprovacoesPendentes },
       { href: "/agenda", rotulo: "Agenda", icone: CalendarDays },
       { href: "/tarefas", rotulo: "Tarefas", icone: ListChecks },
     ],
@@ -97,7 +99,7 @@ export function MenuLateral(dados: DadosMenu) {
   const todos = [...gerais, ...grupos.flatMap((g) => g.itens)];
   const hrefAtivo = todos.filter((i) => ativoEm(caminho, i.href)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
-  const linkItem = ({ href, rotulo, icone: Icone }: Item, recuado = false) => (
+  const linkItem = ({ href, rotulo, icone: Icone, contador }: Item, recuado = false) => (
     <Link
       key={href}
       href={href}
@@ -112,6 +114,10 @@ export function MenuLateral(dados: DadosMenu) {
     >
       <Icone className="h-4 w-4 shrink-0" />
       <span className={cn(recolhido && "lg:hidden")}>{rotulo}</span>
+      {!!contador && (
+        <span className={cn("ml-auto rounded-full bg-destaque px-1.5 text-[11px] font-bold leading-5 text-marca-texto", recolhido && "lg:hidden")}
+          aria-label={`${contador} para aprovar`}>{contador}</span>
+      )}
     </Link>
   );
   const so = (classe: string) => (recolhido ? classe : "");
