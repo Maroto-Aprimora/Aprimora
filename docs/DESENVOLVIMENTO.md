@@ -36,7 +36,8 @@ npm run build
 | `src/proxy.ts` | Renova a sessão e protege as rotas (no Next.js 16 o antigo `middleware` chama-se `proxy`) |
 | `supabase/migrations` | Todas as mudanças do banco, em ordem |
 | `supabase/dados` | Dados fictícios para testes e o script para removê-los |
-| `docs/` | Escopo, guias e decisões |
+| `supabase/testes` | Banco local que imita o Supabase, roteiros de teste das migrações e comparação dos indicadores |
+| `docs/` | Escopo, guias, decisões e roteiros de teste dos portões (`docs/testes/`) |
 
 ## Banco de dados (Supabase)
 
