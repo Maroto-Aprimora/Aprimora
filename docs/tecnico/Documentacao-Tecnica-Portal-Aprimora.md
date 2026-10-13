@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.10 |
+| Versão do documento | 1.11 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -247,7 +247,7 @@ O cargo nunca vem do navegador: só do pré-cadastro feito por um diretor.
 
 - Cookies gerenciados por `@supabase/ssr`. `src/proxy.ts` chama `atualizarSessao()` (`src/lib/supabase/sessao.ts`) em
   toda requisição, valida com `auth.getClaims()` e redireciona para `/entrar?voltar=…` quem não está logado.
-- Rotas públicas: `/entrar`, `/primeiro-acesso`, `/esqueci-senha`, `/auth/*`, `/api/push` e `/api/n8n/*` (protegidas por segredo).
+- Rotas públicas: `/entrar`, `/primeiro-acesso`, `/esqueci-senha`, `/auth/*`, `/api/push`, `/api/n8n/*` e `/api/integracoes/*` (protegidas por segredo ou token).
 - `/auth/confirmar` trata os três formatos de link do Supabase (fragmento `#access_token`, `token_hash` e `code`).
 - `obterUsuario()` (`src/lib/usuario.ts`) carrega o membro e seus cargos uma vez por requisição e expõe `cargoEm()`,
   `ehDiretorDe()` e `ehDiretor`. Membro desativado é mandado de volta ao login.
@@ -345,6 +345,7 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `agentes` | chave, codigo (A1…A12), nome, descricao, tipo, prioridade, fase_roadmap, quem_aprova, ativo | Os 12 agentes do PE-PA-002 + "Teste da fila"; liga/desliga em Config. do funil |
 | `trabalhos` | agente, tipo, negocio_id, payload, status (pendente/processando/concluido/erro/cancelado), tentativas, max_tentativas, proximo_em, reservado_em, resultado, erro, chave | Fila que o n8n consome; só funções internas escrevem |
 | `aprovacoes` | agente, tipo, trabalho_id, negocio_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação |
+| `eventos_integracoes` | origem, recebido_em, payload, processado_em, ligacao_id, erro | Eventos recebidos de sistemas externos (API4COM), como chegaram; só o diretor lê |
 | `feriados` | data, nome | Dias não úteis (nacionais 2026–2027 e aniversário de Londrina); tarefas automáticas pulam fins de semana e feriados |
 | `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
 | `anexos` | negocio_id, nome, caminho, tamanho (≤ 10 MB), tipo_mime, enviado_por | Metadados dos arquivos do bucket `anexos` |
@@ -532,7 +533,7 @@ da Vercel, então o push só funciona em produção.
 | Web Push | EM PRODUÇÃO | Chaves VAPID nas variáveis da Vercel |
 | E-mail transacional (convite, senha) | PARCIAL | Usa o envio padrão do Supabase (limitado). SMTP próprio pendente (Seção 16) |
 | n8n da Aprimora | INSTALADO (fluxos ainda não importados) | VPS Hostinger KVM 2 própria, https://srv2043014.hstgr.cloud; `n8n/docker-compose.yml` com Caddy (HTTPS automático) e n8n (1 vCPU / 1,5 GB, limpeza automática de execuções, áudios em disco, 2 execuções simultâneas); 5 fluxos em `n8n/fluxos/` |
-| API4COM (ligações) | NÃO IMPLEMENTADO no portal | Previsto: webhook → portal (fila) → n8n → Google Drive + Gemini → card do negócio |
+| API4COM (ligações) | PARCIAL (recebimento ativo; processamento na Fase 2.3) | Webhook "após desligamento da chamada" v1.4 → `POST /api/integracoes/api4com?token=…` → `eventos_integracoes` (payload bruto; token conferido pelo hash `privado.config.api4com_token_hash`). Previsto: evento → ligação → fila → n8n → Google Drive + Gemini → card |
 | Gmail (cadência e respostas) | NÃO IMPLEMENTADO no portal | Previsto: e-mails aprovados no portal enviados pelo n8n; respostas classificadas pelo Gemini |
 | Google Drive, Gemini | NÃO IMPLEMENTADO no portal | Usados pelos fluxos do n8n |
 
@@ -700,6 +701,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.11 | 13/10/2026 | Recebimento do webhook da API4COM (`/api/integracoes/api4com`) |
 | 1.10 | 13/10/2026 | Portão da Fase 1 aprovado: fluxo de teste do n8n foi e voltou pela fila sem erro |
 | 1.9 | 13/10/2026 | Vercel religada ao repositório `Maroto-Aprimora/PortalAprimora` |
 | 1.8 | 12/10/2026 | v2 Fase 1: fila de trabalhos, rotas `/api/n8n/*`, Caixa de aprovação, liga/desliga dos agentes e fluxo de teste |

@@ -630,6 +630,44 @@ export type Database = {
           },
         ]
       }
+      eventos_integracoes: {
+        Row: {
+          erro: string | null
+          id: number
+          ligacao_id: string | null
+          origem: string
+          payload: Json
+          processado_em: string | null
+          recebido_em: string
+        }
+        Insert: {
+          erro?: string | null
+          id?: never
+          ligacao_id?: string | null
+          origem: string
+          payload: Json
+          processado_em?: string | null
+          recebido_em?: string
+        }
+        Update: {
+          erro?: string | null
+          id?: never
+          ligacao_id?: string | null
+          origem?: string
+          payload?: Json
+          processado_em?: string | null
+          recebido_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eventos_integracoes_ligacao_id_fkey"
+            columns: ["ligacao_id"]
+            isOneToOne: false
+            referencedRelation: "ligacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fase_campos: {
         Row: {
           ajuda: string | null
@@ -2253,6 +2291,10 @@ export type Database = {
       }
       n8n_saude: { Args: { _segredo: string }; Returns: Json }
       normalizar: { Args: { _t: string }; Returns: string }
+      registrar_evento_integracao: {
+        Args: { _origem: string; _payload: Json; _token: string }
+        Returns: Json
+      }
       remarcar_atividade: {
         Args: {
           _atividade: string
