@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRightLeft, Building2, ChevronDown, Clock, ExternalLink, Globe, MapPin, Phone, PhoneCall, Tag, User, Wallet, Wrench } from "lucide-react";
+import { Building2, Clock, ExternalLink, Globe, MapPin, Phone, PhoneCall, Tag, User, Wallet, Wrench } from "lucide-react";
+import { classeBotao } from "@/components/ui/botao";
+import { Dialogo } from "@/components/ui/dialogo";
 import { Avatar, Selo } from "@/components/ui/selo";
 import { useMoverNegocio } from "@/components/crm/mover-negocio";
 import { RegistrarLigacao } from "@/components/crm/registrar-ligacao";
@@ -95,30 +97,31 @@ export function Kanban({ fases, motivos, resultados, cartoes }: { fases: Fase[];
 }
 
 /**
- * Card do negócio (inspirado no card retrátil enviado pelo Diretor Comercial): fechado mostra o essencial; aberto,
- * todos os dados do lead em linhas com ícone. Continua arrastável entre as fases.
+ * Card do negócio: compacto no quadro; ao clicar, abre numa janela com todos os dados do lead e as ações
+ * (mesmo comportamento do card de tarefa). Continua arrastável entre as fases.
  */
 function Cartao({ cartao, fase, fases, resultados, aoMover }: {
   cartao: CartaoNegocio; fase: Fase; fases: Fase[]; resultados: ResultadoLigacao[]; aoMover: (destino: Fase) => void;
 }) {
   const [aberto, setAberto] = useState(false);
-  const [escolhendo, setEscolhendo] = useState(false);
   const dias = diasDesde(cartao.entrouNaFaseEm);
   const sla = situacaoSla(fase, dias);
   const site = cartao.site ? cartao.site.replace(/^https?:\/\//, "").replace(/\/$/, "") : null;
 
   return (
-    <article
-      draggable
-      onDragStart={(e) => { e.dataTransfer.setData("text/negocio", cartao.id); e.dataTransfer.effectAllowed = "move"; }}
-      className={cn(
-        "cursor-grab overflow-hidden rounded-xl border bg-superficie-2 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing",
-        sla === "estourado" ? "border-destaque ring-1 ring-destaque/40" : "border-borda",
-      )}
-    >
-      <div role="button" tabIndex={0} aria-expanded={aberto} onClick={() => setAberto((v) => !v)}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setAberto((v) => !v))}
-        className="flex items-center gap-2.5 p-2.5">
+    <>
+      <article
+        draggable
+        role="button"
+        tabIndex={0}
+        onClick={() => setAberto(true)}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setAberto(true))}
+        onDragStart={(e) => { e.dataTransfer.setData("text/negocio", cartao.id); e.dataTransfer.effectAllowed = "move"; }}
+        className={cn(
+          "flex cursor-pointer items-center gap-2.5 rounded-xl border bg-superficie p-2.5 shadow-sm transition hover:border-marca/40 hover:shadow-md active:cursor-grabbing",
+          sla === "estourado" ? "border-destaque ring-1 ring-destaque/40" : "border-borda",
+        )}
+      >
         <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white", COR_MACRO[fase.macroetapa])}>
           {iniciais(cartao.empresa)}
         </span>
@@ -127,81 +130,73 @@ function Cartao({ cartao, fase, fases, resultados, aoMover }: {
           <div className="mt-1 flex flex-wrap items-center gap-1">
             <Selo tom={sla === "estourado" || sla === "atencao" ? "destaque" : "neutro"}>{dias}d{sla === "estourado" ? " · SLA" : ""}</Selo>
             {cartao.valor != null && <Selo tom="marca">{formatarMoeda(cartao.valor)}</Selo>}
+            {cartao.ultimaLigacao && <Selo title="Última ligação"><PhoneCall className="h-3 w-3" /></Selo>}
             {cartao.ficticio && <Selo className="opacity-70">fictício</Selo>}
           </div>
         </div>
         {cartao.responsavel && <Avatar iniciais={iniciais(cartao.responsavel)} nome={cartao.responsavel} className="h-6 w-6 text-[10px]" />}
-        <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-borda text-texto-suave transition-transform duration-300",
-          aberto && "rotate-180")}>
-          <ChevronDown className="h-4 w-4" />
-        </span>
-      </div>
+      </article>
 
-      {/* Conteúdo aberto: a altura anima pela grade (0fr → 1fr) */}
-      <div className={cn("grid transition-[grid-template-rows] duration-300 ease-out", aberto ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
-        <div className="overflow-hidden">
-          <div className="space-y-2 rounded-t-2xl border-t border-borda bg-superficie p-3 text-xs">
-            <Linha icone={User} rotulo="Responsável">{cartao.responsavel ?? (fase.tipo === "aberta" ? "Sem responsável" : "—")}</Linha>
-            {cartao.cidade && <Linha icone={MapPin} rotulo="Cidade">{cartao.cidade}</Linha>}
-            <Linha icone={Wallet} rotulo="Valor">{cartao.valor != null ? <Selo tom="sucesso">{formatarMoeda(cartao.valor)}</Selo> : "—"}</Linha>
-            <Linha icone={Clock} rotulo="Na fase">
-              {dias} {dias === 1 ? "dia" : "dias"}{fase.sla_dias ? ` de ${fase.sla_dias}` : ""}
-              {sla === "estourado" && <Selo tom="destaque" className="ml-1">SLA estourado</Selo>}
-            </Linha>
-            {cartao.segmento && <Linha icone={Tag} rotulo="Segmento"><Selo tom="marca">{cartao.segmento}</Selo></Linha>}
-            {cartao.servicos.length > 0 && (
-              <Linha icone={Wrench} rotulo="Serviços">
-                <span className="flex flex-wrap justify-end gap-1">{cartao.servicos.map((s) => <Selo key={s}>{s}</Selo>)}</span>
+      {aberto && (
+        <Dialogo aberto aoFechar={() => setAberto(false)} titulo={cartao.titulo}
+          descricao={`${NOME_MACROETAPA[fase.macroetapa]} · ${fase.nome}`} className="w-[min(94vw,600px)]">
+          <div className="space-y-4">
+            <dl className="space-y-2.5 text-sm">
+              <Linha icone={User} rotulo="Responsável">{cartao.responsavel ?? (fase.tipo === "aberta" ? "Sem responsável" : "—")}</Linha>
+              {cartao.cidade && <Linha icone={MapPin} rotulo="Cidade">{cartao.cidade}</Linha>}
+              <Linha icone={Wallet} rotulo="Valor">{cartao.valor != null ? <Selo tom="sucesso">{formatarMoeda(cartao.valor)}</Selo> : "—"}</Linha>
+              <Linha icone={Clock} rotulo="Na fase">
+                {dias} {dias === 1 ? "dia" : "dias"}{fase.sla_dias ? ` de ${fase.sla_dias}` : ""}
+                {sla === "estourado" && <Selo tom="destaque" className="ml-1">SLA estourado</Selo>}
               </Linha>
-            )}
-            {cartao.contato && <Linha icone={Building2} rotulo="Contato">{cartao.contato}</Linha>}
-            {cartao.telefone && <Linha icone={Phone} rotulo="Telefone">{cartao.telefone}</Linha>}
-            {site && (
-              <Linha icone={Globe} rotulo="Site">
-                <a href={cartao.site!.startsWith("http") ? cartao.site! : `https://${cartao.site}`} target="_blank" rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()} className="truncate rounded-full border border-borda px-2 py-0.5 hover:text-destaque">{site}</a>
-              </Linha>
-            )}
-            {cartao.ultimaLigacao && (
-              <Linha icone={PhoneCall} rotulo="Última ligação">
-                {cartao.ultimaLigacao}{cartao.ultimaLigacaoEm ? ` · ${formatarData(cartao.ultimaLigacaoEm)}` : ""}
-              </Linha>
-            )}
-            <div className="flex items-center gap-1 border-t border-borda pt-2">
-              {fase.tipo === "aberta" && (
-                <RegistrarLigacao compacto negocioId={cartao.id} titulo={cartao.titulo} resultados={resultados} contatoPadrao={cartao.contatoId} />
+              {cartao.segmento && <Linha icone={Tag} rotulo="Segmento"><Selo tom="marca">{cartao.segmento}</Selo></Linha>}
+              {cartao.servicos.length > 0 && (
+                <Linha icone={Wrench} rotulo="Serviços">
+                  <span className="flex flex-wrap justify-end gap-1">{cartao.servicos.map((s) => <Selo key={s}>{s}</Selo>)}</span>
+                </Linha>
               )}
-              <button onClick={() => setEscolhendo((v) => !v)} className="rounded p-1 text-texto-suave hover:bg-superficie-2 hover:text-texto"
-                aria-label="Mover para outra fase" title="Mover para outra fase">
-                <ArrowRightLeft className="h-3.5 w-3.5" />
-              </button>
-              <Link href={`/negocios/${cartao.id}`} className="ml-auto inline-flex items-center gap-1 rounded px-2 py-1 font-semibold text-marca hover:bg-superficie-2 hover:text-destaque">
-                Abrir <ExternalLink className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-            {escolhendo && (
-              <select autoFocus className="w-full rounded-md border border-borda bg-superficie px-2 py-1 text-xs" defaultValue=""
+              {cartao.contato && <Linha icone={Building2} rotulo="Contato">{cartao.contato}</Linha>}
+              {cartao.telefone && <Linha icone={Phone} rotulo="Telefone">{cartao.telefone}</Linha>}
+              {site && (
+                <Linha icone={Globe} rotulo="Site">
+                  <a href={cartao.site!.startsWith("http") ? cartao.site! : `https://${cartao.site}`} target="_blank" rel="noopener noreferrer"
+                    className="truncate rounded-full border border-borda px-2 py-0.5 hover:text-destaque">{site}</a>
+                </Linha>
+              )}
+              {cartao.ultimaLigacao && (
+                <Linha icone={PhoneCall} rotulo="Última ligação">
+                  {cartao.ultimaLigacao}{cartao.ultimaLigacaoEm ? ` · ${formatarData(cartao.ultimaLigacaoEm)}` : ""}
+                </Linha>
+              )}
+            </dl>
+            <div className="flex flex-wrap items-center gap-2 border-t border-borda pt-4">
+              {fase.tipo === "aberta" && (
+                <RegistrarLigacao negocioId={cartao.id} titulo={cartao.titulo} resultados={resultados} contatoPadrao={cartao.contatoId} />
+              )}
+              <select className="h-10 rounded-md border border-borda bg-superficie px-3 text-sm" defaultValue="" aria-label="Mover para a fase"
                 onChange={(e) => {
                   const destino = fases.find((f) => f.id === e.target.value);
-                  setEscolhendo(false);
-                  if (destino) aoMover(destino);
+                  if (destino) { setAberto(false); aoMover(destino); }
                 }}>
                 <option value="" disabled>Mover para…</option>
                 {fases.filter((f) => f.id !== fase.id).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
               </select>
-            )}
+              <Link href={`/negocios/${cartao.id}`} className={cn(classeBotao("primario"), "ml-auto")}>
+                Abrir negócio <ExternalLink className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-        </div>
-      </div>
-    </article>
+        </Dialogo>
+      )}
+    </>
   );
 }
 
 function Linha({ icone: Icone, rotulo, children }: { icone: React.ComponentType<{ className?: string }>; rotulo: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="flex shrink-0 items-center gap-2 text-texto-suave"><Icone className="h-3.5 w-3.5" />{rotulo}</span>
-      <span className="flex min-w-0 items-center justify-end text-right font-semibold">{children}</span>
+    <div className="flex items-center justify-between gap-4">
+      <dt className="flex shrink-0 items-center gap-2 text-texto-suave"><Icone className="h-4 w-4" />{rotulo}</dt>
+      <dd className="flex min-w-0 items-center justify-end text-right font-semibold">{children}</dd>
     </div>
   );
 }

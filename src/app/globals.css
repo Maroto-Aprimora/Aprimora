@@ -11,6 +11,7 @@
   --fundo: #f6f8fb;
   --superficie: #ffffff;
   --superficie-2: #f2f5f9;
+  --dialogo: #ffffff;          /* janela aberta: mais clara que o fundo escurecido */
   --texto: #1a2433;
   --texto-suave: #5b6573;
   --borda: #dde3ea;
@@ -34,6 +35,7 @@
   --fundo: #0f1b2b;
   --superficie: #16253a;
   --superficie-2: #1c2e47;
+  --dialogo: #1f3452;
   --texto: #eef3f8;
   --texto-suave: #9fb0c3;
   --borda: #2a3f5c;
@@ -57,6 +59,7 @@
   --color-fundo: var(--fundo);
   --color-superficie: var(--superficie);
   --color-superficie-2: var(--superficie-2);
+  --color-dialogo: var(--dialogo);
   --color-texto: var(--texto);
   --color-texto-suave: var(--texto-suave);
   --color-borda: var(--borda);
@@ -95,5 +98,7 @@ h1, h2, h3 {
 }
 
 dialog::backdrop {
-  background: rgb(10 20 35 / 0.45);
+  /* Fundo bem escurecido para a janela aberta se destacar */
+  background: rgb(8 16 28 / 0.68);
+  backdrop-filter: blur(2px);
 }

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
   BarChart3, Building2, CalendarDays, ChevronDown, Gauge, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
-  Settings, Target, TrendingUp, Trophy, Users, X,
+  Target, TrendingUp, Trophy, Users, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sair } from "@/app/acoes-sessao";
@@ -31,7 +31,7 @@ export type DadosMenu = {
  * Menu da v2 (portal exclusivo do Comercial): seções gerais, o Comercial e o que permanece das outras diretorias
  * (Membros, Pontuação, Painel geral e Auditoria). Projetos e Marketing não têm telas.
  */
-function montarMenu({ ehDiretor, diretorDe, aprovacoesPendentes }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
+function montarMenu({ ehDiretor, aprovacoesPendentes }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
   return {
     gerais: [
       { href: "/painel", rotulo: "Início", icone: LayoutDashboard },
@@ -45,7 +45,6 @@ function montarMenu({ ehDiretor, diretorDe, aprovacoesPendentes }: DadosMenu): {
         { href: "/empresas", rotulo: "Empresas e leads", icone: Building2 },
         { href: "/desempenho", rotulo: "Desempenho individual", icone: TrendingUp },
         { href: "/metas", rotulo: "Metas", icone: Target },
-        ...(diretorDe.includes("comercial") ? [{ href: "/funil/configuracoes", rotulo: "Config. do funil", icone: Settings }] : []),
       ] },
       { slug: "rh", itens: [
         { href: "/membros", rotulo: "Membros", icone: Users },

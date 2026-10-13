@@ -70,7 +70,10 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
   const acoes = (
     <>
       {usuario.ehDiretorDe("comercial") && (
-        <Link href="/funil/configuracoes" className={classeBotao("secundario", "sm")} title="Configurações do funil"><Settings className="h-4 w-4" /> Config</Link>
+        <Link href="/funil/configuracoes" title="Configurações do funil" aria-label="Configurações do funil"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-borda bg-superficie text-texto-suave hover:text-texto">
+          <Settings className="h-4 w-4" />
+        </Link>
       )}
       <Link href="/empresas/novo" className={classeBotao("destaque", "sm")}><Plus className="h-4 w-4" /> Novo lead</Link>
     </>

@@ -25,7 +25,7 @@ export function Dialogo({
       onClose={aoFechar}
       onClick={(e) => e.target === ref.current && aoFechar()}
       className={cn(
-        "m-auto w-[min(92vw,560px)] rounded-xl border border-borda bg-superficie p-0 text-texto shadow-2xl",
+        "m-auto w-[min(92vw,560px)] rounded-2xl border border-borda bg-dialogo p-0 text-texto shadow-2xl ring-1 ring-white/10",
         className,
       )}
     >
