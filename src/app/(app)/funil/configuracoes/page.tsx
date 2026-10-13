@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
-import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
+import { BarraVisoes } from "@/components/app/barra-visoes";
+import { Cartao, CabecalhoCartao } from "@/components/ui/cartao";
 import { NOME_AREA } from "@/lib/crm";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
 import { Agentes, Cadencia, CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm, Rubrica } from "./componentes";
+import { AbaPeloAncora } from "./aba-ancora";
 
 export const metadata: Metadata = { title: "Configurações do funil" };
 
@@ -15,7 +17,9 @@ const comRegra = <T extends { exige_comentario: boolean; marca_nao_contatar: boo
   ...m, detalhe: m.exige_comentario ? "comentário obrigatório" : m.marca_nao_contatar ? "marca “não contatar”" : undefined,
 });
 
-export default async function PaginaConfiguracoes() {
+export default async function PaginaConfiguracoes({ searchParams }: PageProps<"/funil/configuracoes">) {
+  const sp = await searchParams;
+  const ver = sp.ver === "agentes" || sp.ver === "cadencia" ? sp.ver : "campos";
   const usuario = await obterUsuario();
   if (!usuario.ehDiretorDe("comercial")) redirect("/funil");
   const supabase = await criarClienteServidor();
@@ -50,8 +54,12 @@ export default async function PaginaConfiguracoes() {
       <Link href="/funil" className="mb-3 inline-flex items-center gap-1 text-sm text-texto-suave hover:text-destaque">
         <ArrowLeft className="h-4 w-4" /> Funil
       </Link>
-      <TituloPagina titulo="Configurações do funil" descricao="Ajuste o funil sem precisar de programação. As mudanças valem na hora para toda a diretoria." />
+      <h1 className="mb-3 text-2xl font-bold text-texto">Configurações do funil</h1>
+      <AbaPeloAncora />
+      <BarraVisoes padrao="campos"
+        visoes={[{ chave: "campos", rotulo: "Campos" }, { chave: "agentes", rotulo: "Agentes" }, { chave: "cadencia", rotulo: "Cadência" }]} />
 
+      {ver === "campos" && <>
       <Cartao className="mb-6">
         <CabecalhoCartao titulo="Fases do funil" descricao="SLA: dias máximos na fase. “Mover” leva o negócio automaticamente para a fase de destino quando o SLA estoura (verificado todo dia às 8h)." />
         <div className="overflow-x-auto">
@@ -87,10 +95,6 @@ export default async function PaginaConfiguracoes() {
         </div>
       </Cartao>
 
-      <Agentes agentes={agentes ?? []} saude={saude as Parameters<typeof Agentes>[0]["saude"]} trabalhos={trabalhos ?? []} />
-
-      <Cadencia passos={passos ?? []} parametros={parametros} />
-
       <Cartao className="mb-6">
         <CabecalhoCartao titulo="Resultados de ligação"
           descricao="Lista fechada usada no registro de cada ligação. Define o que acontece com o card e qual tarefa o responsável recebe. Um card só avança de fase (nunca volta) e negócios encerrados não são reabertos." />
@@ -106,14 +110,11 @@ export default async function PaginaConfiguracoes() {
         </div>
       </Cartao>
 
-      <Rubrica criterios={rubrica ?? []} />
-
       <div className="grid gap-6 lg:grid-cols-2">
         <ListaSimples titulo="Motivos de perda" tabela="motivos" extra={{ tipo: "perda" }} itens={(motivos ?? []).filter((m) => m.tipo === "perda").map(comRegra)} />
         <ListaSimples titulo="Motivos de desqualificação" tabela="motivos" extra={{ tipo: "desqualificacao" }} itens={(motivos ?? []).filter((m) => m.tipo === "desqualificacao").map(comRegra)} />
         <ListaSimples titulo="Origens de lead" tabela="origens" itens={origens ?? []} />
         <ListaSimples titulo="Segmentos" tabela="segmentos" itens={segmentos ?? []} />
-        <ListaFeriados feriados={feriados ?? []} />
         <ListaSimples
           titulo="Serviços (Carta de Serviços)"
           tabela="servicos"
@@ -122,6 +123,17 @@ export default async function PaginaConfiguracoes() {
           className="lg:col-span-2"
         />
       </div>
+      </>}
+
+      {ver === "agentes" && <>
+        <Agentes agentes={agentes ?? []} saude={saude as Parameters<typeof Agentes>[0]["saude"]} trabalhos={trabalhos ?? []} />
+        <Rubrica criterios={rubrica ?? []} />
+      </>}
+
+      {ver === "cadencia" && <>
+        <Cadencia passos={passos ?? []} parametros={parametros} />
+        <div className="grid gap-6 lg:grid-cols-2"><ListaFeriados feriados={feriados ?? []} /></div>
+      </>}
     </>
   );
 }

@@ -5,8 +5,12 @@ import { useEffect, useState } from "react";
 import { BarraVisoes, BotaoFiltros, CampoBusca, useParametros } from "@/components/app/barra-visoes";
 import { Campo, Selecao } from "@/components/ui/campos";
 
-/** Cabeçalho de Empresas e leads, igual ao do Funil: Kanban e Lista à esquerda; busca e filtro à direita. */
-export function BarraEmpresas({ segmentos, acoes }: { segmentos: { id: string; nome: string }[]; acoes?: React.ReactNode }) {
+/** Cabeçalho de Empresas e leads no padrão do Funil: busca e filtros (segmento, cidade, responsável) à direita. */
+const FILTROS = ["segmento", "cidade", "resp"] as const;
+
+export function BarraEmpresas({ segmentos, cidades, membros, acoes }: {
+  segmentos: { id: string; nome: string }[]; cidades: string[]; membros: { id: string; nome: string }[]; acoes?: React.ReactNode;
+}) {
   const router = useRouter();
   const { params, montar } = useParametros();
   const [q, setQ] = useState(params.get("q") ?? "");
@@ -20,13 +24,25 @@ export function BarraEmpresas({ segmentos, acoes }: { segmentos: { id: string; n
   }, [q]);
 
   return (
-    <BarraVisoes visoes={[{ chave: "kanban", rotulo: "Kanban" }, { chave: "lista", rotulo: "Lista" }]} padrao="kanban">
+    <BarraVisoes visoes={[{ chave: "lista", rotulo: "Lista" }]} padrao="lista">
       <CampoBusca valor={q} aoMudar={setQ} placeholder="Nome, CNPJ ou telefone" />
-      <BotaoFiltros ativos={params.get("segmento") ? 1 : 0} aoLimpar={() => aplicar({ segmento: null })}>
+      <BotaoFiltros ativos={FILTROS.filter((c) => params.get(c)).length} aoLimpar={() => aplicar(Object.fromEntries(FILTROS.map((c) => [c, null])))}>
         <Campo rotulo="Segmento">
           <Selecao value={params.get("segmento") ?? ""} onChange={(e) => aplicar({ segmento: e.target.value || null })}>
             <option value="">Todos</option>
             {segmentos.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </Selecao>
+        </Campo>
+        <Campo rotulo="Cidade">
+          <Selecao value={params.get("cidade") ?? ""} onChange={(e) => aplicar({ cidade: e.target.value || null })}>
+            <option value="">Todas</option>
+            {cidades.map((c) => <option key={c} value={c}>{c}</option>)}
+          </Selecao>
+        </Campo>
+        <Campo rotulo="Responsável">
+          <Selecao value={params.get("resp") ?? ""} onChange={(e) => aplicar({ resp: e.target.value || null })}>
+            <option value="">Todos</option>
+            {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
           </Selecao>
         </Campo>
       </BotaoFiltros>

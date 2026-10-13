@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.16 |
+| Versão do documento | 1.17 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -720,6 +720,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.17 | 13/10/2026 | Empresas e leads só em lista, com filtros de segmento, cidade e responsável; Config. do funil em abas (Campos, Agentes, Cadência); card do funil em janela; janelas mais claras sobre fundo escurecido |
 | 1.16 | 13/10/2026 | Desempenho individual; Caixa de aprovação dentro de Tarefas (quadro retrátil); Funil com cabeçalho estilo Pipefy, visão em lista e card retrátil; rubrica editável; Agendador (A8) desligado |
 | 1.15 | 13/10/2026 | A2 Agente de ligação e A3 Avaliador (migração `20261013160000`, fluxo 09, Caixa de aprovação com lista de resultados) |
 | 1.14 | 13/10/2026 | Chamadas da API4COM também por consulta do n8n (fluxo 08, `n8n_registrar_chamadas`); o webhook não dispara para ligações do aplicativo |
