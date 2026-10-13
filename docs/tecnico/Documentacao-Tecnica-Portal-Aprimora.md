@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.9 |
+| Versão do documento | 1.10 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -700,6 +700,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.10 | 13/10/2026 | Portão da Fase 1 aprovado: fluxo de teste do n8n foi e voltou pela fila sem erro |
 | 1.9 | 13/10/2026 | Vercel religada ao repositório `Maroto-Aprimora/PortalAprimora` |
 | 1.8 | 12/10/2026 | v2 Fase 1: fila de trabalhos, rotas `/api/n8n/*`, Caixa de aprovação, liga/desliga dos agentes e fluxo de teste |
 | 1.7 | 12/10/2026 | v2 Fase 1: n8n instalado na VPS da Hostinger (https://srv2043014.hstgr.cloud) com Caddy |

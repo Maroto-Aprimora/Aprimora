@@ -30,4 +30,5 @@ duplicar, 3 tentativas com erro e aviso, Caixa de aprovação).
 ## Depois do roteiro
 
 - [ ] Deixar **Teste da fila** desligado.
-- [ ] Registrar aqui a data da validação e liberar a Fase 2.
+- [x] Registrar aqui a data da validação e liberar a Fase 2. **Portão aprovado pelo Diretor Comercial em 13/10/2026**:
+      3 trabalhos de teste reservados pelo n8n e concluídos na 1ª tentativa (12/10, 18:58).
