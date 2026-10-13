@@ -1,0 +1,395 @@
+{
+ "name": "APRIMORA | Agente | A2 Agente de ligação",
+ "nodes": [
+  {
+   "id": "09-nota",
+   "name": "Nota",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    -80,
+    -320
+   ],
+   "parameters": {
+    "content": "## APRIMORA | Agente | A2 Agente de ligação + A3 Avaliador\nA cada 2 minutos reserva 1 ligação (criada pelo portal a partir das chamadas da API4COM, com conversa de 15 s ou mais). Baixa a gravação pelo link da API4COM e manda o áudio ao **Gemini gratuito** numa só chamada: transcrição, resumo, resultado sugerido (lista 3.1), dores, próximo passo e datas e, com o Avaliador ligado, nota de 1 a 4 por critério da rubrica. O membro confirma o resultado na **Caixa de aprovação**.\n\nLimite: o áudio vai inteiro no pedido (até ~20 MB, cerca de 15–20 min de MP3).",
+    "width": 900,
+    "height": 220,
+    "color": 4
+   }
+  },
+  {
+   "id": "09-gatilho",
+   "name": "A cada 2 minutos",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "minutes",
+       "minutesInterval": 2
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "09-reservar",
+   "name": "Reservar trabalhos",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/reservar",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ agente: 'ligacao', limite: 1 }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "09-separar",
+   "name": "Separar trabalhos",
+   "type": "n8n-nodes-base.splitOut",
+   "typeVersion": 1,
+   "position": [
+    440,
+    0
+   ],
+   "parameters": {
+    "fieldToSplitOut": "trabalhos",
+    "options": {}
+   }
+  },
+  {
+   "id": "09-baixar",
+   "name": "Baixar gravação",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    660,
+    0
+   ],
+   "parameters": {
+    "method": "GET",
+    "url": "={{ $json.payload.gravacao_url }}",
+    "options": {
+     "timeout": 120000,
+     "response": {
+      "response": {
+       "responseFormat": "file",
+       "outputPropertyName": "data"
+      }
+     }
+    }
+   },
+   "onError": "continueErrorOutput",
+   "retryOnFail": true,
+   "maxTries": 2,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "09-base64",
+   "name": "Áudio em base64",
+   "type": "n8n-nodes-base.extractFromFile",
+   "typeVersion": 1,
+   "position": [
+    880,
+    0
+   ],
+   "parameters": {
+    "operation": "binaryToPropery",
+    "binaryPropertyName": "data",
+    "destinationKey": "audio",
+    "options": {}
+   },
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "09-pedido",
+   "name": "Montar pedido ao Gemini",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1100,
+    0
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Monta o pedido ao Gemini: o áudio da gravação + o contexto do lead. Uma só chamada faz o A2 e o A3.\nconst t = $('Separar trabalhos').item.json;\nconst p = t.payload || {};\nconst audio = $json.audio;\nif (!audio) throw new Error('Gravação vazia ou não baixada');\nconst mime = (($('Baixar gravação').item.binary || {}).data || {}).mimeType || 'audio/mpeg';\nconst rubrica = Array.isArray(p.rubrica) ? p.rubrica : [];\nconst lista = { type: 'ARRAY', items: { type: 'STRING' } };\nconst props = {\n  transcricao: { type: 'STRING' }, resumo: { type: 'STRING' },\n  resultado: { type: 'STRING', enum: (p.resultados || []).map((r) => r.chave) },\n  proximo_passo: { type: 'STRING' }, retorno_em: { type: 'STRING' }, compromisso_em: { type: 'STRING' },\n  decisor_nome: { type: 'STRING' }, decisor_melhor_horario: { type: 'STRING' }, dores: lista,\n};\nconst req = ['transcricao', 'resumo', 'resultado', 'proximo_passo', 'retorno_em', 'compromisso_em', 'decisor_nome', 'decisor_melhor_horario', 'dores'];\nif (rubrica.length) {\n  props.avaliacao = { type: 'OBJECT', properties: {\n    notas: { type: 'ARRAY', items: { type: 'OBJECT', properties: { chave: { type: 'STRING', enum: rubrica.map((r) => r.chave) },\n      nota: { type: 'INTEGER' }, comentario: { type: 'STRING' } }, required: ['chave', 'nota', 'comentario'] } },\n    comentario: { type: 'STRING' } }, required: ['notas', 'comentario'] };\n  req.push('avaliacao');\n}\nconst prompt = [\n  'Você é o Agente de ligação da Diretoria Comercial da Aprimora (empresa júnior de consultoria em engenharia de produção).',\n  'Ouça a gravação de uma ligação de prospecção feita por ' + (p.membro || 'um membro') + ' para ' + ((p.empresa && p.empresa.nome) || 'um lead') +\n    (p.contato && p.contato.nome ? ' (contato: ' + p.contato.nome + (p.contato.cargo ? ', ' + p.contato.cargo : '') + ')' : '') + '.',\n  'Fase atual do lead no funil: ' + (p.fase || '-') + '. Hoje é ' + (p.hoje || '') + '.',\n  '',\n  'Devolva em português do Brasil:',\n  '- transcricao: a conversa completa, uma fala por linha, começando com \"Membro:\" ou \"Lead:\" (ou \"Secretária:\"/\"Caixa postal:\").',\n  '- resumo: 2 ou 3 frases objetivas sobre o que aconteceu.',\n  '- resultado: a chave que melhor descreve o desfecho, entre: ' + (p.resultados || []).map((r) => r.chave + ' (' + r.nome + ')').join('; ') + '.',\n  '- proximo_passo: o que ficou combinado, em uma frase (\"\" se nada).',\n  '- retorno_em: data AAAA-MM-DD se o decisor pediu retorno numa data; senão \"\".',\n  '- compromisso_em: \"AAAA-MM-DD HH:MM\" se marcaram diagnóstico/reunião; senão \"\".',\n  '- decisor_nome e decisor_melhor_horario: se a secretária ou alguém informou; senão \"\".',\n  '- dores: problemas que o LEAD citou (não invente), frases curtas.',\n  rubrica.length ? '- avaliacao: nota de 1 a 4 para cada critério da rubrica (1 = não fez, 4 = fez muito bem), com um comentário curto e específico, e um comentário geral com 1 ponto forte e 1 melhoria. Critérios: ' +\n    rubrica.map((r) => r.chave + ' = ' + r.nome + ': ' + r.descricao).join(' | ') : '',\n  'Se a gravação não tiver conversa (só chamando, caixa postal), diga isso no resumo e use o resultado adequado.',\n].filter(Boolean).join('\\n');\nreturn {\n  json: {\n    corpo: {\n      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: audio } }, { text: prompt }] }],\n      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: { type: 'OBJECT', properties: props, required: req } },\n    },\n  },\n};\n"
+   },
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "09-gemini",
+   "name": "Gemini: ouvir e avaliar",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1320,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-goog-api-key",
+       "value": "={{ $env.GEMINI_API_KEY }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.corpo) }}",
+    "options": {
+     "timeout": 300000
+    }
+   },
+   "onError": "continueErrorOutput",
+   "retryOnFail": true,
+   "maxTries": 2,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "09-ler",
+   "name": "Ler resposta",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1540,
+    0
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Lê a resposta (JSON garantido pelo responseSchema) e devolve ao portal.\nconst t = $('Separar trabalhos').item.json;\nconst c = ($json.candidates || [])[0] || {};\nconst texto = ((c.content || {}).parts || []).map((p) => p.text || '').join('').trim();\nif (!texto) throw new Error('Gemini respondeu sem texto (' + (c.finishReason || ($json.promptFeedback && $json.promptFeedback.blockReason) || 'sem motivo') + ')');\nlet r;\ntry { r = JSON.parse(texto); } catch (err) { throw new Error('JSON inválido do Gemini: ' + err.message); }\nconst ok = (v) => (typeof v === 'string' ? v.trim() : '');\nconst data = (v) => (/^\\d{4}-\\d{2}-\\d{2}$/.test(ok(v)) ? ok(v) : '');\nconst dataHora = (v) => (/^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}/.test(ok(v)) ? ok(v).slice(0, 16).replace('T', ' ') : '');\nreturn {\n  json: {\n    trabalho_id: t.id,\n    resultado: {\n      transcricao: ok(r.transcricao), resumo: ok(r.resumo), resultado: ok(r.resultado), proximo_passo: ok(r.proximo_passo),\n      retorno_em: data(r.retorno_em), compromisso_em: dataHora(r.compromisso_em),\n      decisor_nome: ok(r.decisor_nome), decisor_melhor_horario: ok(r.decisor_melhor_horario),\n      dores: Array.isArray(r.dores) ? r.dores.map(ok).filter(Boolean).slice(0, 6) : [],\n      ...(r.avaliacao ? { avaliacao: r.avaliacao } : {}),\n    },\n  },\n};\n"
+   },
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "09-devolver",
+   "name": "Devolver resultado ao portal",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1760,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $json.trabalho_id }}/resultado",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ resultado: $json.resultado }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "09-falha",
+   "name": "Registrar falha no portal",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1320,
+    260
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $('Separar trabalhos').item.json.id }}/falha",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ etapa: 'ligacao', mensagem: String(($json.error && ($json.error.message || JSON.stringify($json.error))) || 'erro sem mensagem').slice(0, 1500) }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  }
+ ],
+ "connections": {
+  "A cada 2 minutos": {
+   "main": [
+    [
+     {
+      "node": "Reservar trabalhos",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Reservar trabalhos": {
+   "main": [
+    [
+     {
+      "node": "Separar trabalhos",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Separar trabalhos": {
+   "main": [
+    [
+     {
+      "node": "Baixar gravação",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Baixar gravação": {
+   "main": [
+    [
+     {
+      "node": "Áudio em base64",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Áudio em base64": {
+   "main": [
+    [
+     {
+      "node": "Montar pedido ao Gemini",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Montar pedido ao Gemini": {
+   "main": [
+    [
+     {
+      "node": "Gemini: ouvir e avaliar",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gemini: ouvir e avaliar": {
+   "main": [
+    [
+     {
+      "node": "Ler resposta",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Ler resposta": {
+   "main": [
+    [
+     {
+      "node": "Devolver resultado ao portal",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "timezone": "America/Sao_Paulo",
+  "saveDataSuccessExecution": "none",
+  "saveDataErrorExecution": "all"
+ },
+ "pinData": {},
+ "active": false,
+ "meta": {
+  "templateCredsSetupCompleted": true
+ },
+ "tags": []
+}
