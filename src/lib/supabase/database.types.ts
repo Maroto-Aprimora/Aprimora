@@ -540,6 +540,7 @@ export type Database = {
       empresas: {
         Row: {
           cidade: string | null
+          cnae: string | null
           cnpj: string | null
           cnpj_digitos: string | null
           created_at: string
@@ -548,15 +549,19 @@ export type Database = {
           email_secundario: string | null
           email_terciario: string | null
           endereco: string | null
+          enriquecido_em: string | null
+          enriquecimento: Json | null
           ficticio: boolean
           id: string
           nome: string
           nome_normalizado: string | null
           observacoes: string | null
+          porte: string | null
           razao_social: string | null
           rede_social: string | null
           segmento_id: string | null
           site: string | null
+          situacao_cadastral: string | null
           telefone: string | null
           telefone_digitos: string | null
           telefone_invalido: boolean
@@ -565,6 +570,7 @@ export type Database = {
         }
         Insert: {
           cidade?: string | null
+          cnae?: string | null
           cnpj?: string | null
           cnpj_digitos?: string | null
           created_at?: string
@@ -573,15 +579,19 @@ export type Database = {
           email_secundario?: string | null
           email_terciario?: string | null
           endereco?: string | null
+          enriquecido_em?: string | null
+          enriquecimento?: Json | null
           ficticio?: boolean
           id?: string
           nome: string
           nome_normalizado?: string | null
           observacoes?: string | null
+          porte?: string | null
           razao_social?: string | null
           rede_social?: string | null
           segmento_id?: string | null
           site?: string | null
+          situacao_cadastral?: string | null
           telefone?: string | null
           telefone_digitos?: string | null
           telefone_invalido?: boolean
@@ -590,6 +600,7 @@ export type Database = {
         }
         Update: {
           cidade?: string | null
+          cnae?: string | null
           cnpj?: string | null
           cnpj_digitos?: string | null
           created_at?: string
@@ -598,15 +609,19 @@ export type Database = {
           email_secundario?: string | null
           email_terciario?: string | null
           endereco?: string | null
+          enriquecido_em?: string | null
+          enriquecimento?: Json | null
           ficticio?: boolean
           id?: string
           nome?: string
           nome_normalizado?: string | null
           observacoes?: string | null
+          porte?: string | null
           razao_social?: string | null
           rede_social?: string | null
           segmento_id?: string | null
           site?: string | null
+          situacao_cadastral?: string | null
           telefone?: string | null
           telefone_digitos?: string | null
           telefone_invalido?: boolean
@@ -1725,6 +1740,82 @@ export type Database = {
           },
         ]
       }
+      relatorios: {
+        Row: {
+          analise: Json | null
+          ate: string
+          created_at: string
+          criado_por: string | null
+          dados: Json
+          de: string
+          erro: string | null
+          id: string
+          revisado_em: string | null
+          revisado_por: string | null
+          status: Database["public"]["Enums"]["status_relatorio"]
+          texto_revisado: string | null
+          tipo: string
+          trabalho_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          analise?: Json | null
+          ate: string
+          created_at?: string
+          criado_por?: string | null
+          dados: Json
+          de: string
+          erro?: string | null
+          id?: string
+          revisado_em?: string | null
+          revisado_por?: string | null
+          status?: Database["public"]["Enums"]["status_relatorio"]
+          texto_revisado?: string | null
+          tipo?: string
+          trabalho_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          analise?: Json | null
+          ate?: string
+          created_at?: string
+          criado_por?: string | null
+          dados?: Json
+          de?: string
+          erro?: string | null
+          id?: string
+          revisado_em?: string | null
+          revisado_por?: string | null
+          status?: Database["public"]["Enums"]["status_relatorio"]
+          texto_revisado?: string | null
+          tipo?: string
+          trabalho_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relatorios_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorios_revisado_por_fkey"
+            columns: ["revisado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorios_trabalho_id_fkey"
+            columns: ["trabalho_id"]
+            isOneToOne: false
+            referencedRelation: "trabalhos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resultados_ligacao: {
         Row: {
           ativo: boolean
@@ -2237,10 +2328,15 @@ export type Database = {
           semelhanca: number
         }[]
       }
+      enriquecer_negocio: { Args: { _negocio: string }; Returns: string }
       enviar_trabalho_teste: { Args: never; Returns: string }
       excluir_fase: {
         Args: { _destino?: string; _fase: string }
         Returns: Json
+      }
+      gerar_relatorio_ri: {
+        Args: { _ate?: string; _de?: string }
+        Returns: string
       }
       indicadores_comerciais: {
         Args: { _ate: string; _de: string; _responsavel?: string }
@@ -2343,6 +2439,7 @@ export type Database = {
         | "realizada"
         | "remarcada"
         | "cancelada"
+      status_relatorio: "gerando" | "pronto" | "erro"
       status_tarefa: "pendente" | "em_andamento" | "concluida"
       status_trabalho:
         | "pendente"
@@ -2520,6 +2617,7 @@ export const Constants = {
         "remarcada",
         "cancelada",
       ],
+      status_relatorio: ["gerando", "pronto", "erro"],
       status_tarefa: ["pendente", "em_andamento", "concluida"],
       status_trabalho: [
         "pendente",

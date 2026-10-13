@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Sparkles, Trash2 } from "lucide-react";
 import { Botao } from "@/components/ui/botao";
 import { AreaTexto, Campo, Entrada, Selecao } from "@/components/ui/campos";
 import { useMoverNegocio } from "@/components/crm/mover-negocio";
 import { NOME_AREA, type CampoFase, type Fase, type MembroResumo, type Motivo } from "@/lib/crm";
 import type { Json } from "@/lib/supabase/database.types";
-import { excluirNegocio, salvarCamposFase, salvarNegocio } from "../acoes";
+import { enriquecerNegocio, excluirNegocio, salvarCamposFase, salvarNegocio } from "../acoes";
 
 export function AcoesTopoNegocio({
   negocioId, titulo, faseAtualId, fases, motivos, podeEditar, podeExcluir,
@@ -249,5 +249,29 @@ export function FormCamposFase({
         </div>
       )}
     </form>
+  );
+}
+
+/** "Enriquecer agora": manda o negócio para o Enriquecedor (A1); o que ele achar volta pela Caixa de aprovação. */
+export function BotaoEnriquecer({ negocioId, naFila }: { negocioId: string; naFila: boolean }) {
+  const router = useRouter();
+  const [pendente, iniciar] = useTransition();
+  return (
+    <Botao
+      variante="secundario"
+      carregando={pendente}
+      disabled={naFila}
+      title={naFila ? "Já está na fila do Enriquecedor" : "Buscar CNPJ, contatos, decisor e hipóteses de dor"}
+      onClick={() =>
+        iniciar(async () => {
+          const r = await enriquecerNegocio(negocioId);
+          if (!r.ok) { toast.error(r.erro); return; }
+          toast.success("Na fila do Enriquecedor. O resultado chega na Caixa de aprovação.");
+          router.refresh();
+        })
+      }
+    >
+      <Sparkles className="h-4 w-4" /> {naFila ? "Enriquecendo…" : "Enriquecer agora"}
+    </Botao>
   );
 }

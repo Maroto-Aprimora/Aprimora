@@ -1,0 +1,309 @@
+{
+ "name": "APRIMORA | Agente | A4 Analista gerencial",
+ "nodes": [
+  {
+   "id": "77b4c654-392d-5d72-a13b-42899118dfe5",
+   "name": "Nota",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    -80,
+    -360
+   ],
+   "parameters": {
+    "content": "## APRIMORA | Agente | A4 Analista gerencial\nA cada minuto reserva o relatório da R.I pedido pelo diretor (*Painel comercial → Relatórios da R.I*). Os números chegam prontos do portal; o Gemini só escreve resumo, destaques, pontos de atenção e o rascunho do plano de melhoria de cada membro (resposta em JSON garantida pelo `responseSchema`). O diretor revisa no portal antes de compartilhar.\n\nVariáveis: `PORTAL_URL`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY`, `GEMINI_MODELO` (opcional). Na 3ª falha o relatório fica com erro e os diretores são avisados.",
+    "width": 900,
+    "height": 200,
+    "color": 4
+   }
+  },
+  {
+   "id": "e5246501-2d71-50de-84c9-9a5eefa00d23",
+   "name": "A cada minuto",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "minutes",
+       "minutesInterval": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "514549c7-1a27-59f8-8134-4a855f3734d2",
+   "name": "Reservar trabalhos",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/reservar",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ agente: 'analista_gerencial', limite: 1 }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "3ac7f1bf-f040-5092-9e04-f1cb0969d095",
+   "name": "Separar trabalhos",
+   "type": "n8n-nodes-base.splitOut",
+   "typeVersion": 1,
+   "position": [
+    440,
+    0
+   ],
+   "parameters": {
+    "fieldToSplitOut": "trabalhos",
+    "options": {}
+   }
+  },
+  {
+   "id": "c932268c-b09a-5485-bc62-2c5ac530dd88",
+   "name": "Montar pedido",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    660,
+    0
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Monta o pedido ao Gemini para o relatório da R.I. Os números vêm prontos do portal; a IA só escreve.\nconst t = $json;\nconst d = (t.payload || {}).dados || {};\nconst enxuto = (i) => i && ({\n  resumo: i.resumo, coldcall: i.coldcall, funil: i.funil,\n  tempoPorFase: (i.tempoPorFase || []).map((f) => ({ fase: f.fase, sla: f.sla, mediaDias: f.mediaDias, dentroSla: f.dentroSla })),\n  motivosPerda: i.motivosPerda, motivosDesqualificacao: i.motivosDesqualificacao, origens: i.origens,\n});\nconst numeros = {\n  periodo: d.periodo, semana: enxuto(d.semana), trimestre: enxuto(d.trimestre),\n  membros: (d.membros || []).map((m) => ({\n    nome: m.nome, cargo: m.cargo, semana: m.semana, trimestre: m.trimestre,\n    ligacoes_semana: m.ligacoes_semana && { ligacoes: m.ligacoes_semana.ligacoes, pctDiagnostico: m.ligacoes_semana.pctDiagnostico, porResultado: m.ligacoes_semana.porResultado },\n    tarefas_atrasadas: m.tarefas_atrasadas, negocios_ativos: m.negocios_ativos,\n  })),\n  sla_estourado: d.sla_estourado,\n};\nconst prompt = [\n  'Você é o Analista gerencial da Diretoria Comercial da Aprimora (empresa júnior de consultoria).',\n  'Escreva a análise da Reunião de Indicadores (R.I) a partir dos números abaixo, que já estão calculados e são a fonte da verdade.',\n  'Regras: português do Brasil, frases curtas e diretas; cite números exatamente como estão; não invente dados; taxas vêm de 0 a 1 (0,25 = 25%);',\n  'valores em reais; compare semana com trimestre quando ajudar; o plano de cada membro é um rascunho que o diretor vai revisar,',\n  'então seja específico e acionável (ex.: \"subir de 12 para 20 ligações por semana\"). Inclua um plano para cada membro listado.',\n  '',\n  'Números:',\n  JSON.stringify(numeros),\n].join('\\n');\nconst lista = { type: 'ARRAY', items: { type: 'STRING' } };\nreturn {\n  json: {\n    trabalho: { id: t.id },\n    corpo: {\n      contents: [{ role: 'user', parts: [{ text: prompt }] }],\n      generationConfig: {\n        temperature: 0.3,\n        responseMimeType: 'application/json',\n        responseSchema: {\n          type: 'OBJECT',\n          properties: {\n            resumo: { type: 'STRING' },\n            destaques: lista,\n            pontos_atencao: lista,\n            planos: {\n              type: 'ARRAY',\n              items: {\n                type: 'OBJECT',\n                properties: { membro: { type: 'STRING' }, pontos_fortes: lista, melhorias: lista, acoes: lista },\n                required: ['membro', 'pontos_fortes', 'melhorias', 'acoes'],\n              },\n            },\n          },\n          required: ['resumo', 'destaques', 'pontos_atencao', 'planos'],\n        },\n      },\n    },\n  },\n};\n"
+   }
+  },
+  {
+   "id": "c786bc4b-9fae-50ea-99e5-34d9a13d6c48",
+   "name": "Escrever com o Gemini",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    880,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.GEMINI_MODELO || 'gemini-2.5-flash' }}:generateContent",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-goog-api-key",
+       "value": "={{ $env.GEMINI_API_KEY }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.corpo) }}",
+    "options": {
+     "timeout": 180000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 2,
+   "waitBetweenTries": 30000,
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "aeb8a3f5-4be5-5d25-beac-b945e4f656de",
+   "name": "Ler análise",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1100,
+    -100
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Lê a análise (JSON garantido pelo responseSchema) e devolve ao portal.\nconst trabalho = $('Montar pedido').item.json.trabalho;\nconst c = ($json.candidates || [])[0] || {};\nconst texto = ((c.content || {}).parts || []).map((p) => p.text || '').join('').trim();\nif (!texto) throw new Error('Gemini respondeu sem texto (' + (c.finishReason || 'sem motivo') + ')');\nlet analise;\ntry {\n  analise = JSON.parse(texto);\n} catch (err) {\n  throw new Error('JSON inválido do Gemini: ' + err.message);\n}\nreturn { json: { trabalho_id: trabalho.id, resultado: { analise } } };\n"
+   },
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "2b620fa0-687a-51d3-adef-28a6b0faf24f",
+   "name": "Devolver resultado ao portal",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1320,
+    -100
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $json.trabalho_id }}/resultado",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ resultado: $json.resultado }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "1b1bc3f1-d9dc-59b0-a11a-a7e6553018b3",
+   "name": "Registrar falha no portal",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1320,
+    200
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $('Montar pedido').item.json.trabalho.id }}/falha",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ etapa: 'analista_gerencial', mensagem: String(($json.error && ($json.error.message || JSON.stringify($json.error))) || 'erro sem mensagem').slice(0, 1500) }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  }
+ ],
+ "connections": {
+  "A cada minuto": {
+   "main": [
+    [
+     {
+      "node": "Reservar trabalhos",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Reservar trabalhos": {
+   "main": [
+    [
+     {
+      "node": "Separar trabalhos",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Separar trabalhos": {
+   "main": [
+    [
+     {
+      "node": "Montar pedido",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Montar pedido": {
+   "main": [
+    [
+     {
+      "node": "Escrever com o Gemini",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Escrever com o Gemini": {
+   "main": [
+    [
+     {
+      "node": "Ler análise",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Ler análise": {
+   "main": [
+    [
+     {
+      "node": "Devolver resultado ao portal",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "saveManualExecutions": true,
+  "callerPolicy": "workflowsFromSameOwner",
+  "timezone": "America/Sao_Paulo",
+  "saveDataSuccessExecution": "none",
+  "saveDataErrorExecution": "all"
+ },
+ "pinData": {},
+ "active": false,
+ "meta": {
+  "templateCredsSetupCompleted": true
+ },
+ "tags": []
+}

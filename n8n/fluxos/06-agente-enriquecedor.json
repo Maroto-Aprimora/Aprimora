@@ -1,0 +1,425 @@
+{
+ "name": "APRIMORA | Agente | A1 Enriquecedor",
+ "nodes": [
+  {
+   "id": "67f78f37-fd89-5376-9be8-82dd4ecb2f78",
+   "name": "Nota",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    -80,
+    -360
+   ],
+   "parameters": {
+    "content": "## APRIMORA | Agente | A1 Enriquecedor\nA cada 2 minutos reserva até 2 trabalhos do **Enriquecedor** (card que entrou em Enriquecimento ou botão *Enriquecer agora*). O Gemini pesquisa a empresa com a busca do Google; com o CNPJ, a **BrasilAPI** traz o cadastro oficial (tem prioridade). O portal grava os dados públicos só nos campos vazios, manda decisor, e-mails e hipóteses de dor para a **Caixa de aprovação** e cria a tarefa *Completar dados do lead* com o que faltar.\n\nVariáveis: `PORTAL_URL`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY`, `GEMINI_MODELO` (opcional). Qualquer erro devolve o trabalho como falha (o portal tenta de novo em 5 e 10 min; na 3ª avisa os diretores).",
+    "width": 900,
+    "height": 220,
+    "color": 4
+   }
+  },
+  {
+   "id": "482698c2-4f88-5ba0-99fa-4a25aa664f39",
+   "name": "A cada 2 minutos",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "minutes",
+       "minutesInterval": 2
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "a7db0354-7594-53ff-8e7c-ca2630c7e115",
+   "name": "Reservar trabalhos",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/reservar",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ agente: 'enriquecedor', limite: 2 }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "b90b47e3-98f0-5a54-8d23-16e02e8a5fe2",
+   "name": "Separar trabalhos",
+   "type": "n8n-nodes-base.splitOut",
+   "typeVersion": 1,
+   "position": [
+    440,
+    0
+   ],
+   "parameters": {
+    "fieldToSplitOut": "trabalhos",
+    "options": {}
+   }
+  },
+  {
+   "id": "6f9501a2-1896-5069-adc2-476add8a33aa",
+   "name": "Montar pesquisa",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    660,
+    0
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Monta a pesquisa do Gemini (com busca no Google) para um trabalho do Enriquecedor.\nconst t = $json;\nconst p = t.payload || {};\nconst e = p.empresa || {};\nconst contatos = (p.contatos || []).map((c) => `${c.nome}${c.cargo ? ' (' + c.cargo + ')' : ''}${c.decisor ? ' [decisor]' : ''}`).join('; ') || 'nenhum';\nconst prompt = [\n  'Você é o Enriquecedor da Aprimora, empresa júnior de consultoria em engenharia de produção.',\n  'Pesquise na internet (site oficial, Google Maps, LinkedIn da empresa, consultas públicas de CNPJ) a empresa abaixo e devolva SOMENTE um objeto JSON, sem texto antes ou depois.',\n  '',\n  'Empresa: ' + (e.nome || ''),\n  'Razão social: ' + (e.razao_social || 'desconhecida'),\n  'CNPJ: ' + (e.cnpj || 'desconhecido'),\n  'Site: ' + (e.site || 'desconhecido'),\n  'Cidade/UF: ' + [e.cidade, e.uf].filter(Boolean).join('/'),\n  'Segmento atual: ' + (e.segmento || 'não definido'),\n  'Contatos já cadastrados: ' + contatos,\n  '',\n  'Formato (use \"\" ou [] quando não encontrar; NUNCA invente dados):',\n  '{\"cnpj\":\"\",\"razao_social\":\"\",\"nome_fantasia\":\"\",\"site\":\"\",\"telefone\":\"\",\"email\":\"\",\"endereco\":\"\",\"cidade\":\"\",\"uf\":\"\",',\n  ' \"segmento\":\"\",\"decisor\":{\"nome\":\"\",\"cargo\":\"\",\"email\":\"\",\"telefone\":\"\",\"linkedin\":\"\"},\"emails\":[],\"hipoteses_dor\":[],\"resumo\":\"\"}',\n  '',\n  'Regras:',\n  '- \"segmento\": escolha exatamente um destes ou deixe \"\": ' + (p.segmentos || []).join(', ') + '.',\n  '- \"decisor\": quem decide sobre contratar consultoria (sócio, diretor, gerente industrial ou de operações). Só nomes encontrados em fonte pública.',\n  '- \"emails\": e-mails corporativos publicados pela empresa (no máximo 3).',\n  '- \"hipoteses_dor\": até 3 hipóteses curtas de dor ligadas aos serviços da Aprimora (' + (p.servicos || []).join(', ') + '), baseadas no que a empresa faz.',\n  '- \"resumo\": 1 ou 2 frases sobre o que a empresa faz e o porte aparente.',\n  '- Telefone com DDD. CNPJ só com números.',\n].join('\\n');\nreturn {\n  json: {\n    trabalho: { id: t.id, negocio_id: t.negocio_id, empresa: e },\n    corpo: {\n      contents: [{ role: 'user', parts: [{ text: prompt }] }],\n      tools: [{ google_search: {} }],\n      generationConfig: { temperature: 0.2 },\n    },\n  },\n};\n"
+   }
+  },
+  {
+   "id": "b3a3d3e3-2f71-5332-8b69-fce8300ad64f",
+   "name": "Pesquisar com o Gemini",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    880,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.GEMINI_MODELO || 'gemini-2.5-flash' }}:generateContent",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-goog-api-key",
+       "value": "={{ $env.GEMINI_API_KEY }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.corpo) }}",
+    "options": {
+     "timeout": 180000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 2,
+   "waitBetweenTries": 30000,
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "547d7cdc-4c9f-5cc8-adc9-1057f79e0e25",
+   "name": "Ler resposta",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1100,
+    -100
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Lê a resposta do Gemini: extrai o JSON do texto e as fontes da busca.\nconst trabalho = $('Montar pesquisa').item.json.trabalho;\nconst c = ($json.candidates || [])[0] || {};\nconst texto = ((c.content || {}).parts || []).map((p) => p.text || '').join('').trim();\nif (!texto) throw new Error('Gemini respondeu sem texto (' + (c.finishReason || 'sem motivo') + ')');\nconst inicio = texto.indexOf('{');\nconst fim = texto.lastIndexOf('}');\nif (inicio < 0 || fim <= inicio) throw new Error('Resposta sem JSON: ' + texto.slice(0, 300));\nlet achado;\ntry {\n  achado = JSON.parse(texto.slice(inicio, fim + 1));\n} catch (err) {\n  throw new Error('JSON inválido do Gemini: ' + err.message);\n}\nconst fontes = (((c.groundingMetadata || {}).groundingChunks) || [])\n  .map((g) => (g.web || {}).uri).filter(Boolean).slice(0, 8);\nconst so = (v) => String(v || '').replace(/\\D/g, '');\nconst cnpj = so(trabalho.empresa.cnpj).length === 14 ? so(trabalho.empresa.cnpj) : so(achado.cnpj);\nreturn { json: { trabalho, achado, fontes, cnpj: cnpj.length === 14 ? cnpj : '' } };\n"
+   },
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "f9de058b-529a-5c20-9088-421f2f228bc5",
+   "name": "Tem CNPJ?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    1320,
+    -200
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "24b16260-4b5a-557c-8565-6201debf5cc6",
+       "leftValue": "={{ $json.cnpj }}",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "7cde6b31-2ad0-596e-a59d-368a54bed85b",
+   "name": "Consultar CNPJ (BrasilAPI)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1540,
+    -300
+   ],
+   "parameters": {
+    "url": "=https://brasilapi.com.br/api/cnpj/v1/{{ $json.cnpj }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 2,
+   "waitBetweenTries": 5000,
+   "onError": "continueRegularOutput"
+  },
+  {
+   "id": "37b034a0-11f6-5ee6-af92-e41c6aec466b",
+   "name": "Montar resultado",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1760,
+    -200
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Junta o que o Gemini achou com o cadastro oficial da BrasilAPI (que tem prioridade nos dados cadastrais).\nconst base = $('Ler resposta').item.json;\nconst a = base.achado || {};\nconst b = ($json && $json.razao_social && !$json.trabalho) ? $json : null;\nconst txt = (v) => (v == null ? '' : String(v).trim());\nconst tel = (v) => { const d = txt(v).replace(/\\D/g, ''); return d.length >= 10 ? '(' + d.slice(0, 2) + ') ' + d.slice(2) : ''; };\nconst titulo = (s) => txt(s).toLowerCase().replace(/(^|\\s)\\S/g, (l) => l.toUpperCase());\nconst lista = (v) => (Array.isArray(v) ? v.map(txt).filter(Boolean) : []);\n\nconst dados = {\n  cnpj: base.cnpj || '',\n  razao_social: txt(b ? b.razao_social : a.razao_social),\n  nome_fantasia: txt(b ? b.nome_fantasia : a.nome_fantasia) || txt(a.nome_fantasia),\n  telefone: (b && tel(b.ddd_telefone_1)) || txt(a.telefone),\n  email: txt(b && b.email ? String(b.email).toLowerCase() : a.email),\n  site: txt(a.site),\n  endereco: b ? [titulo(b.descricao_tipo_de_logradouro) + ' ' + titulo(b.logradouro), txt(b.numero), titulo(b.bairro)].map((s) => s.trim()).filter(Boolean).join(', ') : txt(a.endereco),\n  cidade: b ? titulo(b.municipio) : txt(a.cidade),\n  uf: txt(b ? b.uf : a.uf).toUpperCase().slice(0, 2),\n  cnae: b && b.cnae_fiscal ? b.cnae_fiscal + ' · ' + txt(b.cnae_fiscal_descricao) : '',\n  porte: b ? txt(b.porte) : '',\n  situacao: b ? txt(b.descricao_situacao_cadastral) : '',\n};\n\nconst d = a.decisor || {};\nlet decisor = { nome: txt(d.nome), cargo: txt(d.cargo), email: txt(d.email), telefone: txt(d.telefone), linkedin: txt(d.linkedin) };\n// Sem decisor na busca: o primeiro sócio-administrador do quadro societário\nif (!decisor.nome && b && Array.isArray(b.qsa) && b.qsa.length) {\n  const s = b.qsa.find((q) => /administrador/i.test(q.qualificacao_socio || '')) || b.qsa[0];\n  if (s && s.nome_socio) decisor = { nome: titulo(s.nome_socio), cargo: txt(s.qualificacao_socio), email: '', telefone: '', linkedin: '' };\n}\n\nconst fontes = [...new Set([...(base.fontes || []), ...(b ? ['https://brasilapi.com.br/api/cnpj/v1/' + base.cnpj] : [])])];\nreturn {\n  json: {\n    trabalho_id: base.trabalho.id,\n    resultado: {\n      dados_publicos: dados,\n      segmento: txt(a.segmento),\n      decisor,\n      emails: [...new Set(lista(a.emails).map((e) => e.toLowerCase()))].slice(0, 3),\n      hipoteses_dor: lista(a.hipoteses_dor).slice(0, 3),\n      resumo: txt(a.resumo),\n      fontes,\n    },\n  },\n};\n"
+   },
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "000f5c4d-537c-5339-9edf-33d394073022",
+   "name": "Devolver resultado ao portal",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1980,
+    -200
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $json.trabalho_id }}/resultado",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ resultado: $json.resultado }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "bcdc9932-5244-5341-ae60-ed71fc884fc3",
+   "name": "Registrar falha no portal",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1320,
+    200
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $('Montar pesquisa').item.json.trabalho.id }}/falha",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ etapa: 'enriquecedor', mensagem: String(($json.error && ($json.error.message || JSON.stringify($json.error))) || 'erro sem mensagem').slice(0, 1500) }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  }
+ ],
+ "connections": {
+  "A cada 2 minutos": {
+   "main": [
+    [
+     {
+      "node": "Reservar trabalhos",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Reservar trabalhos": {
+   "main": [
+    [
+     {
+      "node": "Separar trabalhos",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Separar trabalhos": {
+   "main": [
+    [
+     {
+      "node": "Montar pesquisa",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Montar pesquisa": {
+   "main": [
+    [
+     {
+      "node": "Pesquisar com o Gemini",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Pesquisar com o Gemini": {
+   "main": [
+    [
+     {
+      "node": "Ler resposta",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Ler resposta": {
+   "main": [
+    [
+     {
+      "node": "Tem CNPJ?",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Tem CNPJ?": {
+   "main": [
+    [
+     {
+      "node": "Consultar CNPJ (BrasilAPI)",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Montar resultado",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Consultar CNPJ (BrasilAPI)": {
+   "main": [
+    [
+     {
+      "node": "Montar resultado",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Montar resultado": {
+   "main": [
+    [
+     {
+      "node": "Devolver resultado ao portal",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "saveManualExecutions": true,
+  "callerPolicy": "workflowsFromSameOwner",
+  "timezone": "America/Sao_Paulo",
+  "saveDataSuccessExecution": "none",
+  "saveDataErrorExecution": "all"
+ },
+ "pinData": {},
+ "active": false,
+ "meta": {
+  "templateCredsSetupCompleted": true
+ },
+ "tags": []
+}

@@ -179,3 +179,13 @@ export async function registrarLigacao(dados: Record<string, unknown>): Promise<
   revalidatePath("/agenda");
   return { ok: true };
 }
+
+/** Coloca o negócio na fila do Enriquecedor (A1). O resultado chega pela Caixa de aprovação. */
+export async function enriquecerNegocio(negocioId: string): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("enriquecer_negocio", { _negocio: negocioId });
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  revalidatePath(`/negocios/${negocioId}`);
+  revalidatePath("/funil/configuracoes");
+  return { ok: true };
+}

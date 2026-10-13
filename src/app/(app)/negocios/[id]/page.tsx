@@ -12,7 +12,7 @@ import { obterUsuario } from "@/lib/usuario";
 import { AtividadesDoNegocio } from "@/components/agenda/atividades-negocio";
 import { AnexosDoNegocio } from "@/components/crm/anexos";
 import { RegistrarLigacao } from "@/components/crm/registrar-ligacao";
-import { AcoesTopoNegocio, FormCamposFase, FormNegocio } from "./componentes";
+import { AcoesTopoNegocio, BotaoEnriquecer, FormCamposFase, FormNegocio } from "./componentes";
 
 export const metadata: Metadata = { title: "Negócio" };
 
@@ -25,13 +25,13 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
     carregarTodosMembros(),
     supabase
       .from("negocios")
-      .select("*, empresas(id, nome, cidade, uf, telefone, email_principal), negocio_servicos(servico_id, valor), negocio_participantes(membro_id), motivos(nome)")
+      .select("*, empresas(id, nome, cidade, uf, telefone, email_principal, cnpj, porte, cnae, situacao_cadastral, enriquecido_em, enriquecimento), negocio_servicos(servico_id, valor), negocio_participantes(membro_id), motivos(nome)")
       .eq("id", id)
       .maybeSingle(),
   ]);
   if (!negocio) notFound();
 
-  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }, { data: anexos }, { data: ligacoes }] = await Promise.all([
+  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }, { data: anexos }, { data: ligacoes }, { data: agenteEnriquecedor }, { count: naFilaEnriquecedor }] = await Promise.all([
     supabase.from("contatos").select("id, nome, cargo, decisor, telefone, telefone_invalido, nao_contatar").eq("empresa_id", negocio.empresa_id).order("decisor", { ascending: false }),
     supabase.from("negocio_historico").select("id, fase_origem_id, fase_destino_id, autor_id, automatico, comentario, created_at, motivos(nome)")
       .eq("negocio_id", id).order("created_at", { ascending: false }),
@@ -40,6 +40,9 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
     supabase.from("anexos").select("id, nome, caminho, tamanho, enviado_por, created_at").eq("negocio_id", id).order("created_at", { ascending: false }),
     supabase.from("ligacoes").select("id, inicio, membro_id, duracao_seg, proximo_passo, comentario, retorno_em, decisor_nome, decisor_melhor_horario, origem, resultados_ligacao(nome), contatos(nome)")
       .eq("negocio_id", id).order("inicio", { ascending: false }),
+    supabase.from("agentes").select("ativo").eq("chave", "enriquecedor").maybeSingle(),
+    supabase.from("trabalhos").select("id", { count: "exact", head: true })
+      .eq("negocio_id", id).eq("agente", "enriquecedor").in("status", ["pendente", "processando"]),
   ]);
 
   const fase = config.fases.find((f) => f.id === negocio.fase_id);
@@ -76,6 +79,9 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
           </Link>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+        {podeEditar && agenteEnriquecedor?.ativo && fase?.tipo !== "ganho" && fase?.tipo !== "perda" && (
+          <BotaoEnriquecer negocioId={negocio.id} naFila={(naFilaEnriquecedor ?? 0) > 0} />
+        )}
         {podeEditar && fase?.tipo !== "ganho" && fase?.tipo !== "perda" && (
           <RegistrarLigacao negocioId={negocio.id} titulo={negocio.titulo} resultados={config.resultadosLigacao}
             contatos={contatos ?? []} contatoPadrao={negocio.contato_id} />
@@ -180,6 +186,8 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
             usuarioId={usuario.id}
           />
 
+          <CartaoEnriquecimento empresa={negocio.empresas} />
+
           <AnexosDoNegocio
             negocioId={negocio.id}
             anexos={anexos ?? []}
@@ -243,6 +251,38 @@ function Indicador({ rotulo, valor }: { rotulo: string; valor: string }) {
     <Cartao className="px-4 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-texto-suave">{rotulo}</p>
       <p className="mt-0.5 truncate font-titulo text-lg font-bold">{valor}</p>
+    </Cartao>
+  );
+}
+
+type Enriquecimento = { resumo?: string; fontes?: string[] } | null;
+
+/** O que o Enriquecedor (A1) achou da empresa: dados cadastrais e fontes. Decisor e e-mails passam pela aprovação. */
+function CartaoEnriquecimento({ empresa }: {
+  empresa: { cnpj: string | null; porte: string | null; cnae: string | null; situacao_cadastral: string | null; enriquecido_em: string | null; enriquecimento: unknown };
+}) {
+  if (!empresa.enriquecido_em) return null;
+  const e = empresa.enriquecimento as Enriquecimento;
+  const fontes = (e?.fontes ?? []).filter((f) => typeof f === "string" && /^https?:\/\//.test(f)).slice(0, 5);
+  return (
+    <Cartao>
+      <CabecalhoCartao titulo="Enriquecimento" descricao={`Pelo Enriquecedor em ${formatarDataHora(empresa.enriquecido_em)}`} />
+      <dl className="space-y-1 px-5 py-3 text-sm">
+        {empresa.cnpj && <div><dt className="inline text-texto-suave">CNPJ: </dt><dd className="inline">{empresa.cnpj}</dd></div>}
+        {empresa.situacao_cadastral && <div><dt className="inline text-texto-suave">Situação: </dt><dd className="inline">{empresa.situacao_cadastral}</dd></div>}
+        {empresa.porte && <div><dt className="inline text-texto-suave">Porte: </dt><dd className="inline">{empresa.porte}</dd></div>}
+        {empresa.cnae && <div><dt className="inline text-texto-suave">CNAE: </dt><dd className="inline">{empresa.cnae}</dd></div>}
+      </dl>
+      {e?.resumo && <p className="border-t border-borda px-5 py-3 text-sm text-texto-suave">{e.resumo}</p>}
+      {fontes.length > 0 && (
+        <ul className="border-t border-borda px-5 py-3 text-xs">
+          {fontes.map((f) => (
+            <li key={f} className="truncate">
+              <a href={f} target="_blank" rel="noopener noreferrer" className="text-marca hover:text-destaque">{f}</a>
+            </li>
+          ))}
+        </ul>
+      )}
     </Cartao>
   );
 }

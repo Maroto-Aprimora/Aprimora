@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.11 |
+| Versão do documento | 1.12 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -101,6 +101,7 @@ Pipefy) e foi estruturado para receber as demais diretorias.
 | Comercial | Funil (kanban), Empresas e leads, Negócio, Anexos | EM PRODUÇÃO |
 | Comercial | Painel comercial (indicadores), Exportação xlsx/csv, Metas (automáticas e manuais) | EM PRODUÇÃO |
 | Comercial | Configurações do funil (fases, SLA, campos, cadastros auxiliares) | EM PRODUÇÃO |
+| Comercial | Agentes A1 Enriquecedor (botão no negócio, aprovação do decisor) e A4 Analista gerencial (Relatórios da R.I) | EM PRODUÇÃO no portal; fluxos 06 e 07 do n8n a publicar |
 | Projetos, Marketing | Telas próprias | FORA DO ESCOPO da v2 (diretorias mantidas no banco, sem telas) |
 | Integrações | n8n (ligações API4COM + Gemini + Drive; cadência de e-mail Gmail) | PRONTO, NÃO INSTALADO |
 | Integrações | Importação de dados do Pipefy | NÃO IMPLEMENTADO |
@@ -331,7 +332,7 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `funis` | diretoria, chave, nome | Funil por diretoria (hoje só `comercial`) |
 | `fases` | funil_id, chave, nome, ordem, macroetapa, tipo, probabilidade, sla_dias, acao_sla, fase_destino_sla, auto_mover_para, distribui_responsavel, exige_motivo, ativa, excluida_em | Colunas do kanban e suas regras |
 | `fase_campos` | fase_id, chave, rotulo, tipo, opcoes, obrigatorio, ordem | Campos dinâmicos por fase (valores em `negocios.campos`, jsonb) |
-| `empresas` | nome, razao_social, cnpj, segmento_id, telefone, e-mails, site, rede_social, endereco, cidade, uf, ficticio; colunas derivadas `nome_normalizado`, `cnpj_digitos`, `telefone_digitos` | Leads/clientes. Colunas derivadas para busca e duplicidade |
+| `empresas` | nome, razao_social, cnpj, segmento_id, telefone, e-mails, site, rede_social, endereco, cidade, uf, ficticio; do Enriquecedor: porte, cnae, situacao_cadastral, enriquecido_em, enriquecimento (jsonb com o resultado e as fontes); colunas derivadas `nome_normalizado`, `cnpj_digitos`, `telefone_digitos` | Leads/clientes. Colunas derivadas para busca e duplicidade |
 | `contatos` | empresa_id, nome, cargo, decisor, email, telefone, linkedin, nao_contatar | Pessoas da empresa |
 | `negocios` | funil_id, empresa_id, contato_id, titulo, fase_id, responsavel_id, valor, origem_id, campos (jsonb), motivo_id, retorno_em, entrou_na_fase_em, ganho_em, encerrado_em, ficticio | O card do funil |
 | `negocio_historico` | negocio_id, fase_origem_id, fase_destino_id, autor_id, automatico, motivo_id, comentario, responsavel_id (da época) | Toda movimentação de fase (base dos indicadores) |
@@ -345,6 +346,7 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `agentes` | chave, codigo (A1…A12), nome, descricao, tipo, prioridade, fase_roadmap, quem_aprova, ativo | Os 12 agentes do PE-PA-002 + "Teste da fila"; liga/desliga em Config. do funil |
 | `trabalhos` | agente, tipo, negocio_id, payload, status (pendente/processando/concluido/erro/cancelado), tentativas, max_tentativas, proximo_em, reservado_em, resultado, erro, chave | Fila que o n8n consome; só funções internas escrevem |
 | `aprovacoes` | agente, tipo, trabalho_id, negocio_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação |
+| `relatorios` | tipo ('ri'), de, ate, dados (números calculados no banco), analise (texto do A4), texto_revisado, status (gerando/pronto/erro), erro, trabalho_id, revisado_por/em, criado_por | Relatórios da R.I; só o diretor comercial lê e revisa |
 | `eventos_integracoes` | origem, recebido_em, payload, processado_em, ligacao_id, erro | Eventos recebidos de sistemas externos (API4COM), como chegaram; só o diretor lê |
 | `feriados` | data, nome | Dias não úteis (nacionais 2026–2027 e aniversário de Londrina); tarefas automáticas pulam fins de semana e feriados |
 | `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
@@ -393,6 +395,8 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `tarefas_ao_mudar_fase` (`negocio_historico`) | após inserir | Ao sair da cadência conclui as tarefas de cadência; ao entrar em Oportunidade cria o follow-up para marcar o diagnóstico; ao voltar da Reciclagem (automático) cria "Retomar contato" |
 | `concluir_tarefas_da_atividade` (`atividades`) | após mudar status | Compromisso realizado, cancelado ou remarcado conclui a tarefa "Hoje às…" ligada a ele |
 | `somar_valor_servicos` (`negocio_servicos`) | após inserir/atualizar/excluir | Quando algum serviço tem valor, `negocios.valor` = soma dos valores |
+| `agentes_ao_mudar_fase` (`negocio_historico`) | após inserir | Entrou em Enriquecimento: enfileira o trabalho do Enriquecedor (A1), se ligado |
+| `aplicar_aprovacao` (`aprovacoes`) | após mudar status | Aprovado `decisor_empresa`: cria ou atualiza o contato decisor (vira o contato do negócio, se vazio), completa os e-mails da empresa e acrescenta as hipóteses de dor ao negócio |
 | `*_updated_at` | antes de atualizar | Atualiza `updated_at` |
 
 ## 8.2 Funções chamáveis pelo app (RPC)
@@ -404,8 +408,10 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `transferir_carteira(de, para, diretoria)` | definer, exige diretor | Passa negócios abertos, tarefas abertas e atividades futuras; audita |
 | `excluir_fase(fase, destino)` | definer, exige diretor | Move os negócios e marca a fase como excluída (`excluida_em`), preservando o histórico; bloqueia a primeira fase e a última de ganho |
 | `remarcar_atividade(atividade, novo_inicio, novo_fim?, motivo?)` | invoker (respeita RLS) | Marca a atividade como `remarcada` e cria a nova (mesmos participantes) |
+| `enriquecer_negocio(negocio)` | definer, exige poder editar o negócio | Botão "Enriquecer agora": põe o negócio na fila do Enriquecedor (recusa se o agente estiver desligado ou já houver trabalho pendente) |
+| `gerar_relatorio_ri(de?, ate?)` | definer, exige diretor comercial | Cria o relatório com os números (`privado.dados_relatorio_ri`: semana, trimestre, cada membro, SLA estourado) e enfileira o Analista gerencial; agente desligado → relatório só com números |
 
-Funções internas (schema `privado`): `criar_tarefa(...)` (tarefa do sistema/agente com `chave` para não duplicar), `dia_util(data)`, `dia_util_anterior(data)`, `hoje()`.
+Funções internas (schema `privado`): `destinatario_negocio(negocio, reserva)` (responsável, senão quem pediu, senão o diretor comercial), `enfileirar_enriquecimento`, `aplicar_enriquecimento` (dados públicos só em campos vazios; aprovação `decisor_empresa`; tarefa "Completar dados do lead" com o que faltar), `aplicar_relatorio`, `aplicar_resultado_agente` (despacho por agente, chamado por `n8n_concluir`), `criar_tarefa(...)` (tarefa do sistema/agente com `chave` para não duplicar), `dia_util(data)`, `dia_util_anterior(data)`, `hoje()`.
 
 ## 8.3 Tarefas agendadas (pg_cron, horário UTC)
 
@@ -535,11 +541,13 @@ da Vercel, então o push só funciona em produção.
 | n8n da Aprimora | INSTALADO (fluxos ainda não importados) | VPS Hostinger KVM 2 própria, https://srv2043014.hstgr.cloud; `n8n/docker-compose.yml` com Caddy (HTTPS automático) e n8n (1 vCPU / 1,5 GB, limpeza automática de execuções, áudios em disco, 2 execuções simultâneas); 5 fluxos em `n8n/fluxos/` |
 | API4COM (ligações) | PARCIAL (recebimento ativo; processamento na Fase 2.3) | Webhook "após desligamento da chamada" v1.4 → `POST /api/integracoes/api4com?token=…` → `eventos_integracoes` (payload bruto; token conferido pelo hash `privado.config.api4com_token_hash`). Previsto: evento → ligação → fila → n8n → Google Drive + Gemini → card |
 | Gmail (cadência e respostas) | NÃO IMPLEMENTADO no portal | Previsto: e-mails aprovados no portal enviados pelo n8n; respostas classificadas pelo Gemini |
-| Google Drive, Gemini | NÃO IMPLEMENTADO no portal | Usados pelos fluxos do n8n |
+| Gemini | EM USO pelo n8n (A1 e A4) | Chave `GEMINI_API_KEY` só na VPS; modelo `GEMINI_MODELO` (padrão `gemini-2.5-flash`). A1 usa a busca do Google (`google_search`); A4 responde em JSON pelo `responseSchema` |
+| BrasilAPI (CNPJ) | EM USO pelo n8n (A1) | `https://brasilapi.com.br/api/cnpj/v1/{cnpj}`, pública e sem chave; cadastro oficial tem prioridade sobre a busca; o quadro societário dá o decisor quando a busca não acha |
+| Google Drive | NÃO IMPLEMENTADO | Usado pelo fluxo de ligações (Fase 2.3) |
 
-**Contrato previsto entre n8n e portal** (descrito em `n8n/README.md`; **as rotas `/api/n8n/*` ainda não existem no
-portal**): reservar ligações/e-mails, devolver resultado ou falha, registrar pasta do Drive, classificar resposta,
-saúde da fila, alerta e erro. Autenticação por cabeçalho `x-n8n-segredo`. O portal funciona como fila: o n8n busca
+**Contrato entre n8n e portal** (em `n8n/README.md`): rotas genéricas `/api/n8n/*` para reservar trabalhos de um
+agente, devolver resultado ou falha, saúde da fila, alerta e erro. O resultado é aplicado no banco conforme o agente
+(`privado.aplicar_resultado_agente`). Autenticação por cabeçalho `x-n8n-segredo`. O portal funciona como fila: o n8n busca
 trabalho, então trocar o n8n de servidor não exige mudar o portal.
 
 ---
@@ -686,6 +694,8 @@ Escopo v1.0 (Seção 14).
 | F-V2-06 | Fila de trabalhos e rotas `/api/n8n/*` | v2 F1 | EM PRODUÇÃO | `trabalhos`, `n8n_*`, `src/app/api/n8n` |
 | F-V2-07 | Caixa de aprovação | v2 F1 | EM PRODUÇÃO (itens chegam na Fase 2) | `/aprovacoes`, `aprovacoes` |
 | F-V2-08 | Liga/desliga de agentes e saúde da fila | v2 F1 | EM PRODUÇÃO | Config. do funil → Agentes e fila |
+| F-V2-09 | A1 Enriquecedor (fila ao entrar em Enriquecimento, botão "Enriquecer agora", dados públicos, aprovação do decisor, tarefa "Completar dados") | v2 F2 | EM PRODUÇÃO no portal (fluxo 06 a publicar) | `enriquecer_negocio`, `aplicar_enriquecimento`, `n8n/fluxos/06-agente-enriquecedor.json` |
+| F-V2-10 | A4 Analista gerencial (relatório da R.I com um clique, plano por membro, revisão do diretor) | v2 F2 | EM PRODUÇÃO no portal (fluxo 07 a publicar) | `/comercial/relatorios`, `gerar_relatorio_ri`, `n8n/fluxos/07-agente-analista-gerencial.json` |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
 | F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
 | F-INT-04 | Resumo semanal e passagem do ganho para Projetos/Presidência | 4 | NÃO IMPLEMENTADO | — |
@@ -701,6 +711,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.12 | 13/10/2026 | Fase 2: A1 Enriquecedor e A4 Analista gerencial (migração `20261013140000`, telas e fluxos 06/07) |
 | 1.11 | 13/10/2026 | Recebimento do webhook da API4COM (`/api/integracoes/api4com`) |
 | 1.10 | 13/10/2026 | Portão da Fase 1 aprovado: fluxo de teste do n8n foi e voltou pela fila sem erro |
 | 1.9 | 13/10/2026 | Vercel religada ao repositório `Maroto-Aprimora/PortalAprimora` |

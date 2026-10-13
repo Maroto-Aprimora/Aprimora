@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Mail, Plus } from "lucide-react";
+import { FileText, Mail, Plus } from "lucide-react";
 import { classeBotao } from "@/components/ui/botao";
 import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
@@ -50,6 +50,7 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
         descricao={`Indicadores de ${periodo.rotulo.toLowerCase()}${responsavel ? ` · ${dados.config.membrosComercial.find((m) => m.id === responsavel)?.nome ?? ""}` : ""}. Contam as movimentações registradas no funil dentro do período.`}
         acoes={<>
           <Exportar />
+          {ehDiretor && <Link href="/comercial/relatorios" className={classeBotao("secundario")}><FileText className="h-4 w-4" /> Relatórios da R.I</Link>}
           {usuario.cargoEm("comercial") && <Link href="/empresas/novo" className={classeBotao("destaque")}><Plus className="h-4 w-4" /> Novo lead</Link>}
         </>}
       />

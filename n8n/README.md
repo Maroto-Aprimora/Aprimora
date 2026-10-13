@@ -36,6 +36,8 @@ Padrão de nome: `APRIMORA | Área | Ação`. Coloque a etiqueta `aprimora` em t
 | `03-email-monitorar-respostas.json` | E-mail · Monitorar respostas | A cada 5 min | Para cada e-mail novo, pergunta ao portal se é resposta de lead; se for, o Gemini classifica e o portal atualiza o card |
 | `04-sistema-monitor-fila.json` | Sistema · Monitor da fila | De hora em hora, 7h–21h | Avisa os diretores se a fila acumular (mais de 30, mais antiga com mais de 3 h) ou houver mais de 5 erros em 24 h |
 | `05-sistema-tratamento-erros.json` | Sistema · Tratamento de erros | Quando outro fluxo quebra | Avisa o portal (auditoria + notificação aos diretores) |
+| `06-agente-enriquecedor.json` | Agente · A1 Enriquecedor | A cada 2 min | Reserva até 2 trabalhos do Enriquecedor; Gemini com busca do Google acha site, CNPJ, decisor, e-mails e hipóteses de dor; com o CNPJ, a BrasilAPI traz o cadastro oficial; devolve ao portal (dados públicos entram direto, decisor e e-mails vão para a Caixa de aprovação) |
+| `07-agente-analista-gerencial.json` | Agente · A4 Analista gerencial | A cada 1 min | Reserva o relatório da R.I pedido pelo diretor; o Gemini escreve resumo, destaques, pontos de atenção e plano por membro (JSON pelo `responseSchema`) a partir dos números do portal |
 
 ### Modo de espera para muitas ligações ao mesmo tempo
 
@@ -107,6 +109,13 @@ chama uma função `n8n_*` do banco, que confere o segredo de novo (hash em `pri
 | `GET /api/n8n/saude` | — | `{ pendentes, processando, mais_antiga_minutos, erros_24h, concluidos_24h, ultimo_concluido_em, aprovacoes_pendentes }` |
 | `POST /api/n8n/alerta` | `{ tipo, detalhes }` | `{ ok }` (auditoria + notificação aos diretores) |
 | `POST /api/n8n/erro` | `{ fluxo, execucao_id, execucao_url, no, mensagem }` | `{ ok }` (auditoria + notificação) |
+
+**Resultado por agente (Fase 2)** — o portal aplica o `resultado` conforme o agente:
+
+| Agente | Payload recebido | `resultado` esperado |
+|---|---|---|
+| `enriquecedor` | `{ negocio_id, empresa: {id, nome, razao_social, cnpj, site, telefone, email, cidade, uf, segmento}, contatos[], segmentos[], servicos[] }` | `{ dados_publicos: {cnpj, razao_social, nome_fantasia, telefone, email, site, endereco, cidade, uf, cnae, porte, situacao}, segmento, decisor: {nome, cargo, email, telefone, linkedin}, emails[], hipoteses_dor[], resumo, fontes[] }` |
+| `analista_gerencial` | `{ relatorio_id, dados: {periodo, semana, trimestre, membros[], sla_estourado[]} }` | `{ analise: { resumo, destaques[], pontos_atencao[], planos: [{ membro, pontos_fortes[], melhorias[], acoes[] }] } }` |
 
 **Rotas específicas previstas** (fluxos 01 a 03, entram nas Fases 2 e 3 sobre a mesma fila):
 `/api/n8n/ligacoes/*`, `/api/n8n/negocios/:id/pasta-drive`, `/api/n8n/emails/*` e a rota da API4COM
