@@ -64,6 +64,7 @@ services:
       - PORTAL_N8N_SEGREDO=${PORTAL_N8N_SEGREDO}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODELO=${GEMINI_MODELO:-gemini-3.8-flash}
+      - APOLLO_API_KEY=${APOLLO_API_KEY:-}
       - DRIVE_PASTA_LIGACOES=${DRIVE_PASTA_LIGACOES}
     volumes:
       - n8n_aprimora_dados:/home/node/.n8n

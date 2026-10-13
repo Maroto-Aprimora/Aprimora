@@ -11,18 +11,19 @@ diretor, erro na 3ª falha).
 
 ## Preparação (uma vez)
 
-1. Fluxos 06 e 07 criados e publicados no n8n pelo conector do n8n em 13/10/2026 (ids `X4QxQK0Xaa0l153J` e
-   `VN5goyMMvOWnYY5z`). Teste real em 13/10: o Analista gerencial escreveu a análise do relatório da semana.
-2. Pendente: publicar "APRIMORA | Sistema | Tratamento de erros" (e o Monitor da fila) e escolhê-lo em
-   **Settings → Error workflow** dos fluxos 06 e 07.
+1. Fluxos 06 e 07 criados e publicados no n8n pelo conector do n8n em 13/10/2026 (ids `nWA8nWwKhuzuV8ev` e
+   `VN5goyMMvOWnYY5z`), com "Tratamento de erros" como Error workflow. Testes reais em 13/10: o Analista gerencial
+   escreveu a análise do relatório da semana; o Enriquecedor devolveu segmento, dores e resumo de um lead fictício.
+2. Para o Apollo: `APOLLO_API_KEY` no ambiente da VPS e a linha `- APOLLO_API_KEY=${APOLLO_API_KEY:-}` no
+   `docker-compose.yml` (já está no repositório). Sem ela, o Enriquecedor segue sem o Apollo.
 3. Confira que a VPS tem `GEMINI_API_KEY` no ambiente do n8n (feito em 13/10/2026). Os fluxos 06 e 07 usam o modelo
    `gemini-3.8-flash` fixo no nó do Gemini (o `gemini-2.5-flash` não aceita mais contas novas).
 4. No portal, **Config. do funil → Agentes e fila**: ligar **Enriquecedor** e **Analista gerencial**.
 
 ## A1 · Enriquecedor
 
-Use uma empresa **real** da região (o agente pesquisa na internet; empresa fictícia não tem o que achar). Cadastre só
-com o nome e a cidade.
+Use uma empresa **real** da região, com o **site** preenchido (o agente lê o site, o Apollo busca pelo domínio e a
+BrasilAPI usa o CNPJ do rodapé). Sem site, sobram só o CNPJ (se informado) e o nome.
 
 - [ ] **Novo lead** com nome e cidade: o card cai em Enriquecimento e, em até 2 minutos, em Agentes e fila aparece
       um trabalho do Enriquecedor como **Concluído**.

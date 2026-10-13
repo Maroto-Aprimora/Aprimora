@@ -2,7 +2,7 @@
  "name": "APRIMORA | Agente | A1 Enriquecedor",
  "nodes": [
   {
-   "id": "67f78f37-fd89-5376-9be8-82dd4ecb2f78",
+   "id": "175a1cf6-2ceb-516f-95f6-e17414a3e788",
    "name": "Nota",
    "type": "n8n-nodes-base.stickyNote",
    "typeVersion": 1,
@@ -11,14 +11,14 @@
     -360
    ],
    "parameters": {
-    "content": "## APRIMORA | Agente | A1 Enriquecedor\nA cada 2 minutos reserva até 2 trabalhos do **Enriquecedor** (card que entrou em Enriquecimento ou botão *Enriquecer agora*). O Gemini pesquisa a empresa com a busca do Google; com o CNPJ, a **BrasilAPI** traz o cadastro oficial (tem prioridade). O portal grava os dados públicos só nos campos vazios, manda decisor, e-mails e hipóteses de dor para a **Caixa de aprovação** e cria a tarefa *Completar dados do lead* com o que faltar.\n\nVariáveis: `PORTAL_URL`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY` (modelo `gemini-3.8-flash`). Qualquer erro devolve o trabalho como falha (o portal tenta de novo em 5 e 10 min; na 3ª avisa os diretores).",
+    "content": "## APRIMORA | Agente | A1 Enriquecedor\nA cada 2 minutos reserva até 2 trabalhos do **Enriquecedor**. Coleta, nesta ordem: **site** da empresa (texto, e-mails, telefones e CNPJ do rodapé) → **Apollo** (busca de decisores, sem crédito; revelar e-mail do 1º decisor gasta crédito e, sem crédito, segue sem ele) → **BrasilAPI** (cadastro oficial e sócios). O **Gemini** (gratuito, sem busca) só escolhe o segmento e escreve hipóteses de dor e resumo a partir do que foi coletado; se ele falhar, os dados seguem mesmo assim.\n\nVariáveis: `PORTAL_URL`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY`, `APOLLO_API_KEY` (sem ela, o Apollo é pulado).",
     "width": 900,
-    "height": 220,
+    "height": 240,
     "color": 4
    }
   },
   {
-   "id": "482698c2-4f88-5ba0-99fa-4a25aa664f39",
+   "id": "e1e492f3-d4e8-597d-b231-a6f016575da4",
    "name": "A cada 2 minutos",
    "type": "n8n-nodes-base.scheduleTrigger",
    "typeVersion": 1.2,
@@ -38,7 +38,7 @@
    }
   },
   {
-   "id": "a7db0354-7594-53ff-8e7c-ca2630c7e115",
+   "id": "d6de4948-a644-5f98-a940-ade50c282c43",
    "name": "Reservar trabalhos",
    "type": "n8n-nodes-base.httpRequest",
    "typeVersion": 4.2,
@@ -70,7 +70,7 @@
    "waitBetweenTries": 5000
   },
   {
-   "id": "b90b47e3-98f0-5a54-8d23-16e02e8a5fe2",
+   "id": "dfcad964-8153-5ec6-9336-63d93510fd9a",
    "name": "Separar trabalhos",
    "type": "n8n-nodes-base.splitOut",
    "typeVersion": 1,
@@ -84,8 +84,8 @@
    }
   },
   {
-   "id": "6f9501a2-1896-5069-adc2-476add8a33aa",
-   "name": "Montar pesquisa",
+   "id": "330382f6-f406-57b0-aa14-c0cb4b9f1e8c",
+   "name": "Preparar coleta",
    "type": "n8n-nodes-base.code",
    "typeVersion": 2,
    "position": [
@@ -94,12 +94,12 @@
    ],
    "parameters": {
     "mode": "runOnceForEachItem",
-    "jsCode": "// Monta a pesquisa do Gemini (com busca no Google) para um trabalho do Enriquecedor.\nconst t = $json;\nconst p = t.payload || {};\nconst e = p.empresa || {};\nconst contatos = (p.contatos || []).map((c) => `${c.nome}${c.cargo ? ' (' + c.cargo + ')' : ''}${c.decisor ? ' [decisor]' : ''}`).join('; ') || 'nenhum';\nconst prompt = [\n  'Você é o Enriquecedor da Aprimora, empresa júnior de consultoria em engenharia de produção.',\n  'Pesquise na internet (site oficial, Google Maps, LinkedIn da empresa, consultas públicas de CNPJ) a empresa abaixo e devolva SOMENTE um objeto JSON, sem texto antes ou depois.',\n  '',\n  'Empresa: ' + (e.nome || ''),\n  'Razão social: ' + (e.razao_social || 'desconhecida'),\n  'CNPJ: ' + (e.cnpj || 'desconhecido'),\n  'Site: ' + (e.site || 'desconhecido'),\n  'Cidade/UF: ' + [e.cidade, e.uf].filter(Boolean).join('/'),\n  'Segmento atual: ' + (e.segmento || 'não definido'),\n  'Contatos já cadastrados: ' + contatos,\n  '',\n  'Formato (use \"\" ou [] quando não encontrar; NUNCA invente dados):',\n  '{\"cnpj\":\"\",\"razao_social\":\"\",\"nome_fantasia\":\"\",\"site\":\"\",\"telefone\":\"\",\"email\":\"\",\"endereco\":\"\",\"cidade\":\"\",\"uf\":\"\",',\n  ' \"segmento\":\"\",\"decisor\":{\"nome\":\"\",\"cargo\":\"\",\"email\":\"\",\"telefone\":\"\",\"linkedin\":\"\"},\"emails\":[],\"hipoteses_dor\":[],\"resumo\":\"\"}',\n  '',\n  'Regras:',\n  '- \"segmento\": escolha exatamente um destes ou deixe \"\": ' + (p.segmentos || []).join(', ') + '.',\n  '- \"decisor\": quem decide sobre contratar consultoria (sócio, diretor, gerente industrial ou de operações). Só nomes encontrados em fonte pública.',\n  '- \"emails\": e-mails corporativos publicados pela empresa (no máximo 3).',\n  '- \"hipoteses_dor\": até 3 hipóteses curtas de dor ligadas aos serviços da Aprimora (' + (p.servicos || []).join(', ') + '), baseadas no que a empresa faz.',\n  '- \"resumo\": 1 ou 2 frases sobre o que a empresa faz e o porte aparente.',\n  '- Telefone com DDD. CNPJ só com números.',\n].join('\\n');\nreturn {\n  json: {\n    trabalho: { id: t.id, negocio_id: t.negocio_id, empresa: e },\n    corpo: {\n      contents: [{ role: 'user', parts: [{ text: prompt }] }],\n      tools: [{ google_search: {} }],\n      generationConfig: { temperature: 0.2 },\n    },\n  },\n};\n"
+    "jsCode": "// Prepara a coleta: domínio do site (ou do e-mail corporativo), CNPJ e nome.\nconst t = $json;\nconst p = t.payload || {};\nconst e = p.empresa || {};\nconst gratuitos = /^(gmail|hotmail|outlook|live|yahoo|bol|uol|terra|icloud|ig)\\./i;\nconst doSite = String(e.site || '').trim().replace(/^https?:\\/\\//i, '').replace(/^www\\./i, '').split(/[\\/?#]/)[0].toLowerCase();\nconst doEmail = String(e.email || '').split('@')[1] || '';\nconst dominio = doSite || (doEmail && !gratuitos.test(doEmail) ? doEmail.toLowerCase() : '');\nreturn {\n  json: {\n    trabalho: { id: t.id, negocio_id: t.negocio_id, empresa: e, segmentos: p.segmentos || [], servicos: p.servicos || [], contatos: p.contatos || [] },\n    dominio,\n    url_site: dominio ? 'https://' + dominio : '',\n  },\n};\n"
    }
   },
   {
-   "id": "b3a3d3e3-2f71-5332-8b69-fce8300ad64f",
-   "name": "Pesquisar com o Gemini",
+   "id": "75fae6cf-2715-57a3-b03a-e34e05dd8e0f",
+   "name": "Ler o site",
    "type": "n8n-nodes-base.httpRequest",
    "typeVersion": 4.2,
    "position": [
@@ -107,8 +107,156 @@
     0
    ],
    "parameters": {
+    "method": "GET",
+    "url": "={{ $json.url_site || 'https://site-ausente.invalid' }}",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "User-Agent",
+       "value": "Mozilla/5.0 (compatible; AprimoraBot/1.0)"
+      }
+     ]
+    },
+    "options": {
+     "timeout": 15000,
+     "allowUnauthorizedCerts": true,
+     "response": {
+      "response": {
+       "responseFormat": "text"
+      }
+     }
+    }
+   },
+   "onError": "continueRegularOutput"
+  },
+  {
+   "id": "1403f156-cd1e-50fd-9ee2-bd3e07cbfe58",
+   "name": "Extrair do site",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1100,
+    0
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Extrai do site: texto, e-mails, telefones e CNPJ (rodapés costumam trazer o CNPJ).\nconst prep = $('Preparar coleta').item.json;\nconst html = typeof $json.data === 'string' ? $json.data : '';\nconst texto = html\n  .replace(/<script[\\s\\S]*?<\\/script>|<style[\\s\\S]*?<\\/style>|<noscript[\\s\\S]*?<\\/noscript>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\\s+/g, ' ').trim();\nconst emails = [...new Set((html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || []).map((x) => x.toLowerCase()))]\n  .filter((x) => !/\\.(png|jpe?g|gif|svg|webp)$/.test(x) && !/(sentry|wixpress|example|exemplo)/.test(x))\n  .sort((a, b) => (b.endsWith('@' + prep.dominio) ? 1 : 0) - (a.endsWith('@' + prep.dominio) ? 1 : 0))\n  .slice(0, 5);\nconst telefones = [...new Set((texto.match(/\\(?\\b\\d{2}\\)?\\s?9?\\d{4}[-\\s]?\\d{4}\\b/g) || []).map((x) => x.trim()))].slice(0, 3);\nconst so = (v) => String(v || '').replace(/\\D/g, '');\nconst cnpjSite = ((texto.match(/\\b\\d{2}\\.?\\d{3}\\.?\\d{3}\\/?\\d{4}-?\\d{2}\\b/) || [])[0]) || '';\nconst cnpj = so(prep.trabalho.empresa.cnpj).length === 14 ? so(prep.trabalho.empresa.cnpj) : (so(cnpjSite).length === 14 ? so(cnpjSite) : '');\nreturn { json: { site_ok: texto.length > 0, texto: texto.slice(0, 6000), emails, telefones, cnpj } };\n"
+   }
+  },
+  {
+   "id": "472338be-fd04-54f9-88db-1776a95f0504",
+   "name": "Apollo: buscar decisores",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1320,
+    0
+   ],
+   "parameters": {
     "method": "POST",
-    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+    "url": "=https://api.apollo.io/api/v1/mixed_people/api_search",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-api-key",
+       "value": "={{ $env.APOLLO_API_KEY }}"
+      },
+      {
+       "name": "Cache-Control",
+       "value": "no-cache"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ q_organization_domains_list: [$('Preparar coleta').item.json.dominio || 'sem-dominio.invalid'], person_seniorities: ['owner', 'founder', 'c_suite', 'partner', 'director', 'head'], per_page: 5, page: 1 }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "onError": "continueRegularOutput"
+  },
+  {
+   "id": "132bd4f5-91ab-5fdb-baaa-0121cead3487",
+   "name": "Apollo: revelar decisor",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1540,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "=https://api.apollo.io/api/v1/people/match",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-api-key",
+       "value": "={{ $env.APOLLO_API_KEY }}"
+      },
+      {
+       "name": "Cache-Control",
+       "value": "no-cache"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ id: (($json.people || [])[0] || {}).id || 'sem-id', reveal_personal_emails: false, reveal_phone_number: false }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "onError": "continueRegularOutput"
+  },
+  {
+   "id": "ff8bafd5-02f0-57d4-a8da-22d76e1681cd",
+   "name": "Consultar CNPJ (BrasilAPI)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1760,
+    0
+   ],
+   "parameters": {
+    "method": "GET",
+    "url": "=https://brasilapi.com.br/api/cnpj/v1/{{ $('Extrair do site').item.json.cnpj || '00000000000000' }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "onError": "continueRegularOutput"
+  },
+  {
+   "id": "90204b14-76d2-52e1-b07c-46598be91c8f",
+   "name": "Montar pedido ao Gemini",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1980,
+    0
+   ],
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Junta as fontes e monta o pedido ao Gemini (sem busca: só classifica e escreve a partir do que foi coletado).\nconst prep = $('Preparar coleta').item.json;\nconst site = $('Extrair do site').item.json;\nconst busca = $('Apollo: buscar decisores').item.json;\nconst revelado = $('Apollo: revelar decisor').item.json;\nconst b = $json && $json.razao_social && !$json.error ? $json : null;\nconst e = prep.trabalho.empresa;\nconst candidatos = (Array.isArray(busca.people) ? busca.people : []).slice(0, 5).map((x) => ({\n  id: x.id, nome: [x.first_name, x.last_name || x.last_name_obfuscated].filter(Boolean).join(' '), cargo: x.title || '',\n}));\nconst pessoa = revelado && revelado.person ? revelado.person : null;\nconst org = (pessoa && pessoa.organization) || (busca.people && busca.people[0] && busca.people[0].organization) || null;\nconst coleta = {\n  site: { dominio: prep.dominio, lido: site.site_ok, emails: site.emails, telefones: site.telefones, cnpj: site.cnpj },\n  apollo: {\n    candidatos,\n    decisor: pessoa ? { nome: pessoa.name || [pessoa.first_name, pessoa.last_name].filter(Boolean).join(' '), cargo: pessoa.title || '',\n      email: pessoa.email || '', linkedin: pessoa.linkedin_url || '' } : null,\n    empresa: org ? { nome: org.name || '', setor: org.industry || '', funcionarios: org.estimated_num_employees || null,\n      telefone: (org.primary_phone && org.primary_phone.number) || org.phone || '', linkedin: org.linkedin_url || '' } : null,\n  },\n  cnpj: b,\n};\nconst prompt = [\n  'Você é o Enriquecedor da Aprimora, empresa júnior de consultoria em engenharia de produção.',\n  'Com base SOMENTE nas informações abaixo (não invente nada), classifique a empresa e escreva hipóteses de dor.',\n  '',\n  'Empresa: ' + (e.nome || '') + (e.cidade ? ' · ' + e.cidade + (e.uf ? '/' + e.uf : '') : ''),\n  'Atividade no CNPJ: ' + (b ? (b.cnae_fiscal_descricao || '') + (b.porte ? ' · porte ' + b.porte : '') : 'não consultado'),\n  'Setor no Apollo: ' + ((coleta.apollo.empresa && coleta.apollo.empresa.setor) || 'não encontrado') +\n    (coleta.apollo.empresa && coleta.apollo.empresa.funcionarios ? ' · cerca de ' + coleta.apollo.empresa.funcionarios + ' funcionários' : ''),\n  'Texto do site: ' + (site.texto ? site.texto.slice(0, 5000) : 'site não lido'),\n  '',\n  'Segmentos possíveis (escolha um ou \"\"): ' + prep.trabalho.segmentos.join(', ') + '.',\n  'Serviços da Aprimora: ' + prep.trabalho.servicos.join(', ') + '.',\n  'hipoteses_dor: até 3 frases curtas, cada uma ligando algo concreto da empresa a um serviço da Aprimora.',\n  'resumo: 1 ou 2 frases sobre o que a empresa faz e o porte aparente. Se as informações forem poucas, diga isso.',\n].join('\\n');\nconst lista = { type: 'ARRAY', items: { type: 'STRING' } };\nreturn {\n  json: {\n    coleta,\n    corpo: {\n      contents: [{ role: 'user', parts: [{ text: prompt }] }],\n      generationConfig: {\n        temperature: 0.2,\n        responseMimeType: 'application/json',\n        responseSchema: { type: 'OBJECT', properties: { segmento: { type: 'STRING' }, hipoteses_dor: lista, resumo: { type: 'STRING' } },\n          required: ['segmento', 'hipoteses_dor', 'resumo'] },\n      },\n    },\n  },\n};\n"
+   },
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "7886cc3e-d875-5581-a8d7-8bf01a5f46f1",
+   "name": "Gemini: segmento e dores",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    2200,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
     "sendHeaders": true,
     "headerParameters": {
      "parameters": [
@@ -122,106 +270,37 @@
     "specifyBody": "json",
     "jsonBody": "={{ JSON.stringify($json.corpo) }}",
     "options": {
-     "timeout": 180000
+     "timeout": 120000
     }
    },
+   "onError": "continueRegularOutput",
    "retryOnFail": true,
    "maxTries": 2,
-   "waitBetweenTries": 30000,
-   "onError": "continueErrorOutput"
+   "waitBetweenTries": 5000
   },
   {
-   "id": "547d7cdc-4c9f-5cc8-adc9-1057f79e0e25",
-   "name": "Ler resposta",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    1100,
-    -100
-   ],
-   "parameters": {
-    "mode": "runOnceForEachItem",
-    "jsCode": "// Lê a resposta do Gemini: extrai o JSON do texto e as fontes da busca.\nconst trabalho = $('Montar pesquisa').item.json.trabalho;\nconst c = ($json.candidates || [])[0] || {};\nconst texto = ((c.content || {}).parts || []).map((p) => p.text || '').join('').trim();\nif (!texto) throw new Error('Gemini respondeu sem texto (' + (c.finishReason || 'sem motivo') + ')');\nconst inicio = texto.indexOf('{');\nconst fim = texto.lastIndexOf('}');\nif (inicio < 0 || fim <= inicio) throw new Error('Resposta sem JSON: ' + texto.slice(0, 300));\nlet achado;\ntry {\n  achado = JSON.parse(texto.slice(inicio, fim + 1));\n} catch (err) {\n  throw new Error('JSON inválido do Gemini: ' + err.message);\n}\nconst fontes = (((c.groundingMetadata || {}).groundingChunks) || [])\n  .map((g) => (g.web || {}).uri).filter(Boolean).slice(0, 8);\nconst so = (v) => String(v || '').replace(/\\D/g, '');\nconst cnpj = so(trabalho.empresa.cnpj).length === 14 ? so(trabalho.empresa.cnpj) : so(achado.cnpj);\nreturn { json: { trabalho, achado, fontes, cnpj: cnpj.length === 14 ? cnpj : '' } };\n"
-   },
-   "onError": "continueErrorOutput"
-  },
-  {
-   "id": "f9de058b-529a-5c20-9088-421f2f228bc5",
-   "name": "Tem CNPJ?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.2,
-   "position": [
-    1320,
-    -200
-   ],
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "loose",
-      "version": 2
-     },
-     "conditions": [
-      {
-       "id": "24b16260-4b5a-557c-8565-6201debf5cc6",
-       "leftValue": "={{ $json.cnpj }}",
-       "rightValue": "",
-       "operator": {
-        "type": "string",
-        "operation": "notEmpty",
-        "singleValue": true
-       }
-      }
-     ],
-     "combinator": "and"
-    },
-    "options": {}
-   }
-  },
-  {
-   "id": "7cde6b31-2ad0-596e-a59d-368a54bed85b",
-   "name": "Consultar CNPJ (BrasilAPI)",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    1540,
-    -300
-   ],
-   "parameters": {
-    "url": "=https://brasilapi.com.br/api/cnpj/v1/{{ $json.cnpj }}",
-    "options": {
-     "timeout": 30000
-    }
-   },
-   "retryOnFail": true,
-   "maxTries": 2,
-   "waitBetweenTries": 5000,
-   "onError": "continueRegularOutput"
-  },
-  {
-   "id": "37b034a0-11f6-5ee6-af92-e41c6aec466b",
+   "id": "bedd1a15-9865-5661-afaa-6179558d700c",
    "name": "Montar resultado",
    "type": "n8n-nodes-base.code",
    "typeVersion": 2,
    "position": [
-    1760,
-    -200
+    2420,
+    0
    ],
    "parameters": {
     "mode": "runOnceForEachItem",
-    "jsCode": "// Junta o que o Gemini achou com o cadastro oficial da BrasilAPI (que tem prioridade nos dados cadastrais).\nconst base = $('Ler resposta').item.json;\nconst a = base.achado || {};\nconst b = ($json && $json.razao_social && !$json.trabalho) ? $json : null;\nconst txt = (v) => (v == null ? '' : String(v).trim());\nconst tel = (v) => { const d = txt(v).replace(/\\D/g, ''); return d.length >= 10 ? '(' + d.slice(0, 2) + ') ' + d.slice(2) : ''; };\nconst titulo = (s) => txt(s).toLowerCase().replace(/(^|\\s)\\S/g, (l) => l.toUpperCase());\nconst lista = (v) => (Array.isArray(v) ? v.map(txt).filter(Boolean) : []);\n\nconst dados = {\n  cnpj: base.cnpj || '',\n  razao_social: txt(b ? b.razao_social : a.razao_social),\n  nome_fantasia: txt(b ? b.nome_fantasia : a.nome_fantasia) || txt(a.nome_fantasia),\n  telefone: (b && tel(b.ddd_telefone_1)) || txt(a.telefone),\n  email: txt(b && b.email ? String(b.email).toLowerCase() : a.email),\n  site: txt(a.site),\n  endereco: b ? [titulo(b.descricao_tipo_de_logradouro) + ' ' + titulo(b.logradouro), txt(b.numero), titulo(b.bairro)].map((s) => s.trim()).filter(Boolean).join(', ') : txt(a.endereco),\n  cidade: b ? titulo(b.municipio) : txt(a.cidade),\n  uf: txt(b ? b.uf : a.uf).toUpperCase().slice(0, 2),\n  cnae: b && b.cnae_fiscal ? b.cnae_fiscal + ' · ' + txt(b.cnae_fiscal_descricao) : '',\n  porte: b ? txt(b.porte) : '',\n  situacao: b ? txt(b.descricao_situacao_cadastral) : '',\n};\n\nconst d = a.decisor || {};\nlet decisor = { nome: txt(d.nome), cargo: txt(d.cargo), email: txt(d.email), telefone: txt(d.telefone), linkedin: txt(d.linkedin) };\n// Sem decisor na busca: o primeiro sócio-administrador do quadro societário\nif (!decisor.nome && b && Array.isArray(b.qsa) && b.qsa.length) {\n  const s = b.qsa.find((q) => /administrador/i.test(q.qualificacao_socio || '')) || b.qsa[0];\n  if (s && s.nome_socio) decisor = { nome: titulo(s.nome_socio), cargo: txt(s.qualificacao_socio), email: '', telefone: '', linkedin: '' };\n}\n\nconst fontes = [...new Set([...(base.fontes || []), ...(b ? ['https://brasilapi.com.br/api/cnpj/v1/' + base.cnpj] : [])])];\nreturn {\n  json: {\n    trabalho_id: base.trabalho.id,\n    resultado: {\n      dados_publicos: dados,\n      segmento: txt(a.segmento),\n      decisor,\n      emails: [...new Set(lista(a.emails).map((e) => e.toLowerCase()))].slice(0, 3),\n      hipoteses_dor: lista(a.hipoteses_dor).slice(0, 3),\n      resumo: txt(a.resumo),\n      fontes,\n    },\n  },\n};\n"
+    "jsCode": "// Monta o resultado para o portal: fatos das fontes (CNPJ > site > Apollo); o Gemini só dá segmento, dores e resumo.\nconst prep = $('Preparar coleta').item.json;\nconst { coleta } = $('Montar pedido ao Gemini').item.json;\nconst c = ($json.candidates || [])[0] || {};\nconst texto = ((c.content || {}).parts || []).map((p) => p.text || '').join('').trim();\nlet ia = {};\ntry { ia = texto ? JSON.parse(texto) : {}; } catch (err) { ia = {}; }\nconst txt = (v) => (v == null ? '' : String(v).trim());\nconst titulo = (s) => txt(s).toLowerCase().replace(/(^|\\s)\\S/g, (l) => l.toUpperCase());\nconst tel = (v) => { const d = txt(v).replace(/\\D/g, '').replace(/^55(?=\\d{10,11}$)/, ''); return d.length >= 10 ? '(' + d.slice(0, 2) + ') ' + d.slice(2) : ''; };\nconst b = coleta.cnpj;\nconst s = coleta.site;\nconst ap = coleta.apollo;\n\nconst dados = {\n  cnpj: b ? txt(b.cnpj) : (s.cnpj || ''),\n  razao_social: b ? txt(b.razao_social) : '',\n  nome_fantasia: b ? txt(b.nome_fantasia) : '',\n  telefone: (b && tel(b.ddd_telefone_1)) || tel(s.telefones[0]) || tel(ap.empresa && ap.empresa.telefone),\n  email: txt(b && b.email ? String(b.email).toLowerCase() : s.emails[0]),\n  site: prep.dominio ? 'https://' + prep.dominio : '',\n  endereco: b ? [titulo(b.descricao_tipo_de_logradouro) + ' ' + titulo(b.logradouro), txt(b.numero), titulo(b.bairro)].map((x) => x.trim()).filter(Boolean).join(', ') : '',\n  cidade: b ? titulo(b.municipio) : '',\n  uf: b ? txt(b.uf).toUpperCase() : '',\n  cnae: b && b.cnae_fiscal ? b.cnae_fiscal + ' · ' + txt(b.cnae_fiscal_descricao) : '',\n  porte: b ? txt(b.porte) : '',\n  situacao: b ? txt(b.descricao_situacao_cadastral) : '',\n};\n\nlet decisor = { nome: '', cargo: '', email: '', telefone: '', linkedin: '' };\nlet origem = '';\nif (ap.decisor && ap.decisor.nome) { decisor = { ...decisor, ...ap.decisor }; origem = 'Apollo'; }\nelse if (b && Array.isArray(b.qsa) && b.qsa.length) {\n  const q = b.qsa.find((x) => /administrador/i.test(x.qualificacao_socio || '')) || b.qsa[0];\n  if (q && q.nome_socio) { decisor = { ...decisor, nome: titulo(q.nome_socio), cargo: txt(q.qualificacao_socio) }; origem = 'quadro societário (CNPJ)'; }\n}\nconst outros = ap.candidatos.filter((x) => !decisor.nome || !x.nome.startsWith(decisor.nome.split(' ')[0])).map((x) => x.nome + (x.cargo ? ' (' + x.cargo + ')' : ''));\n\nconst fontes = [];\nif (s.lido) fontes.push('https://' + prep.dominio);\nif (b) fontes.push('https://brasilapi.com.br/api/cnpj/v1/' + b.cnpj);\nif (ap.candidatos.length || ap.decisor) fontes.push('https://app.apollo.io');\nconst semIa = !texto ? 'Gemini indisponível nesta busca: segmento e dores ficaram em branco.' : '';\nconst resumo = [txt(ia.resumo), semIa, origem ? 'Decisor sugerido pelo ' + origem + '.' : '', outros.length ? 'Outros nomes no Apollo: ' + outros.join('; ') + '.' : '']\n  .filter(Boolean).join(' ');\n\nreturn {\n  json: {\n    trabalho_id: prep.trabalho.id,\n    resultado: {\n      dados_publicos: dados,\n      segmento: txt(ia.segmento),\n      decisor,\n      emails: s.emails.filter((x) => x !== dados.email).slice(0, 3),\n      hipoteses_dor: (Array.isArray(ia.hipoteses_dor) ? ia.hipoteses_dor.map(txt).filter(Boolean) : []).slice(0, 3),\n      resumo,\n      fontes,\n    },\n  },\n};\n"
    },
    "onError": "continueErrorOutput"
   },
   {
-   "id": "000f5c4d-537c-5339-9edf-33d394073022",
+   "id": "b71cc5c4-4c82-53e4-acc8-bdd917b47043",
    "name": "Devolver resultado ao portal",
    "type": "n8n-nodes-base.httpRequest",
    "typeVersion": 4.2,
    "position": [
-    1980,
-    -200
+    2640,
+    0
    ],
    "parameters": {
     "method": "POST",
@@ -247,17 +326,17 @@
    "waitBetweenTries": 5000
   },
   {
-   "id": "bcdc9932-5244-5341-ae60-ed71fc884fc3",
+   "id": "ed25ad74-5d43-56c4-87f8-f62f35296f55",
    "name": "Registrar falha no portal",
    "type": "n8n-nodes-base.httpRequest",
    "typeVersion": 4.2,
    "position": [
-    1320,
-    200
+    2420,
+    260
    ],
    "parameters": {
     "method": "POST",
-    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $('Montar pesquisa').item.json.trabalho.id }}/falha",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/trabalhos/{{ $('Preparar coleta').item.json.trabalho.id }}/falha",
     "sendHeaders": true,
     "headerParameters": {
      "parameters": [
@@ -306,61 +385,58 @@
    "main": [
     [
      {
-      "node": "Montar pesquisa",
+      "node": "Preparar coleta",
       "type": "main",
       "index": 0
      }
     ]
    ]
   },
-  "Montar pesquisa": {
+  "Preparar coleta": {
    "main": [
     [
      {
-      "node": "Pesquisar com o Gemini",
+      "node": "Ler o site",
       "type": "main",
       "index": 0
      }
     ]
    ]
   },
-  "Pesquisar com o Gemini": {
+  "Ler o site": {
    "main": [
     [
      {
-      "node": "Ler resposta",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Registrar falha no portal",
+      "node": "Extrair do site",
       "type": "main",
       "index": 0
      }
     ]
    ]
   },
-  "Ler resposta": {
+  "Extrair do site": {
    "main": [
     [
      {
-      "node": "Tem CNPJ?",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Registrar falha no portal",
+      "node": "Apollo: buscar decisores",
       "type": "main",
       "index": 0
      }
     ]
    ]
   },
-  "Tem CNPJ?": {
+  "Apollo: buscar decisores": {
+   "main": [
+    [
+     {
+      "node": "Apollo: revelar decisor",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Apollo: revelar decisor": {
    "main": [
     [
      {
@@ -368,17 +444,39 @@
       "type": "main",
       "index": 0
      }
-    ],
+    ]
+   ]
+  },
+  "Consultar CNPJ (BrasilAPI)": {
+   "main": [
     [
      {
-      "node": "Montar resultado",
+      "node": "Montar pedido ao Gemini",
       "type": "main",
       "index": 0
      }
     ]
    ]
   },
-  "Consultar CNPJ (BrasilAPI)": {
+  "Montar pedido ao Gemini": {
+   "main": [
+    [
+     {
+      "node": "Gemini: segmento e dores",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Registrar falha no portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gemini: segmento e dores": {
    "main": [
     [
      {
@@ -410,8 +508,6 @@
  },
  "settings": {
   "executionOrder": "v1",
-  "saveManualExecutions": true,
-  "callerPolicy": "workflowsFromSameOwner",
   "timezone": "America/Sao_Paulo",
   "saveDataSuccessExecution": "none",
   "saveDataErrorExecution": "all"

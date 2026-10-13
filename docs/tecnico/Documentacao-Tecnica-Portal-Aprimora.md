@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.12 |
+| Versão do documento | 1.13 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -541,7 +541,9 @@ da Vercel, então o push só funciona em produção.
 | n8n da Aprimora | INSTALADO (fluxos ainda não importados) | VPS Hostinger KVM 2 própria, https://srv2043014.hstgr.cloud; `n8n/docker-compose.yml` com Caddy (HTTPS automático) e n8n (1 vCPU / 1,5 GB, limpeza automática de execuções, áudios em disco, 2 execuções simultâneas); 5 fluxos em `n8n/fluxos/` |
 | API4COM (ligações) | PARCIAL (recebimento ativo; processamento na Fase 2.3) | Webhook "após desligamento da chamada" v1.4 → `POST /api/integracoes/api4com?token=…` → `eventos_integracoes` (payload bruto; token conferido pelo hash `privado.config.api4com_token_hash`). Previsto: evento → ligação → fila → n8n → Google Drive + Gemini → card |
 | Gmail (cadência e respostas) | NÃO IMPLEMENTADO no portal | Previsto: e-mails aprovados no portal enviados pelo n8n; respostas classificadas pelo Gemini |
-| Gemini | EM USO pelo n8n (A1 e A4) | Chave `GEMINI_API_KEY` só na VPS; modelo `gemini-3.8-flash`, fixo nos fluxos 06 e 07 (o `gemini-2.5-flash` deixou de aceitar contas novas; a variável `GEMINI_MODELO` da VPS ficou obsoleta). A1 usa a busca do Google (`google_search`); A4 responde em JSON pelo `responseSchema` |
+| Gemini | EM USO pelo n8n (A1 e A4) | Chave `GEMINI_API_KEY` só na VPS; modelo `gemini-3.8-flash`, fixo nos fluxos 06 e 07 (o `gemini-2.5-flash` deixou de aceitar contas novas; a variável `GEMINI_MODELO` da VPS ficou obsoleta). Plano gratuito: a busca do Google pelo Gemini não tem cota grátis, então o A1 não usa busca (só classifica e escreve a partir do que foi coletado); A1 e A4 respondem em JSON pelo `responseSchema` |
+| Apollo.io | EM USO pelo n8n (A1), opcional | `APOLLO_API_KEY` na VPS. Busca de decisores pelo domínio (`mixed_people/api_search`, sem crédito) e revelação do 1º decisor (`people/match`, gasta crédito); sem chave ou sem crédito, o fluxo segue sem o Apollo |
+| Site da empresa | EM USO pelo n8n (A1) | Página inicial lida pelo n8n: texto para o Gemini, e-mails, telefones e CNPJ do rodapé |
 | BrasilAPI (CNPJ) | EM USO pelo n8n (A1) | `https://brasilapi.com.br/api/cnpj/v1/{cnpj}`, pública e sem chave; cadastro oficial tem prioridade sobre a busca; o quadro societário dá o decisor quando a busca não acha |
 | Google Drive | NÃO IMPLEMENTADO | Usado pelo fluxo de ligações (Fase 2.3) |
 
@@ -711,6 +713,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.13 | 13/10/2026 | Enriquecedor v2: site + Apollo + BrasilAPI + Gemini gratuito sem busca; fluxos criados direto no n8n pelo conector |
 | 1.12 | 13/10/2026 | Fase 2: A1 Enriquecedor e A4 Analista gerencial (migração `20261013140000`, telas e fluxos 06/07) |
 | 1.11 | 13/10/2026 | Recebimento do webhook da API4COM (`/api/integracoes/api4com`) |
 | 1.10 | 13/10/2026 | Portão da Fase 1 aprovado: fluxo de teste do n8n foi e voltou pela fila sem erro |
