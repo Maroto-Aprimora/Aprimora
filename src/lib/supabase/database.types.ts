@@ -125,6 +125,7 @@ export type Database = {
           decidido_em: string | null
           decidido_por: string | null
           id: string
+          ligacao_id: string | null
           negocio_id: string | null
           responsavel_id: string | null
           resumo: string | null
@@ -143,6 +144,7 @@ export type Database = {
           decidido_em?: string | null
           decidido_por?: string | null
           id?: string
+          ligacao_id?: string | null
           negocio_id?: string | null
           responsavel_id?: string | null
           resumo?: string | null
@@ -161,6 +163,7 @@ export type Database = {
           decidido_em?: string | null
           decidido_por?: string | null
           id?: string
+          ligacao_id?: string | null
           negocio_id?: string | null
           responsavel_id?: string | null
           resumo?: string | null
@@ -183,6 +186,13 @@ export type Database = {
             columns: ["decidido_por"]
             isOneToOne: false
             referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aprovacoes_ligacao_id_fkey"
+            columns: ["ligacao_id"]
+            isOneToOne: false
+            referencedRelation: "ligacoes"
             referencedColumns: ["id"]
           },
           {
@@ -402,6 +412,51 @@ export type Database = {
           id?: never
         }
         Relationships: []
+      }
+      avaliacoes_ligacao: {
+        Row: {
+          comentario: string | null
+          created_at: string
+          id: string
+          ligacao_id: string
+          media: number | null
+          membro_id: string
+          notas: Json
+        }
+        Insert: {
+          comentario?: string | null
+          created_at?: string
+          id?: string
+          ligacao_id: string
+          media?: number | null
+          membro_id: string
+          notas?: Json
+        }
+        Update: {
+          comentario?: string | null
+          created_at?: string
+          id?: string
+          ligacao_id?: string
+          media?: number | null
+          membro_id?: string
+          notas?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacoes_ligacao_ligacao_id_fkey"
+            columns: ["ligacao_id"]
+            isOneToOne: true
+            referencedRelation: "ligacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_ligacao_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cadencia_passos: {
         Row: {
@@ -2003,6 +2058,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rubrica_criterios: {
+        Row: {
+          ativo: boolean
+          chave: string
+          created_at: string
+          descricao: string
+          id: string
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          created_at?: string
+          descricao: string
+          id?: string
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          nome?: string
+          ordem?: number
+        }
+        Relationships: []
       }
       segmentos: {
         Row: {

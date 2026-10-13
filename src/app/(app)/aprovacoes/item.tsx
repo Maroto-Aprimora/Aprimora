@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
 import { Botao } from "@/components/ui/botao";
-import { AreaTexto, Campo, Entrada } from "@/components/ui/campos";
+import { AreaTexto, Campo, Entrada, Selecao } from "@/components/ui/campos";
 import { Cartao } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
 import { formatarDataHora } from "@/lib/formatar";
@@ -18,11 +18,23 @@ export type ItemAprovacao = {
 
 const rotuloCampo = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, " ");
 
+/** Campos do "Confirmar resultado da ligação" com controle próprio (lista fechada e datas). */
+const CAMPOS_LIGACAO: Record<string, { rotulo: string; tipo?: "date" | "datetime-local" }> = {
+  resultado: { rotulo: "Resultado" },
+  retorno_em: { rotulo: "Retornar em", tipo: "date" },
+  compromisso_em: { rotulo: "Data e hora do compromisso", tipo: "datetime-local" },
+  decisor_nome: { rotulo: "Nome do decisor" },
+  decisor_melhor_horario: { rotulo: "Melhor horário do decisor" },
+  proximo_passo: { rotulo: "Próximo passo" },
+};
+
 /**
  * Um item da Caixa de aprovação. O texto aparece por inteiro e cada campo pode ser editado antes de aprovar
  * (PE-PA-002, risco "time aprova sem ler").
  */
-export function CartaoAprovacao({ item, mostrarResponsavel }: { item: ItemAprovacao; mostrarResponsavel: boolean }) {
+export function CartaoAprovacao({ item, mostrarResponsavel, resultados = [] }: {
+  item: ItemAprovacao; mostrarResponsavel: boolean; resultados?: { chave: string; nome: string }[];
+}) {
   const [pendente, iniciar] = useTransition();
   const [conteudo, setConteudo] = useState(item.conteudo);
   const [comentario, setComentario] = useState("");
@@ -49,6 +61,25 @@ export function CartaoAprovacao({ item, mostrarResponsavel }: { item: ItemAprova
           const texto = typeof valor === "string" ? valor : JSON.stringify(valor, null, 2);
           const longo = texto.length > 80 || texto.includes("\n");
           const mudar = (novo: string) => setConteudo((c) => ({ ...c, [chave]: typeof valor === "string" ? novo : tentarJson(novo, valor) }));
+          const especial = item.tipo === "resultado_ligacao" ? CAMPOS_LIGACAO[chave] : undefined;
+          if (especial && chave === "resultado") {
+            return (
+              <Campo key={chave} rotulo={especial.rotulo} obrigatorio>
+                <Selecao value={texto} onChange={(e) => mudar(e.target.value)} disabled={pendente}>
+                  <option value="">Escolha…</option>
+                  {resultados.map((r) => <option key={r.chave} value={r.chave}>{r.nome}</option>)}
+                </Selecao>
+              </Campo>
+            );
+          }
+          if (especial) {
+            return (
+              <Campo key={chave} rotulo={especial.rotulo}>
+                <Entrada type={especial.tipo ?? "text"} value={especial.tipo === "datetime-local" ? texto.replace(" ", "T") : texto}
+                  onChange={(e) => mudar(e.target.value)} disabled={pendente} />
+              </Campo>
+            );
+          }
           return (
             <Campo key={chave} rotulo={rotuloCampo(chave)}>
               {longo

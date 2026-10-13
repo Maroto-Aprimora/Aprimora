@@ -38,7 +38,7 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
     supabase.from("atividades").select("*, atividade_participantes(membro_id)").eq("negocio_id", id).order("inicio", { ascending: false }),
     supabase.from("tipos_atividade").select("*").eq("ativo", true).order("ordem"),
     supabase.from("anexos").select("id, nome, caminho, tamanho, enviado_por, created_at").eq("negocio_id", id).order("created_at", { ascending: false }),
-    supabase.from("ligacoes").select("id, inicio, membro_id, duracao_seg, proximo_passo, comentario, retorno_em, decisor_nome, decisor_melhor_horario, origem, resultados_ligacao(nome), contatos(nome)")
+    supabase.from("ligacoes").select("id, inicio, membro_id, duracao_seg, proximo_passo, comentario, retorno_em, decisor_nome, decisor_melhor_horario, origem, resumo, transcricao, gravacao_url, resultados_ligacao(nome), contatos(nome), avaliacoes_ligacao(media)")
       .eq("negocio_id", id).order("inicio", { ascending: false }),
     supabase.from("agentes").select("ativo").eq("chave", "enriquecedor").maybeSingle(),
     supabase.from("trabalhos").select("id", { count: "exact", head: true })
@@ -144,7 +144,7 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
               {(ligacoes ?? []).map((l) => (
                 <li key={l.id} className="px-5 py-3 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Selo tom="marca">{l.resultados_ligacao?.nome ?? "Aguardando resultado"}</Selo>
+                    <Selo tom={l.resultados_ligacao ? "marca" : "destaque"}>{l.resultados_ligacao?.nome ?? "Aguardando confirmação"}</Selo>
                     <span className="text-xs text-texto-suave">
                       {formatarDataHora(l.inicio)} · {nomeMembro(l.membro_id)}
                       {l.contatos ? ` · com ${l.contatos.nome}` : ""}
@@ -157,6 +157,16 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
                   {l.retorno_em && <p className="mt-1 text-xs">Retornar em {formatarData(l.retorno_em)}</p>}
                   {l.proximo_passo && <p className="mt-1"><strong>Próximo passo:</strong> {l.proximo_passo}</p>}
                   {l.comentario && <p className="mt-1 whitespace-pre-line text-texto-suave">{l.comentario}</p>}
+                  {l.resumo && l.resumo !== l.comentario && <p className="mt-1 text-texto-suave">{l.resumo}</p>}
+                  {(l.transcricao || l.gravacao_url) && (
+                    <details className="mt-1 text-xs">
+                      <summary className="cursor-pointer font-semibold text-marca">
+                        Transcrição{l.avaliacoes_ligacao?.media != null ? ` · nota ${String(l.avaliacoes_ligacao.media).replace(".", ",")} de 4` : ""}
+                      </summary>
+                      {l.gravacao_url && <a href={l.gravacao_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-marca hover:text-destaque">Ouvir a gravação</a>}
+                      {l.transcricao && <p className="mt-1 whitespace-pre-line text-texto-suave">{l.transcricao}</p>}
+                    </details>
+                  )}
                 </li>
               ))}
               {(ligacoes ?? []).length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhuma ligação registrada.</li>}

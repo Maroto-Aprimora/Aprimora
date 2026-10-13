@@ -4,6 +4,7 @@ import { Cartao, TituloPagina, Vazio } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
 import { formatarDataHora } from "@/lib/formatar";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
 import { obterUsuario } from "@/lib/usuario";
 import { cn } from "@/lib/utils";
 import { CartaoAprovacao, type ItemAprovacao } from "./item";
@@ -16,7 +17,8 @@ export const metadata: Metadata = { title: "Caixa de aprovação" };
  */
 export default async function PaginaAprovacoes({ searchParams }: PageProps<"/aprovacoes">) {
   const sp = await searchParams;
-  const [usuario, supabase] = await Promise.all([obterUsuario(), criarClienteServidor()]);
+  const [usuario, supabase, config] = await Promise.all([obterUsuario(), criarClienteServidor(), carregarConfiguracaoComercial()]);
+  const resultados = config.resultadosLigacao.map((r) => ({ chave: r.chave, nome: r.nome }));
   const ehDiretor = usuario.ehDiretorDe("comercial");
   const todos = ehDiretor && sp.ver === "todos";
 
@@ -50,7 +52,7 @@ export default async function PaginaAprovacoes({ searchParams }: PageProps<"/apr
       )}
 
       <div className="space-y-4">
-        {pendentes.map((item) => <CartaoAprovacao key={item.id} item={item} mostrarResponsavel={todos} />)}
+        {pendentes.map((item) => <CartaoAprovacao key={item.id} item={item} mostrarResponsavel={todos} resultados={resultados} />)}
         {pendentes.length === 0 && (
           <Cartao>
             <Vazio titulo="Nada para aprovar"
