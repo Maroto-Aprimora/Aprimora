@@ -1,0 +1,145 @@
+{
+ "name": "APRIMORA | Ligações | Buscar chamadas da API4COM",
+ "nodes": [
+  {
+   "id": "08-nota",
+   "name": "Nota",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    -80,
+    -300
+   ],
+   "parameters": {
+    "content": "## APRIMORA | Ligações | Buscar chamadas da API4COM\nA cada 5 minutos lê as 50 chamadas mais recentes da API4COM (credencial **API4COM**, Header Auth `Authorization`) e entrega ao portal as encerradas nos últimos 2 dias. O portal grava cada chamada uma vez só (id da API4COM), venha por aqui ou pelo webhook. Necessário porque o webhook da API4COM não dispara para ligações feitas pelo aplicativo/webphone.",
+    "width": 700,
+    "height": 200,
+    "color": 4
+   }
+  },
+  {
+   "id": "08-gatilho",
+   "name": "A cada 5 minutos",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "minutes",
+       "minutesInterval": 5
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "08-buscar",
+   "name": "Buscar chamadas na API4COM",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    240,
+    0
+   ],
+   "parameters": {
+    "method": "GET",
+    "url": "https://api.api4com.com/api/v1/calls",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendQuery": true,
+    "queryParameters": {
+     "parameters": [
+      {
+       "name": "filter",
+       "value": "{\"order\":\"started_at DESC\",\"limit\":50}"
+      }
+     ]
+    },
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "credentials": {
+    "httpHeaderAuth": {
+     "name": "API4COM"
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  },
+  {
+   "id": "08-entregar",
+   "name": "Entregar ao portal",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    480,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.PORTAL_URL }}/api/n8n/ligacoes/api4com",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-n8n-segredo",
+       "value": "={{ $env.PORTAL_N8N_SEGREDO }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ chamadas: ($json.data || []).filter(c => c.id && c.ended_at && new Date(c.started_at) > new Date(Date.now() - 2 * 24 * 3600 * 1000)) }) }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000
+  }
+ ],
+ "connections": {
+  "A cada 5 minutos": {
+   "main": [
+    [
+     {
+      "node": "Buscar chamadas na API4COM",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Buscar chamadas na API4COM": {
+   "main": [
+    [
+     {
+      "node": "Entregar ao portal",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "timezone": "America/Sao_Paulo",
+  "saveDataSuccessExecution": "none",
+  "saveDataErrorExecution": "all"
+ },
+ "pinData": {},
+ "active": false,
+ "meta": {
+  "templateCredsSetupCompleted": true
+ },
+ "tags": []
+}

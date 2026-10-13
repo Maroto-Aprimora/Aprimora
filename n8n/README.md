@@ -38,6 +38,7 @@ Padrão de nome: `APRIMORA | Área | Ação`. Coloque a etiqueta `aprimora` em t
 | `05-sistema-tratamento-erros.json` | Sistema · Tratamento de erros | Quando outro fluxo quebra | Avisa o portal (auditoria + notificação aos diretores) |
 | `06-agente-enriquecedor.json` | Agente · A1 Enriquecedor | A cada 2 min | Reserva até 2 trabalhos do Enriquecedor; lê o site da empresa (texto, e-mails, telefones, CNPJ do rodapé), busca decisores no Apollo (sem crédito; revelar o e-mail gasta crédito e, sem crédito ou sem `APOLLO_API_KEY`, segue sem ele), consulta o CNPJ na BrasilAPI e pede ao Gemini gratuito (sem busca) só segmento, hipóteses de dor e resumo; se o Gemini falhar, os dados seguem mesmo assim |
 | `07-agente-analista-gerencial.json` | Agente · A4 Analista gerencial | A cada 1 min | Reserva o relatório da R.I pedido pelo diretor; o Gemini escreve resumo, destaques, pontos de atenção e plano por membro (JSON pelo `responseSchema`) a partir dos números do portal |
+| `08-ligacoes-buscar-api4com.json` | Ligações · Buscar chamadas da API4COM | A cada 5 min | Lê `GET /api/v1/calls` (credencial **API4COM**, Header Auth `Authorization`) e entrega ao portal (`POST /api/n8n/ligacoes/api4com`) as chamadas encerradas nos últimos 2 dias; o portal grava cada uma uma vez só. Substitui o webhook, que não dispara para ligações do aplicativo/webphone |
 
 ### Modo de espera para muitas ligações ao mesmo tempo
 

@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.13 |
+| Versão do documento | 1.14 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -347,7 +347,7 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `trabalhos` | agente, tipo, negocio_id, payload, status (pendente/processando/concluido/erro/cancelado), tentativas, max_tentativas, proximo_em, reservado_em, resultado, erro, chave | Fila que o n8n consome; só funções internas escrevem |
 | `aprovacoes` | agente, tipo, trabalho_id, negocio_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação |
 | `relatorios` | tipo ('ri'), de, ate, dados (números calculados no banco), analise (texto do A4), texto_revisado, status (gerando/pronto/erro), erro, trabalho_id, revisado_por/em, criado_por | Relatórios da R.I; só o diretor comercial lê e revisa |
-| `eventos_integracoes` | origem, recebido_em, payload, processado_em, ligacao_id, erro | Eventos recebidos de sistemas externos (API4COM), como chegaram; só o diretor lê |
+| `eventos_integracoes` | origem, recebido_em, payload, externo_id (id da chamada na API4COM, único por origem), processado_em, ligacao_id, erro | Eventos recebidos de sistemas externos (API4COM), como chegaram; só o diretor lê |
 | `feriados` | data, nome | Dias não úteis (nacionais 2026–2027 e aniversário de Londrina); tarefas automáticas pulam fins de semana e feriados |
 | `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
 | `anexos` | negocio_id, nome, caminho, tamanho (≤ 10 MB), tipo_mime, enviado_por | Metadados dos arquivos do bucket `anexos` |
@@ -539,7 +539,7 @@ da Vercel, então o push só funciona em produção.
 | Web Push | EM PRODUÇÃO | Chaves VAPID nas variáveis da Vercel |
 | E-mail transacional (convite, senha) | PARCIAL | Usa o envio padrão do Supabase (limitado). SMTP próprio pendente (Seção 16) |
 | n8n da Aprimora | INSTALADO (fluxos ainda não importados) | VPS Hostinger KVM 2 própria, https://srv2043014.hstgr.cloud; `n8n/docker-compose.yml` com Caddy (HTTPS automático) e n8n (1 vCPU / 1,5 GB, limpeza automática de execuções, áudios em disco, 2 execuções simultâneas); 5 fluxos em `n8n/fluxos/` |
-| API4COM (ligações) | PARCIAL (recebimento ativo; processamento na Fase 2.3) | Webhook "após desligamento da chamada" v1.4 → `POST /api/integracoes/api4com?token=…` → `eventos_integracoes` (payload bruto; token conferido pelo hash `privado.config.api4com_token_hash`). Previsto: evento → ligação → fila → n8n → Google Drive + Gemini → card |
+| API4COM (ligações) | PARCIAL (recebimento ativo, por webhook e por consulta do n8n a cada 5 min; processamento na Fase 2.3) | Webhook "após desligamento da chamada" v1.4 → `POST /api/integracoes/api4com?token=…` → `eventos_integracoes` (payload bruto; token conferido pelo hash `privado.config.api4com_token_hash`). Previsto: evento → ligação → fila → n8n → Google Drive + Gemini → card |
 | Gmail (cadência e respostas) | NÃO IMPLEMENTADO no portal | Previsto: e-mails aprovados no portal enviados pelo n8n; respostas classificadas pelo Gemini |
 | Gemini | EM USO pelo n8n (A1 e A4) | Chave `GEMINI_API_KEY` só na VPS; modelo `gemini-3.8-flash`, fixo nos fluxos 06 e 07 (o `gemini-2.5-flash` deixou de aceitar contas novas; a variável `GEMINI_MODELO` da VPS ficou obsoleta). Plano gratuito: a busca do Google pelo Gemini não tem cota grátis, então o A1 não usa busca (só classifica e escreve a partir do que foi coletado); A1 e A4 respondem em JSON pelo `responseSchema` |
 | Apollo.io | EM USO pelo n8n (A1), opcional | `APOLLO_API_KEY` na VPS. Busca de decisores pelo domínio (`mixed_people/api_search`, sem crédito) e revelação do 1º decisor (`people/match`, gasta crédito); sem chave ou sem crédito, o fluxo segue sem o Apollo |
@@ -713,6 +713,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.14 | 13/10/2026 | Chamadas da API4COM também por consulta do n8n (fluxo 08, `n8n_registrar_chamadas`); o webhook não dispara para ligações do aplicativo |
 | 1.13 | 13/10/2026 | Enriquecedor v2: site + Apollo + BrasilAPI + Gemini gratuito sem busca; fluxos criados direto no n8n pelo conector |
 | 1.12 | 13/10/2026 | Fase 2: A1 Enriquecedor e A4 Analista gerencial (migração `20261013140000`, telas e fluxos 06/07) |
 | 1.11 | 13/10/2026 | Recebimento do webhook da API4COM (`/api/integracoes/api4com`) |
