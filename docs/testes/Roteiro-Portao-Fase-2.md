@@ -2,8 +2,8 @@
 
 Portão do PE-PA-002: **card enriquecido sem digitação, ligação anotada sozinha e R.I gerada com um clique.**
 
-Este roteiro cresce a cada entrega da Fase 2. Hoje cobre o **A1 Enriquecedor** e o **A4 Analista gerencial**; o
-Agente de ligação (A2), o Avaliador (A3) e a tela de Desempenho individual entram depois dos testes da API4COM.
+Este roteiro cresce a cada entrega da Fase 2. Hoje cobre o **A1 Enriquecedor**, o **A4 Analista gerencial**, o **A2 Agente
+de ligação** e o **A3 Avaliador**; a tela de Desempenho individual entra na sequência.
 
 Os testes automáticos de banco estão em `supabase/testes/fase2_enriquecedor_analista.sql` (fila ao entrar em
 Enriquecimento, só campos vazios preenchidos, aprovação do decisor, tarefa "Completar dados", relatório só pelo
@@ -49,6 +49,20 @@ BrasilAPI usa o CNPJ do rodapé). Sem site, sobram só o CNPJ (se informado) e o
 - [ ] Editar o **Texto revisado**, **Marcar como revisado** e **Copiar**: a lista mostra o selo "Revisado".
 - [ ] Com o Analista desligado, o relatório sai na hora só com os números e o aviso.
 - [ ] Um assessor não acessa `/comercial/relatorios` (volta para o Painel comercial).
+
+## A2 · Agente de ligação e A3 · Avaliador
+
+Testes de banco em `supabase/testes/fase2_agente_ligacao.sql`. Use um lead com o **telefone do contato** (ou da empresa)
+igual ao número que você vai discar, e ligue pela API4COM com o seu ramal (o e-mail do ramal é o do portal).
+
+- [ ] Ligação com conversa (15 s ou mais): em até ~7 minutos aparece no negócio, em **Ligações**, como "Aguardando
+      confirmação", com resumo, transcrição e link da gravação.
+- [ ] Na **Caixa de aprovação** de quem ligou chega "Confirmar resultado da ligação", com o resultado sugerido numa
+      lista, datas, próximo passo e dores. Confirmar aplica o resultado como no registro manual (fase, tarefa, agenda) e
+      as dores entram no negócio.
+- [ ] Ligação sem conversa (não atendeu): chega direto como "Não atendeu", sem gastar IA.
+- [ ] Resultado que exige data (ex.: "Decisor indisponível, retornar") sem a data: a confirmação é recusada.
+- [ ] A ligação mostra a nota da rubrica (média de 1 a 4); o membro vê só as suas avaliações, o diretor vê todas.
 
 ## Depois do roteiro
 

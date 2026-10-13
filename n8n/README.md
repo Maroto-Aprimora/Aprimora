@@ -39,6 +39,7 @@ Padrão de nome: `APRIMORA | Área | Ação`. Coloque a etiqueta `aprimora` em t
 | `06-agente-enriquecedor.json` | Agente · A1 Enriquecedor | A cada 2 min | Reserva até 2 trabalhos do Enriquecedor; lê o site da empresa (texto, e-mails, telefones, CNPJ do rodapé), busca decisores no Apollo (sem crédito; revelar o e-mail gasta crédito e, sem crédito ou sem `APOLLO_API_KEY`, segue sem ele), consulta o CNPJ na BrasilAPI e pede ao Gemini gratuito (sem busca) só segmento, hipóteses de dor e resumo; se o Gemini falhar, os dados seguem mesmo assim |
 | `07-agente-analista-gerencial.json` | Agente · A4 Analista gerencial | A cada 1 min | Reserva o relatório da R.I pedido pelo diretor; o Gemini escreve resumo, destaques, pontos de atenção e plano por membro (JSON pelo `responseSchema`) a partir dos números do portal |
 | `08-ligacoes-buscar-api4com.json` | Ligações · Buscar chamadas da API4COM | A cada 5 min | Lê `GET /api/v1/calls` (credencial **API4COM**, Header Auth `Authorization`) e entrega ao portal (`POST /api/n8n/ligacoes/api4com`) as chamadas encerradas nos últimos 2 dias; o portal grava cada uma uma vez só. Substitui o webhook, que não dispara para ligações do aplicativo/webphone |
+| `09-agente-ligacao.json` | Agente · A2 Agente de ligação (+ A3) | A cada 2 min | Reserva 1 ligação, baixa a gravação pelo link da API4COM, manda o áudio ao Gemini gratuito (transcrição, resumo, resultado sugerido, dores, próximo passo, datas e notas da rubrica, em JSON pelo `responseSchema`) e devolve ao portal. Áudio até ~20 MB por pedido |
 
 ### Modo de espera para muitas ligações ao mesmo tempo
 
@@ -117,6 +118,7 @@ chama uma função `n8n_*` do banco, que confere o segredo de novo (hash em `pri
 |---|---|---|
 | `enriquecedor` | `{ negocio_id, empresa: {id, nome, razao_social, cnpj, site, telefone, email, cidade, uf, segmento}, contatos[], segmentos[], servicos[] }` | `{ dados_publicos: {cnpj, razao_social, nome_fantasia, telefone, email, site, endereco, cidade, uf, cnae, porte, situacao}, segmento, decisor: {nome, cargo, email, telefone, linkedin}, emails[], hipoteses_dor[], resumo, fontes[] }` |
 | `analista_gerencial` | `{ relatorio_id, dados: {periodo, semana, trimestre, membros[], sla_estourado[]} }` | `{ analise: { resumo, destaques[], pontos_atencao[], planos: [{ membro, pontos_fortes[], melhorias[], acoes[] }] } }` |
+| `ligacao` | `{ ligacao_id, gravacao_url, duracao_seg, membro, empresa, contato, fase, dores_atuais, hoje, resultados: [{chave, nome}], servicos, rubrica?: [{chave, nome, descricao}] }` | `{ transcricao, resumo, resultado (chave), proximo_passo, retorno_em, compromisso_em, decisor_nome, decisor_melhor_horario, dores: [], avaliacao?: { notas: [{chave, nota, comentario}], comentario } }` |
 
 **Rotas específicas previstas** (fluxos 01 a 03, entram nas Fases 2 e 3 sobre a mesma fila):
 `/api/n8n/ligacoes/*`, `/api/n8n/negocios/:id/pasta-drive`, `/api/n8n/emails/*` e a rota da API4COM

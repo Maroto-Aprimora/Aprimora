@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.14 |
+| Versão do documento | 1.15 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -347,6 +347,8 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `trabalhos` | agente, tipo, negocio_id, payload, status (pendente/processando/concluido/erro/cancelado), tentativas, max_tentativas, proximo_em, reservado_em, resultado, erro, chave | Fila que o n8n consome; só funções internas escrevem |
 | `aprovacoes` | agente, tipo, trabalho_id, negocio_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação |
 | `relatorios` | tipo ('ri'), de, ate, dados (números calculados no banco), analise (texto do A4), texto_revisado, status (gerando/pronto/erro), erro, trabalho_id, revisado_por/em, criado_por | Relatórios da R.I; só o diretor comercial lê e revisa |
+| `rubrica_criterios` | chave, nome, descricao, ordem, ativo | Rubrica do Avaliador (PE-PA-002, 5.1), 7 critérios iniciais; o diretor edita |
+| `avaliacoes_ligacao` | ligacao_id (único), membro_id, notas (jsonb: chave, nome, nota 1–4, comentário), media, comentario | Avaliação de cada ligação pelo A3; o membro vê as suas, o diretor vê todas |
 | `eventos_integracoes` | origem, recebido_em, payload, externo_id (id da chamada na API4COM, único por origem), processado_em, ligacao_id, erro | Eventos recebidos de sistemas externos (API4COM), como chegaram; só o diretor lê |
 | `feriados` | data, nome | Dias não úteis (nacionais 2026–2027 e aniversário de Londrina); tarefas automáticas pulam fins de semana e feriados |
 | `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
@@ -397,6 +399,7 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `somar_valor_servicos` (`negocio_servicos`) | após inserir/atualizar/excluir | Quando algum serviço tem valor, `negocios.valor` = soma dos valores |
 | `agentes_ao_mudar_fase` (`negocio_historico`) | após inserir | Entrou em Enriquecimento: enfileira o trabalho do Enriquecedor (A1), se ligado |
 | `aplicar_aprovacao` (`aprovacoes`) | após mudar status | Aprovado `decisor_empresa`: cria ou atualiza o contato decisor (vira o contato do negócio, se vazio), completa os e-mails da empresa e acrescenta as hipóteses de dor ao negócio |
+| (A2) `privado.processar_eventos_api4com()` | chamado pelo webhook e pela consulta do n8n | Chamada encerrada → ligação no negócio aberto da empresa (telefone: últimos 10 dígitos, contato ou empresa; membro pelo e-mail da API4COM). Com conversa (≥ 15 s e gravação): trabalho do Agente de ligação; sem conversa: aprovação "Não atendeu" sem IA. Sem negócio: tenta de novo por 7 dias |
 | `*_updated_at` | antes de atualizar | Atualiza `updated_at` |
 
 ## 8.2 Funções chamáveis pelo app (RPC)
@@ -411,7 +414,7 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `enriquecer_negocio(negocio)` | definer, exige poder editar o negócio | Botão "Enriquecer agora": põe o negócio na fila do Enriquecedor (recusa se o agente estiver desligado ou já houver trabalho pendente) |
 | `gerar_relatorio_ri(de?, ate?)` | definer, exige diretor comercial | Cria o relatório com os números (`privado.dados_relatorio_ri`: semana, trimestre, cada membro, SLA estourado) e enfileira o Analista gerencial; agente desligado → relatório só com números |
 
-Funções internas (schema `privado`): `destinatario_negocio(negocio, reserva)` (responsável, senão quem pediu, senão o diretor comercial), `enfileirar_enriquecimento`, `aplicar_enriquecimento` (dados públicos só em campos vazios; aprovação `decisor_empresa`; tarefa "Completar dados do lead" com o que faltar), `aplicar_relatorio`, `aplicar_resultado_agente` (despacho por agente, chamado por `n8n_concluir`), `criar_tarefa(...)` (tarefa do sistema/agente com `chave` para não duplicar), `dia_util(data)`, `dia_util_anterior(data)`, `hoje()`.
+Funções internas (schema `privado`): `destinatario_negocio(negocio, reserva)` (responsável, senão quem pediu, senão o diretor comercial), `enfileirar_enriquecimento`, `aplicar_enriquecimento` (dados públicos só em campos vazios; aprovação `decisor_empresa`; tarefa "Completar dados do lead" com o que faltar), `aplicar_relatorio`, `aplicar_ligacao` (transcrição e resumo na ligação, aprovação "Confirmar resultado da ligação" e avaliação), `aprovacao_resultado_ligacao`, `aplicar_resultado_agente` (despacho por agente, chamado por `n8n_concluir`), `criar_tarefa(...)` (tarefa do sistema/agente com `chave` para não duplicar), `dia_util(data)`, `dia_util_anterior(data)`, `hoje()`.
 
 ## 8.3 Tarefas agendadas (pg_cron, horário UTC)
 
@@ -698,6 +701,7 @@ Escopo v1.0 (Seção 14).
 | F-V2-08 | Liga/desliga de agentes e saúde da fila | v2 F1 | EM PRODUÇÃO | Config. do funil → Agentes e fila |
 | F-V2-09 | A1 Enriquecedor (fila ao entrar em Enriquecimento, botão "Enriquecer agora", dados públicos, aprovação do decisor, tarefa "Completar dados") | v2 F2 | EM PRODUÇÃO no portal (fluxo 06 a publicar) | `enriquecer_negocio`, `aplicar_enriquecimento`, `n8n/fluxos/06-agente-enriquecedor.json` |
 | F-V2-10 | A4 Analista gerencial (relatório da R.I com um clique, plano por membro, revisão do diretor) | v2 F2 | EM PRODUÇÃO no portal (fluxo 07 a publicar) | `/comercial/relatorios`, `gerar_relatorio_ri`, `n8n/fluxos/07-agente-analista-gerencial.json` |
+| F-V2-11 | A2 Agente de ligação e A3 Avaliador: chamada da API4COM → ligação no negócio → transcrição, resumo, resultado sugerido, dores e próximo passo → o membro confirma na Caixa de aprovação (o resultado aplicado move o card e cria tarefas); nota por critério da rubrica | v2 F2 | EM PRODUÇÃO | `processar_eventos_api4com`, `aplicar_ligacao`, `n8n/fluxos/08` e `09` |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
 | F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
 | F-INT-04 | Resumo semanal e passagem do ganho para Projetos/Presidência | 4 | NÃO IMPLEMENTADO | — |
@@ -713,6 +717,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.15 | 13/10/2026 | A2 Agente de ligação e A3 Avaliador (migração `20261013160000`, fluxo 09, Caixa de aprovação com lista de resultados) |
 | 1.14 | 13/10/2026 | Chamadas da API4COM também por consulta do n8n (fluxo 08, `n8n_registrar_chamadas`); o webhook não dispara para ligações do aplicativo |
 | 1.13 | 13/10/2026 | Enriquecedor v2: site + Apollo + BrasilAPI + Gemini gratuito sem busca; fluxos criados direto no n8n pelo conector |
 | 1.12 | 13/10/2026 | Fase 2: A1 Enriquecedor e A4 Analista gerencial (migração `20261013140000`, telas e fluxos 06/07) |
