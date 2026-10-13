@@ -11,11 +11,12 @@ diretor, erro na 3ª falha).
 
 ## Preparação (uma vez)
 
-1. No n8n (https://srv2043014.hstgr.cloud), **importe** `n8n/fluxos/06-agente-enriquecedor.json` e
-   `n8n/fluxos/07-agente-analista-gerencial.json` (Workflows → Create workflow → **⋯** → Import from file).
-2. Em cada um, **Settings → Error workflow** = "APRIMORA | Sistema | Tratamento de erros" e **Publish**.
-3. Confira que a VPS tem `GEMINI_API_KEY` no ambiente do n8n (feito em 13/10/2026). `GEMINI_MODELO` é opcional
-   (padrão `gemini-2.5-flash`).
+1. Fluxos 06 e 07 criados e publicados no n8n pelo conector do n8n em 13/10/2026 (ids `X4QxQK0Xaa0l153J` e
+   `VN5goyMMvOWnYY5z`). Teste real em 13/10: o Analista gerencial escreveu a análise do relatório da semana.
+2. Pendente: publicar "APRIMORA | Sistema | Tratamento de erros" (e o Monitor da fila) e escolhê-lo em
+   **Settings → Error workflow** dos fluxos 06 e 07.
+3. Confira que a VPS tem `GEMINI_API_KEY` no ambiente do n8n (feito em 13/10/2026). Os fluxos 06 e 07 usam o modelo
+   `gemini-3.8-flash` fixo no nó do Gemini (o `gemini-2.5-flash` não aceita mais contas novas).
 4. No portal, **Config. do funil → Agentes e fila**: ligar **Enriquecedor** e **Analista gerencial**.
 
 ## A1 · Enriquecedor

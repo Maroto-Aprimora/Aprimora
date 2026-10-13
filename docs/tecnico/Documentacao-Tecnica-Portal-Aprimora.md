@@ -541,7 +541,7 @@ da Vercel, então o push só funciona em produção.
 | n8n da Aprimora | INSTALADO (fluxos ainda não importados) | VPS Hostinger KVM 2 própria, https://srv2043014.hstgr.cloud; `n8n/docker-compose.yml` com Caddy (HTTPS automático) e n8n (1 vCPU / 1,5 GB, limpeza automática de execuções, áudios em disco, 2 execuções simultâneas); 5 fluxos em `n8n/fluxos/` |
 | API4COM (ligações) | PARCIAL (recebimento ativo; processamento na Fase 2.3) | Webhook "após desligamento da chamada" v1.4 → `POST /api/integracoes/api4com?token=…` → `eventos_integracoes` (payload bruto; token conferido pelo hash `privado.config.api4com_token_hash`). Previsto: evento → ligação → fila → n8n → Google Drive + Gemini → card |
 | Gmail (cadência e respostas) | NÃO IMPLEMENTADO no portal | Previsto: e-mails aprovados no portal enviados pelo n8n; respostas classificadas pelo Gemini |
-| Gemini | EM USO pelo n8n (A1 e A4) | Chave `GEMINI_API_KEY` só na VPS; modelo `GEMINI_MODELO` (padrão `gemini-2.5-flash`). A1 usa a busca do Google (`google_search`); A4 responde em JSON pelo `responseSchema` |
+| Gemini | EM USO pelo n8n (A1 e A4) | Chave `GEMINI_API_KEY` só na VPS; modelo `gemini-3.8-flash`, fixo nos fluxos 06 e 07 (o `gemini-2.5-flash` deixou de aceitar contas novas; a variável `GEMINI_MODELO` da VPS ficou obsoleta). A1 usa a busca do Google (`google_search`); A4 responde em JSON pelo `responseSchema` |
 | BrasilAPI (CNPJ) | EM USO pelo n8n (A1) | `https://brasilapi.com.br/api/cnpj/v1/{cnpj}`, pública e sem chave; cadastro oficial tem prioridade sobre a busca; o quadro societário dá o decisor quando a busca não acha |
 | Google Drive | NÃO IMPLEMENTADO | Usado pelo fluxo de ligações (Fase 2.3) |
 

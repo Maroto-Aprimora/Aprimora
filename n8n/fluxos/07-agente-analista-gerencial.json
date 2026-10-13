@@ -11,7 +11,7 @@
     -360
    ],
    "parameters": {
-    "content": "## APRIMORA | Agente | A4 Analista gerencial\nA cada minuto reserva o relatório da R.I pedido pelo diretor (*Painel comercial → Relatórios da R.I*). Os números chegam prontos do portal; o Gemini só escreve resumo, destaques, pontos de atenção e o rascunho do plano de melhoria de cada membro (resposta em JSON garantida pelo `responseSchema`). O diretor revisa no portal antes de compartilhar.\n\nVariáveis: `PORTAL_URL`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY`, `GEMINI_MODELO` (opcional). Na 3ª falha o relatório fica com erro e os diretores são avisados.",
+    "content": "## APRIMORA | Agente | A4 Analista gerencial\nA cada minuto reserva o relatório da R.I pedido pelo diretor (*Painel comercial → Relatórios da R.I*). Os números chegam prontos do portal; o Gemini só escreve resumo, destaques, pontos de atenção e o rascunho do plano de melhoria de cada membro (resposta em JSON garantida pelo `responseSchema`). O diretor revisa no portal antes de compartilhar.\n\nVariáveis: `PORTAL_URL`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY` (modelo `gemini-3.8-flash`). Na 3ª falha o relatório fica com erro e os diretores são avisados.",
     "width": 900,
     "height": 200,
     "color": 4
@@ -108,7 +108,7 @@
    ],
    "parameters": {
     "method": "POST",
-    "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.GEMINI_MODELO || 'gemini-2.5-flash' }}:generateContent",
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
     "sendHeaders": true,
     "headerParameters": {
      "parameters": [

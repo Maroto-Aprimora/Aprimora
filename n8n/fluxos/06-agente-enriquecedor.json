@@ -11,7 +11,7 @@
     -360
    ],
    "parameters": {
-    "content": "## APRIMORA | Agente | A1 Enriquecedor\nA cada 2 minutos reserva até 2 trabalhos do **Enriquecedor** (card que entrou em Enriquecimento ou botão *Enriquecer agora*). O Gemini pesquisa a empresa com a busca do Google; com o CNPJ, a **BrasilAPI** traz o cadastro oficial (tem prioridade). O portal grava os dados públicos só nos campos vazios, manda decisor, e-mails e hipóteses de dor para a **Caixa de aprovação** e cria a tarefa *Completar dados do lead* com o que faltar.\n\nVariáveis: `PORTAL_URL`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY`, `GEMINI_MODELO` (opcional). Qualquer erro devolve o trabalho como falha (o portal tenta de novo em 5 e 10 min; na 3ª avisa os diretores).",
+    "content": "## APRIMORA | Agente | A1 Enriquecedor\nA cada 2 minutos reserva até 2 trabalhos do **Enriquecedor** (card que entrou em Enriquecimento ou botão *Enriquecer agora*). O Gemini pesquisa a empresa com a busca do Google; com o CNPJ, a **BrasilAPI** traz o cadastro oficial (tem prioridade). O portal grava os dados públicos só nos campos vazios, manda decisor, e-mails e hipóteses de dor para a **Caixa de aprovação** e cria a tarefa *Completar dados do lead* com o que faltar.\n\nVariáveis: `PORTAL_URL`, `PORTAL_N8N_SEGREDO`, `GEMINI_API_KEY` (modelo `gemini-3.8-flash`). Qualquer erro devolve o trabalho como falha (o portal tenta de novo em 5 e 10 min; na 3ª avisa os diretores).",
     "width": 900,
     "height": 220,
     "color": 4
@@ -108,7 +108,7 @@
    ],
    "parameters": {
     "method": "POST",
-    "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.GEMINI_MODELO || 'gemini-2.5-flash' }}:generateContent",
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
     "sendHeaders": true,
     "headerParameters": {
      "parameters": [
