@@ -2479,6 +2479,7 @@ export type Database = {
       }
       n8n_saude: { Args: { _segredo: string }; Returns: Json }
       normalizar: { Args: { _t: string }; Returns: string }
+      plano_melhoria: { Args: { _membro: string }; Returns: Json }
       registrar_evento_integracao: {
         Args: { _origem: string; _payload: Json; _token: string }
         Returns: Json

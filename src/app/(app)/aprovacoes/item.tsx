@@ -32,8 +32,9 @@ const CAMPOS_LIGACAO: Record<string, { rotulo: string; tipo?: "date" | "datetime
  * Um item da Caixa de aprovação. O texto aparece por inteiro e cada campo pode ser editado antes de aprovar
  * (PE-PA-002, risco "time aprova sem ler").
  */
-export function CartaoAprovacao({ item, mostrarResponsavel, resultados = [] }: {
+export function CartaoAprovacao({ item, mostrarResponsavel, resultados = [], aoDecidir, semMoldura }: {
   item: ItemAprovacao; mostrarResponsavel: boolean; resultados?: { chave: string; nome: string }[];
+  aoDecidir?: () => void; semMoldura?: boolean;
 }) {
   const [pendente, iniciar] = useTransition();
   const [conteudo, setConteudo] = useState(item.conteudo);
@@ -41,12 +42,13 @@ export function CartaoAprovacao({ item, mostrarResponsavel, resultados = [] }: {
 
   const decidir = (status: "aprovada" | "descartada") => iniciar(async () => {
     const r = await decidirAprovacao({ id: item.id, status, conteudo, comentario: comentario || null });
-    if (r.ok) toast.success(status === "aprovada" ? "Aprovado." : "Descartado.");
-    else toast.error(r.erro);
+    if (!r.ok) return void toast.error(r.erro);
+    toast.success(status === "aprovada" ? "Aprovado." : "Descartado.");
+    aoDecidir?.();
   });
 
   return (
-    <Cartao className="p-5">
+    <Cartao className={semMoldura ? "border-0 p-0 shadow-none" : "p-5"}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Selo tom="marca">{item.agente}</Selo>
         {item.negocio && <Link href={`/negocios/${item.negocio.id}`}><Selo>{item.negocio.titulo}</Selo></Link>}

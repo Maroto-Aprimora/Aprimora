@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus, Settings } from "lucide-react";
 import { classeBotao } from "@/components/ui/botao";
-import { TituloPagina } from "@/components/ui/cartao";
 import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
-import { FiltrosFunil } from "./filtros";
+import { BarraFunil } from "./filtros";
 import { Kanban, type CartaoNegocio } from "./kanban";
+import { ListaNegocios } from "./lista";
 
 export const metadata: Metadata = { title: "Funil" };
 
@@ -24,12 +24,13 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
   const busca = typeof filtros.q === "string" ? filtros.q.trim() : "";
   const origem = typeof filtros.origem === "string" ? filtros.origem : "";
   const segmento = typeof filtros.segmento === "string" ? filtros.segmento : "";
+  const ver = filtros.ver === "lista" ? "lista" : "kanban";
 
   const [usuario, config, supabase] = await Promise.all([obterUsuario(), carregarConfiguracaoComercial(), criarClienteServidor()]);
 
   let consulta = supabase
     .from("negocios")
-    .select("id, titulo, fase_id, responsavel_id, contato_id, valor, entrou_na_fase_em, encerrado_em, ficticio, empresas!inner(nome, cidade, nome_normalizado), ligacoes(inicio, resultados_ligacao(nome))")
+    .select("id, titulo, fase_id, responsavel_id, contato_id, valor, entrou_na_fase_em, encerrado_em, ficticio, empresas!inner(nome, cidade, site, telefone, nome_normalizado, segmentos(nome)), contatos!negocios_contato_id_fkey(nome, cargo, telefone), negocio_servicos(servicos(nome)), ligacoes(inicio, resultados_ligacao(nome))")
     .eq("funil_id", config.funil.id)
     .or(`encerrado_em.is.null,encerrado_em.gte.${limiteEncerrados()}`)
     .order("entrou_na_fase_em", { ascending: true })
@@ -57,20 +58,31 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
     ficticio: n.ficticio,
     contatoId: n.contato_id,
     ultimaLigacao: n.ligacoes[0]?.resultados_ligacao?.nome ?? null,
+    ultimaLigacaoEm: n.ligacoes[0]?.inicio ?? null,
+    empresa: n.empresas.nome,
+    site: n.empresas.site,
+    telefone: n.contatos?.telefone ?? n.empresas.telefone,
+    segmento: n.empresas.segmentos?.nome ?? null,
+    servicos: n.negocio_servicos.map((s) => s.servicos?.nome).filter((x): x is string => !!x),
+    contato: n.contatos ? [n.contatos.nome, n.contatos.cargo].filter(Boolean).join(" · ") : null,
   }));
+
+  const acoes = (
+    <>
+      {usuario.ehDiretorDe("comercial") && (
+        <Link href="/funil/configuracoes" className={classeBotao("secundario", "sm")} title="Configurações do funil"><Settings className="h-4 w-4" /> Config</Link>
+      )}
+      <Link href="/empresas/novo" className={classeBotao("destaque", "sm")}><Plus className="h-4 w-4" /> Novo lead</Link>
+    </>
+  );
 
   return (
     <>
-      <TituloPagina
-        titulo="Funil comercial"
-        descricao="Arraste os cards entre as fases. Negócios ganhos e perdidos aparecem por 90 dias."
-        acoes={<>
-          {usuario.ehDiretorDe("comercial") && <Link href="/funil/configuracoes" className={classeBotao("secundario")}><Settings className="h-4 w-4" /> Config</Link>}
-          <Link href="/empresas/novo" className={classeBotao("destaque")}><Plus className="h-4 w-4" /> Novo lead</Link>
-        </>}
-      />
-      <FiltrosFunil membros={config.membrosComercial} origens={config.origens} segmentos={config.segmentos} />
-      <Kanban fases={config.fases} motivos={config.motivos} resultados={config.resultadosLigacao} cartoes={cartoes} />
+      <h1 className="mb-3 text-2xl font-bold text-texto">Funil comercial</h1>
+      <BarraFunil membros={config.membrosComercial} origens={config.origens} segmentos={config.segmentos} acoes={acoes} />
+      {ver === "lista"
+        ? <ListaNegocios fases={config.fases} cartoes={cartoes} />
+        : <Kanban fases={config.fases} motivos={config.motivos} resultados={config.resultadosLigacao} cartoes={cartoes} />}
     </>
   );
 }

@@ -3,7 +3,7 @@
 Portão do PE-PA-002: **card enriquecido sem digitação, ligação anotada sozinha e R.I gerada com um clique.**
 
 Este roteiro cresce a cada entrega da Fase 2. Hoje cobre o **A1 Enriquecedor**, o **A4 Analista gerencial**, o **A2 Agente
-de ligação** e o **A3 Avaliador**; a tela de Desempenho individual entra na sequência.
+de ligação**, o **A3 Avaliador** e a tela de **Desempenho individual**.
 
 Os testes automáticos de banco estão em `supabase/testes/fase2_enriquecedor_analista.sql` (fila ao entrar em
 Enriquecimento, só campos vazios preenchidos, aprovação do decisor, tarefa "Completar dados", relatório só pelo
@@ -64,7 +64,19 @@ igual ao número que você vai discar, e ligue pela API4COM com o seu ramal (o e
 - [ ] Resultado que exige data (ex.: "Decisor indisponível, retornar") sem a data: a confirmação é recusada.
 - [ ] A ligação mostra a nota da rubrica (média de 1 a 4); o membro vê só as suas avaliações, o diretor vê todas.
 
+## Desempenho individual e telas novas
+
+- [ ] **Comercial → Desempenho individual**: o membro vê só o seu; o diretor escolhe o membro. Aparecem ligações,
+      nota da rubrica, diagnósticos e contratos do período, a nota por critério, a evolução semanal e as ligações com
+      resumo, avaliação e transcrição.
+- [ ] O plano de melhoria aparece para o membro só depois que o diretor revisa o relatório da R.I.
+- [ ] **Config. do funil → Rubrica**: mudar a descrição de um critério vale para as próximas ligações.
+- [ ] **Tarefas**: a coluna "Para aprovar" traz os itens dos agentes; clicar abre o card para editar e aprovar.
+      Colunas recolhem e ficam recolhidas ao voltar; clicar numa tarefa abre todas as informações e as ações.
+- [ ] **Funil**: Kanban e Lista à esquerda; "Procurar cards" e o ícone de filtro à direita. O card abre e fecha
+      mostrando responsável, cidade, valor, dias na fase, segmento, serviços, contato, telefone, site e última ligação.
+
 ## Depois do roteiro
 
 - [ ] Excluir o lead real de teste, se não for prospectá-lo.
-- [ ] Registrar aqui a data da validação (a aprovação do portão espera também A2, A3 e o Desempenho individual).
+- [ ] Registrar aqui a data da validação e liberar a Fase 3.

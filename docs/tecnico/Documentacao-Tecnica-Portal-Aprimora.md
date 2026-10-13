@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.15 |
+| Versão do documento | 1.16 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -94,7 +94,8 @@ Pipefy) e foi estruturado para receber as demais diretorias.
 
 | Área | Módulo | Status |
 |---|---|---|
-| Geral | Painel geral, Agenda, Tarefas, Notificações (sino + push), PWA | EM PRODUÇÃO |
+| Geral | Painel geral, Agenda, Tarefas (com a Caixa de aprovação: quadro de colunas retráteis ou lista), Notificações (sino + push), PWA | EM PRODUÇÃO |
+| Comercial | Desempenho individual (indicadores, rubrica por critério e por semana, ligações avaliadas, plano de melhoria) | EM PRODUÇÃO |
 | Presidência | Auditoria (só diretores) | EM PRODUÇÃO |
 | Vice-Presidência | Membros (pré-cadastro, cargos, data de entrada, processos seletivos, transferência de carteira) | EM PRODUÇÃO |
 | Vice-Presidência | Pontuação (0 a 12, marco em 6) | EM PRODUÇÃO |
@@ -345,7 +346,7 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `parametros_comercial` | cadencia_dias_reciclagem (21), reciclagem_retorno_dias (90) | Prazos da cadência, editáveis pelo diretor |
 | `agentes` | chave, codigo (A1…A12), nome, descricao, tipo, prioridade, fase_roadmap, quem_aprova, ativo | Os 12 agentes do PE-PA-002 + "Teste da fila"; liga/desliga em Config. do funil |
 | `trabalhos` | agente, tipo, negocio_id, payload, status (pendente/processando/concluido/erro/cancelado), tentativas, max_tentativas, proximo_em, reservado_em, resultado, erro, chave | Fila que o n8n consome; só funções internas escrevem |
-| `aprovacoes` | agente, tipo, trabalho_id, negocio_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação |
+| `aprovacoes` | agente, tipo, trabalho_id, negocio_id, ligacao_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação (coluna "Para aprovar" em Tarefas) |
 | `relatorios` | tipo ('ri'), de, ate, dados (números calculados no banco), analise (texto do A4), texto_revisado, status (gerando/pronto/erro), erro, trabalho_id, revisado_por/em, criado_por | Relatórios da R.I; só o diretor comercial lê e revisa |
 | `rubrica_criterios` | chave, nome, descricao, ordem, ativo | Rubrica do Avaliador (PE-PA-002, 5.1), 7 critérios iniciais; o diretor edita |
 | `avaliacoes_ligacao` | ligacao_id (único), membro_id, notas (jsonb: chave, nome, nota 1–4, comentário), media, comentario | Avaliação de cada ligação pelo A3; o membro vê as suas, o diretor vê todas |
@@ -697,11 +698,13 @@ Escopo v1.0 (Seção 14).
 | F-V2-05 | Indicadores no banco, pelo responsável da época, e indicadores novos da Seção 7 | v2 F0 | EM PRODUÇÃO | `indicadores_comerciais`, `valor_indicador_meta` |
 | F-INT-01 | n8n: instância e fluxos | v2 F1 | EM PRODUÇÃO (fila e fluxo de teste; agentes nas Fases 2+) | `n8n/`, VPS Hostinger |
 | F-V2-06 | Fila de trabalhos e rotas `/api/n8n/*` | v2 F1 | EM PRODUÇÃO | `trabalhos`, `n8n_*`, `src/app/api/n8n` |
-| F-V2-07 | Caixa de aprovação | v2 F1 | EM PRODUÇÃO (itens chegam na Fase 2) | `/aprovacoes`, `aprovacoes` |
+| F-V2-07 | Caixa de aprovação, unificada com Tarefas em 13/10/2026 (`/aprovacoes` redireciona) | v2 F1 | EM PRODUÇÃO | `/tarefas`, `aprovacoes` |
 | F-V2-08 | Liga/desliga de agentes e saúde da fila | v2 F1 | EM PRODUÇÃO | Config. do funil → Agentes e fila |
 | F-V2-09 | A1 Enriquecedor (fila ao entrar em Enriquecimento, botão "Enriquecer agora", dados públicos, aprovação do decisor, tarefa "Completar dados") | v2 F2 | EM PRODUÇÃO no portal (fluxo 06 a publicar) | `enriquecer_negocio`, `aplicar_enriquecimento`, `n8n/fluxos/06-agente-enriquecedor.json` |
 | F-V2-10 | A4 Analista gerencial (relatório da R.I com um clique, plano por membro, revisão do diretor) | v2 F2 | EM PRODUÇÃO no portal (fluxo 07 a publicar) | `/comercial/relatorios`, `gerar_relatorio_ri`, `n8n/fluxos/07-agente-analista-gerencial.json` |
 | F-V2-11 | A2 Agente de ligação e A3 Avaliador: chamada da API4COM → ligação no negócio → transcrição, resumo, resultado sugerido, dores e próximo passo → o membro confirma na Caixa de aprovação (o resultado aplicado move o card e cria tarefas); nota por critério da rubrica | v2 F2 | EM PRODUÇÃO | `processar_eventos_api4com`, `aplicar_ligacao`, `n8n/fluxos/08` e `09` |
+| F-V2-12 | Desempenho individual (membro vê o seu, diretor vê todos; nota média da rubrica no coldcall; plano de melhoria liberado quando o diretor revisa a R.I) e rubrica editável | v2 F2 | EM PRODUÇÃO | `/desempenho`, `plano_melhoria`, Config. do funil → Rubrica |
+| F-V2-13 | Funil com cabeçalho estilo Pipefy (Kanban/Lista, busca, filtros) e card retrátil; Tarefas em quadro de colunas retráteis com card completo | v2 F2 | EM PRODUÇÃO | `/funil`, `/tarefas`, `components/app/barra-visoes.tsx` |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
 | F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
 | F-INT-04 | Resumo semanal e passagem do ganho para Projetos/Presidência | 4 | NÃO IMPLEMENTADO | — |
@@ -717,6 +720,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.16 | 13/10/2026 | Desempenho individual; Caixa de aprovação dentro de Tarefas (quadro retrátil); Funil com cabeçalho estilo Pipefy, visão em lista e card retrátil; rubrica editável; Agendador (A8) desligado |
 | 1.15 | 13/10/2026 | A2 Agente de ligação e A3 Avaliador (migração `20261013160000`, fluxo 09, Caixa de aprovação com lista de resultados) |
 | 1.14 | 13/10/2026 | Chamadas da API4COM também por consulta do n8n (fluxo 08, `n8n_registrar_chamadas`); o webhook não dispara para ligações do aplicativo |
 | 1.13 | 13/10/2026 | Enriquecedor v2: site + Apollo + BrasilAPI + Gemini gratuito sem busca; fluxos criados direto no n8n pelo conector |

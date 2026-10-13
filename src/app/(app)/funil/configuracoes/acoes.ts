@@ -235,3 +235,27 @@ export async function enviarTrabalhoTeste(): Promise<Resultado> {
   revalidar();
   return { ok: true };
 }
+
+const esquemaCriterio = z.object({
+  nome: z.string().trim().min(2, "Informe o nome do critério."),
+  descricao: z.string().trim().min(5, "Descreva o que o Avaliador deve observar."),
+  ordem: z.number().int().min(0),
+  ativo: z.boolean(),
+});
+
+/** Rubrica do Avaliador de ligações (PE-PA-002, 5.1): o diretor ajusta os critérios. */
+export async function salvarCriterioRubrica(id: string | null, dados: z.input<typeof esquemaCriterio>): Promise<Resultado> {
+  const v = esquemaCriterio.safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { error } = id
+    ? await supabase.from("rubrica_criterios").update(v.data).eq("id", id)
+    : await supabase.from("rubrica_criterios").insert({
+        ...v.data,
+        chave: v.data.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""),
+      });
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  revalidatePath("/funil/configuracoes");
+  revalidatePath("/desempenho");
+  return { ok: true };
+}

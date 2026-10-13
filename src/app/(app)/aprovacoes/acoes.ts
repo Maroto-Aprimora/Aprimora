@@ -25,7 +25,8 @@ export async function decidirAprovacao(dados: z.input<typeof esquema>): Promise<
     .eq("id", v.data.id).eq("status", "pendente").select("id");
   if (error) return { ok: false, erro: mensagemDeErro(error) };
   if (!data?.length) return { ok: false, erro: "Este item já foi decidido ou não é seu." };
-  revalidatePath("/aprovacoes");
+  revalidatePath("/tarefas");
+  revalidatePath("/negocios/[id]", "page");
   revalidatePath("/", "layout");
   return { ok: true };
 }

@@ -6,7 +6,7 @@ import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { NOME_AREA } from "@/lib/crm";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
-import { Agentes, Cadencia, CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm } from "./componentes";
+import { Agentes, Cadencia, CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm, Rubrica } from "./componentes";
 
 export const metadata: Metadata = { title: "Configurações do funil" };
 
@@ -22,7 +22,7 @@ export default async function PaginaConfiguracoes() {
   const { data: funil } = await supabase.from("funis").select("id").eq("diretoria", "comercial").eq("chave", "comercial").single();
   const [{ data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos },
     { data: resultados }, { data: tiposAtividade }, { data: feriados }, { data: passos }, { data: parametros },
-    { data: agentes }, { data: saude }, { data: trabalhos }] = await Promise.all([
+    { data: agentes }, { data: saude }, { data: trabalhos }, { data: rubrica }] = await Promise.all([
     supabase.from("fases").select("*").eq("funil_id", funil!.id).is("excluida_em", null).order("ordem"),
     supabase.from("fase_campos").select("*").order("ordem"),
     supabase.from("motivos").select("*").eq("diretoria", "comercial").order("ordem"),
@@ -37,6 +37,7 @@ export default async function PaginaConfiguracoes() {
     supabase.from("agentes").select("*").order("ordem"),
     supabase.rpc("saude_fila"),
     supabase.from("trabalhos").select("id, agente, tipo, status, tentativas, erro, created_at, concluido_em").order("created_at", { ascending: false }).limit(8),
+    supabase.from("rubrica_criterios").select("*").order("ordem"),
   ]);
   const listaFases = fases ?? [];
   // Quantos negócios estão em cada fase (para pedir o destino ao excluir)
@@ -104,6 +105,8 @@ export default async function PaginaConfiguracoes() {
             motivos={(motivos ?? []).filter((m) => m.ativo).map((m) => ({ id: m.id, nome: m.nome, tipo: m.tipo }))} />
         </div>
       </Cartao>
+
+      <Rubrica criterios={rubrica ?? []} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <ListaSimples titulo="Motivos de perda" tabela="motivos" extra={{ tipo: "perda" }} itens={(motivos ?? []).filter((m) => m.tipo === "perda").map(comRegra)} />

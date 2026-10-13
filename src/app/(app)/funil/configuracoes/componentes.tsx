@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { NOME_PRAZO_TAREFA } from "@/lib/crm";
 import { minutosDesde } from "@/lib/formatar";
 import {
+  salvarCriterioRubrica,
   alternarAgente, enviarTrabalhoTeste, excluirCampo, excluirFase, excluirFeriado, excluirPassoCadencia, salvarCampo, salvarFase, salvarFeriado, salvarItem,
   salvarParametrosCadencia, salvarPassoCadencia, salvarResultadoLigacao,
 } from "./acoes";
@@ -485,5 +486,39 @@ function Indicador({ rotulo, valor, alerta, detalhe }: { rotulo: string; valor: 
       <p className={cn("font-titulo text-xl font-bold", alerta ? "text-perigo" : "text-marca")}>{valor}</p>
       {detalhe && <p className="text-xs text-texto-suave">{detalhe}</p>}
     </div>
+  );
+}
+
+/** Rubrica do Avaliador: cada critério recebe nota de 1 a 4 em toda ligação com conversa. */
+export function Rubrica({ criterios }: { criterios: Tables<"rubrica_criterios">[] }) {
+  return (
+    <Cartao className="mb-6">
+      <CabecalhoCartao titulo="Rubrica do Avaliador de ligações"
+        descricao="Cada critério recebe nota de 1 a 4 em toda ligação com conversa. Desativar um critério tira ele das próximas avaliações; as antigas ficam como estão." />
+      <div className="divide-y divide-borda">
+        {criterios.map((c) => <LinhaCriterio key={c.id} criterio={c} />)}
+        <LinhaCriterio criterio={null} proximaOrdem={(criterios.at(-1)?.ordem ?? 0) + 1} />
+      </div>
+    </Cartao>
+  );
+}
+
+function LinhaCriterio({ criterio: c, proximaOrdem = 0 }: { criterio: Tables<"rubrica_criterios"> | null; proximaOrdem?: number }) {
+  const [pendente, iniciar] = useTransition();
+  return (
+    <form className="grid items-end gap-3 px-5 py-3 md:grid-cols-[200px_1fr_80px_auto_auto]" action={(form) => iniciar(async () => {
+      const r = await salvarCriterioRubrica(c?.id ?? null, {
+        nome: String(form.get("nome")), descricao: String(form.get("descricao")),
+        ordem: Number(form.get("ordem") || 0), ativo: form.get("ativo") === "on",
+      });
+      if (r.ok) toast.success(c ? "Critério salvo." : "Critério criado.");
+      else toast.error(r.erro);
+    })}>
+      <Campo rotulo={c ? "Critério" : "Novo critério"}><Entrada name="nome" defaultValue={c?.nome ?? ""} required className="h-9" /></Campo>
+      <Campo rotulo="O que o Avaliador observa"><Entrada name="descricao" defaultValue={c?.descricao ?? ""} required className="h-9" /></Campo>
+      <Campo rotulo="Ordem"><Entrada name="ordem" type="number" min={0} defaultValue={c?.ordem ?? proximaOrdem} className="h-9" /></Campo>
+      <label className="flex h-9 items-center gap-2 text-sm"><input type="checkbox" name="ativo" defaultChecked={c?.ativo ?? true} /> Ativo</label>
+      <Botao type="submit" tamanho="sm" variante={c ? "secundario" : "primario"} carregando={pendente}>{c ? "Salvar" : <><Plus className="h-3.5 w-3.5" /> Adicionar</>}</Botao>
+    </form>
   );
 }

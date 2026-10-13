@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
-  BarChart3, Building2, CalendarDays, ChevronDown, Gauge, Inbox, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
-  Settings, Target, Trophy, Users, X,
+  BarChart3, Building2, CalendarDays, ChevronDown, Gauge, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
+  Settings, Target, TrendingUp, Trophy, Users, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sair } from "@/app/acoes-sessao";
@@ -35,15 +35,15 @@ function montarMenu({ ehDiretor, diretorDe, aprovacoesPendentes }: DadosMenu): {
   return {
     gerais: [
       { href: "/painel", rotulo: "Início", icone: LayoutDashboard },
-      { href: "/aprovacoes", rotulo: "Caixa de aprovação", icone: Inbox, contador: aprovacoesPendentes },
+      { href: "/tarefas", rotulo: "Tarefas", icone: ListChecks, contador: aprovacoesPendentes },
       { href: "/agenda", rotulo: "Agenda", icone: CalendarDays },
-      { href: "/tarefas", rotulo: "Tarefas", icone: ListChecks },
     ],
     grupos: [
       { slug: "comercial", itens: [
         { href: "/comercial", rotulo: "Painel comercial", icone: BarChart3 },
         { href: "/funil", rotulo: "Funil", icone: KanbanSquare },
         { href: "/empresas", rotulo: "Empresas e leads", icone: Building2 },
+        { href: "/desempenho", rotulo: "Desempenho individual", icone: TrendingUp },
         { href: "/metas", rotulo: "Metas", icone: Target },
         ...(diretorDe.includes("comercial") ? [{ href: "/funil/configuracoes", rotulo: "Config. do funil", icone: Settings }] : []),
       ] },

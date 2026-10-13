@@ -299,3 +299,7 @@ Tomadas com o Diretor Comercial no início da Fase 0. Prevalecem sobre o texto a
 - **Uso:** o portal só é liberado ao time ao fim das fases. Cada portão do roadmap vira um **roteiro de teste com dados
   fictícios**, validado pelo diretor. A importação do Pipefy é feita junto com o diretor, com análise prévia dos dados.
 - **Fluxo:** os commits vão direto para a `main`.
+- **13/10/2026** — A Caixa de aprovação passa a fazer parte de **Tarefas** (coluna "Para aprovar"); Tarefas vira
+  quadro de colunas retráteis por prazo, com o card completo ao clicar. O Funil ganha o cabeçalho no estilo do Pipefy
+  (Kanban e Lista à esquerda; busca e filtros à direita) e card retrátil. O **Agendador (A8)** fica desligado por
+  enquanto.
