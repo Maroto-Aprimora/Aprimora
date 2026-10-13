@@ -648,6 +648,7 @@ export type Database = {
       eventos_integracoes: {
         Row: {
           erro: string | null
+          externo_id: string | null
           id: number
           ligacao_id: string | null
           origem: string
@@ -657,6 +658,7 @@ export type Database = {
         }
         Insert: {
           erro?: string | null
+          externo_id?: string | null
           id?: never
           ligacao_id?: string | null
           origem: string
@@ -666,6 +668,7 @@ export type Database = {
         }
         Update: {
           erro?: string | null
+          externo_id?: string | null
           id?: never
           ligacao_id?: string | null
           origem?: string
@@ -2379,6 +2382,10 @@ export type Database = {
           _mensagem?: string
           _segredo: string
         }
+        Returns: Json
+      }
+      n8n_registrar_chamadas: {
+        Args: { _chamadas: Json; _segredo: string }
         Returns: Json
       }
       n8n_reservar: {
