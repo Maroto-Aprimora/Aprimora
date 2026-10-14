@@ -16,6 +16,17 @@ import { AcoesTopoNegocio, BotaoEnriquecer, FormCamposFase, FormNegocio } from "
 
 export const metadata: Metadata = { title: "Negócio" };
 
+const NOME_STATUS_EMAIL: Record<string, string> = {
+  rascunho: "Aguardando aprovação", aprovado: "Na fila de envio", enviado: "Enviado", erro: "Erro no envio", cancelado: "Descartado",
+};
+const TOM_EMAIL: Record<string, "neutro" | "marca" | "destaque" | "sucesso" | "perigo"> = {
+  rascunho: "destaque", aprovado: "marca", enviado: "sucesso", erro: "perigo", cancelado: "neutro",
+};
+const NOME_CLASSIFICACAO: Record<string, string> = {
+  interessado: "Interessado", retornar_depois: "Retornar depois", recusa: "Recusou", descadastro: "Pediu para sair da lista",
+  ausencia: "Resposta automática", outro: "Outro",
+};
+
 export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id]">) {
   const { id } = await params;
   const supabase = await criarClienteServidor();
@@ -31,7 +42,7 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
   ]);
   if (!negocio) notFound();
 
-  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }, { data: anexos }, { data: ligacoes }, { data: agenteEnriquecedor }, { count: naFilaEnriquecedor }] = await Promise.all([
+  const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }, { data: anexos }, { data: ligacoes }, { data: agenteEnriquecedor }, { count: naFilaEnriquecedor }, { data: emails }, { data: respostas }] = await Promise.all([
     supabase.from("contatos").select("id, nome, cargo, decisor, telefone, telefone_invalido, nao_contatar").eq("empresa_id", negocio.empresa_id).order("decisor", { ascending: false }),
     supabase.from("negocio_historico").select("id, fase_origem_id, fase_destino_id, autor_id, automatico, comentario, created_at, motivos(nome)")
       .eq("negocio_id", id).order("created_at", { ascending: false }),
@@ -43,6 +54,10 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
     supabase.from("agentes").select("ativo").eq("chave", "enriquecedor").maybeSingle(),
     supabase.from("trabalhos").select("id", { count: "exact", head: true })
       .eq("negocio_id", id).eq("agente", "enriquecedor").in("status", ["pendente", "processando"]),
+    supabase.from("emails").select("id, para, assunto, corpo, status, enviado_em, created_at, erro, copies_email(versao, nome), cadencia_passos(dia)")
+      .eq("negocio_id", id).order("created_at", { ascending: false }),
+    supabase.from("respostas_email").select("id, email_id, de, trecho, recebido_em, classificacao, resumo")
+      .eq("negocio_id", id).order("recebido_em", { ascending: false }),
   ]);
 
   const fase = config.fases.find((f) => f.id === negocio.fase_id);
@@ -172,6 +187,41 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
               {(ligacoes ?? []).length === 0 && <li className="px-5 py-3 text-sm text-texto-suave">Nenhuma ligação registrada.</li>}
             </ul>
           </Cartao>
+
+          {(emails ?? []).length > 0 && (
+            <Cartao>
+              <CabecalhoCartao titulo="E-mails" descricao="Cadência pela comercial@ (Redator) e respostas do lead" />
+              <ul className="divide-y divide-borda">
+                {(emails ?? []).map((e) => (
+                  <li key={e.id} className="px-5 py-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Selo tom={TOM_EMAIL[e.status] ?? "neutro"}>{NOME_STATUS_EMAIL[e.status] ?? e.status}</Selo>
+                      {e.cadencia_passos && <Selo>D{e.cadencia_passos.dia}</Selo>}
+                      <span className="text-xs text-texto-suave">
+                        {formatarDataHora(e.enviado_em ?? e.created_at)} · para {e.para}
+                        {e.copies_email ? ` · Copy V${e.copies_email.versao}` : ""}
+                      </span>
+                    </div>
+                    <details className="mt-1">
+                      <summary className="cursor-pointer font-semibold">{e.assunto}</summary>
+                      <p className="mt-1 whitespace-pre-line text-texto-suave">{e.corpo}</p>
+                    </details>
+                    {e.erro && e.status === "erro" && <p className="mt-1 text-xs text-perigo">{e.erro}</p>}
+                    {(respostas ?? []).filter((r) => r.email_id === e.id).map((r) => (
+                      <div key={r.id} className="mt-2 rounded-lg border-l-4 border-destaque bg-destaque-suave/50 px-3 py-2">
+                        <p className="text-xs text-texto-suave">
+                          Resposta · {formatarDataHora(r.recebido_em)}{r.de ? ` · ${r.de}` : ""}
+                          {r.classificacao && <> · <strong className="text-texto">{NOME_CLASSIFICACAO[r.classificacao] ?? r.classificacao}</strong></>}
+                        </p>
+                        {r.resumo && <p className="mt-0.5 font-medium">{r.resumo}</p>}
+                        {r.trecho && <p className="mt-0.5 whitespace-pre-line text-texto-suave">{r.trecho}</p>}
+                      </div>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            </Cartao>
+          )}
 
           {fasesComCampos.map(({ fase: f, campos }) => (
             <Cartao key={f.id}>

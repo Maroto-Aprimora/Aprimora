@@ -16,7 +16,11 @@ export type ItemAprovacao = {
   conteudo: Record<string, unknown>; negocio: { id: string; titulo: string } | null; responsavel: string | null;
 };
 
-const rotuloCampo = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, " ");
+/** Rótulos conhecidos; os demais saem do nome do campo. */
+const ROTULOS: Record<string, string> = {
+  para: "Para", assunto: "Assunto", corpo: "E-mail", motivo: "Motivo da desqualificação", comentario: "Comentário",
+};
+const rotuloCampo = (k: string) => ROTULOS[k] ?? (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, " ");
 
 /** Campos do "Confirmar resultado da ligação" com controle próprio (lista fechada e datas). */
 const CAMPOS_LIGACAO: Record<string, { rotulo: string; tipo?: "date" | "datetime-local" }> = {
@@ -85,7 +89,8 @@ export function CartaoAprovacao({ item, mostrarResponsavel, resultados = [], aoD
           return (
             <Campo key={chave} rotulo={rotuloCampo(chave)}>
               {longo
-                ? <AreaTexto value={texto} onChange={(e) => mudar(e.target.value)} className="min-h-40 font-mono text-[13px] leading-relaxed" disabled={pendente} />
+                ? <AreaTexto value={texto} onChange={(e) => mudar(e.target.value)} disabled={pendente}
+                    className={item.tipo === "email" ? "min-h-64 text-sm leading-relaxed" : "min-h-40 font-mono text-[13px] leading-relaxed"} />
                 : <Entrada value={texto} onChange={(e) => mudar(e.target.value)} disabled={pendente} />}
             </Campo>
           );
@@ -97,7 +102,7 @@ export function CartaoAprovacao({ item, mostrarResponsavel, resultados = [], aoD
 
       <div className="mt-4 flex justify-end gap-2">
         <Botao variante="secundario" onClick={() => decidir("descartada")} carregando={pendente}><X className="h-4 w-4" /> Descartar</Botao>
-        <Botao onClick={() => decidir("aprovada")} carregando={pendente}><Check className="h-4 w-4" /> Aprovar</Botao>
+        <Botao onClick={() => decidir("aprovada")} carregando={pendente}><Check className="h-4 w-4" /> {item.tipo === "email" ? "Aprovar e enviar" : item.tipo === "resposta_recusa" ? "Encerrar lead" : "Aprovar"}</Botao>
       </div>
     </Cartao>
   );

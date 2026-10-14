@@ -259,3 +259,87 @@ export async function salvarCriterioRubrica(id: string | null, dados: z.input<ty
   revalidatePath("/desempenho");
   return { ok: true };
 }
+
+const esquemaCopy = z.object({
+  nome: z.string().trim().min(2, "Dê um nome à copy."),
+  uso: z.enum(["cadencia", "pediu_email", "pos_proposta"]),
+  regra: z.enum(["qualquer", "segmento", "origem", "sem_site", "com_dores"]),
+  regra_valor: z.string().uuid().nullable(),
+  ativo: z.boolean(),
+  mensagens: z.array(z.object({
+    passo_id: z.string().uuid().nullable(),
+    assunto: z.string().trim(),
+    corpo: z.string().trim(),
+  })),
+});
+
+/** Copies do playbook (Fase 3): um e-mail por toque da cadência e uma regra de quando a copy é usada. */
+export async function salvarCopy(id: string | null, dados: z.input<typeof esquemaCopy>): Promise<Resultado & { id?: string }> {
+  const v = esquemaCopy.safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const { mensagens, ...copy } = v.data;
+  if ((copy.regra === "segmento" || copy.regra === "origem") && !copy.regra_valor)
+    return { ok: false, erro: copy.regra === "segmento" ? "Escolha o segmento." : "Escolha a origem." };
+  if (copy.regra !== "segmento" && copy.regra !== "origem") copy.regra_valor = null;
+  const preenchidas = mensagens.filter((m) => m.corpo);
+  if (copy.ativo && !preenchidas.length) return { ok: false, erro: "Escreva ao menos um e-mail antes de ativar a copy." };
+  if (preenchidas.some((m) => !m.assunto)) return { ok: false, erro: "Todo e-mail precisa de assunto." };
+  const supabase = await criarClienteServidor();
+  const { data, error } = id
+    ? await supabase.from("copies_email").update(copy).eq("id", id).select("id")
+    : await supabase.from("copies_email").insert(copy).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera as copies." };
+  const copyId = data[0].id;
+  // Mensagens: substitui o conjunto (vazias não ficam guardadas)
+  const { error: e1 } = await supabase.from("copies_email_mensagens").delete().eq("copy_id", copyId);
+  if (e1) return { ok: false, erro: mensagemDeErro(e1) };
+  if (preenchidas.length) {
+    const { error: e2 } = await supabase.from("copies_email_mensagens").insert(preenchidas.map((m) => ({ ...m, copy_id: copyId })));
+    if (e2) return { ok: false, erro: mensagemDeErro(e2) };
+  }
+  revalidatePath("/funil/configuracoes");
+  return { ok: true, id: copyId };
+}
+
+export async function alternarCopy(id: string, ativo: boolean): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  if (ativo) {
+    const { count } = await supabase.from("copies_email_mensagens").select("id", { count: "exact", head: true }).eq("copy_id", id);
+    if (!count) return { ok: false, erro: "Escreva ao menos um e-mail antes de ativar a copy." };
+  }
+  const { data, error } = await supabase.from("copies_email").update({ ativo }).eq("id", id).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera as copies." };
+  revalidatePath("/funil/configuracoes");
+  return { ok: true };
+}
+
+/** Exclui a copy. Os e-mails já enviados com ela continuam no histórico do negócio. */
+export async function excluirCopy(id: string): Promise<Resultado> {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("copies_email").delete().eq("id", id).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera as copies." };
+  revalidatePath("/funil/configuracoes");
+  return { ok: true };
+}
+
+export async function salvarParametrosEmail(dados: {
+  remetente_nome: string; envio_hora_inicio: number; envio_hora_fim: number; follow_up_proposta_dias: number;
+}): Promise<Resultado> {
+  const v = z.object({
+    remetente_nome: z.string().trim().min(2, "Informe o nome do remetente."),
+    envio_hora_inicio: z.number().int().min(0).max(23),
+    envio_hora_fim: z.number().int().min(1).max(24),
+    follow_up_proposta_dias: z.number().int().min(1, "O follow-up precisa de ao menos 1 dia.").max(30),
+  }).refine((d) => d.envio_hora_fim > d.envio_hora_inicio, "O fim do horário de envio precisa ser depois do início.").safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("parametros_comercial").update({ ...v.data, updated_at: new Date().toISOString() })
+    .eq("diretoria", "comercial").select("diretoria");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera o envio de e-mails." };
+  revalidatePath("/funil/configuracoes");
+  return { ok: true };
+}

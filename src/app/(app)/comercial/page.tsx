@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, Mail, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { classeBotao } from "@/components/ui/botao";
 import { Cartao, CabecalhoCartao, TituloPagina } from "@/components/ui/cartao";
 import { Selo } from "@/components/ui/selo";
@@ -8,6 +8,7 @@ import { formatarMoeda, formatarNumero } from "@/lib/formatar";
 import { calcularIndicadores, carregarAtividadesEquipe } from "@/lib/indicadores";
 import { periodoDosParametros } from "@/lib/periodo";
 import { resumoComercial } from "@/lib/resumo-comercial";
+import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
 import { cn } from "@/lib/utils";
 import { Exportar, FiltroAtividades, FiltrosPainel } from "./filtros";
@@ -19,14 +20,27 @@ export const metadata: Metadata = { title: "Painel comercial" };
 const pct = (v: number | null) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const dias = (v: number | null) => (v == null ? "—" : `${formatarNumero(Math.round(v * 10) / 10)} ${Math.round(v) === 1 ? "dia" : "dias"}`);
 
+type IndicadoresEmail = {
+  enviados: number; respondidos: number; taxaResposta: number | null;
+  porClassificacao: { classificacao: string; quantidade: number }[];
+  porCopy: { copy_id: string; versao: number; nome: string; enviados: number; respostas: number; taxa: number | null }[];
+};
+const NOME_CLASSIFICACAO: Record<string, string> = {
+  interessado: "Interessado", retornar_depois: "Retornar depois", recusa: "Recusou", descadastro: "Saiu da lista",
+  ausencia: "Automática", outro: "Outro", aguardando: "Classificando",
+};
+
 export default async function PaginaPainelComercial({ searchParams }: PageProps<"/comercial">) {
   const sp = await searchParams;
   const periodo = periodoDosParametros(sp);
   const responsavel = typeof sp.resp === "string" ? sp.resp : "";
   const usuario = await obterUsuario();
-  const [ind, dados, atual] = await Promise.all([
+  const supabase = await criarClienteServidor();
+  const [ind, dados, atual, { data: emailBruto }] = await Promise.all([
     calcularIndicadores(periodo, responsavel || null), carregarAtividadesEquipe(periodo), resumoComercial(usuario.id),
+    supabase.rpc("indicadores_email", { _de: periodo.de, _ate: periodo.ate, _responsavel: responsavel || undefined }),
   ]);
+  const email = emailBruto as unknown as IndicadoresEmail | null;
   const r = ind.resumo;
   const maiorEtapa = Math.max(1, ...ind.funil.map((e) => e.quantidade));
 
@@ -192,10 +206,20 @@ export default async function PaginaPainelComercial({ searchParams }: PageProps<
           </ul>
         </Cartao>
         <Cartao>
-          <CabecalhoCartao titulo="Em breve" descricao="Chega com a cadência de e-mail (Fase 3)." />
-          <ul className="space-y-2 px-5 py-4 text-sm text-texto-suave">
-            <li className="flex gap-2"><Mail className="mt-0.5 h-4 w-4 shrink-0 text-destaque" /> E-mails enviados, taxa de resposta e respostas por classificação.</li>
-          </ul>
+          <CabecalhoCartao titulo="Cadência de e-mail"
+            descricao={`${email?.enviados ?? 0} e-mails enviados · ${email?.respondidos ?? 0} respondidos · taxa de resposta ${pct(email?.taxaResposta ?? null)}. Resposta automática não conta.`} />
+          <Tabela
+            colunas={["Copy", "Enviados", "Respostas", "Taxa"]}
+            linhas={(email?.porCopy ?? []).map((c) => [`V${c.versao} · ${c.nome}`, String(c.enviados), String(c.respostas), pct(c.taxa)])}
+            vazio="Nenhum e-mail enviado no período."
+          />
+          {(email?.porClassificacao ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-2 border-t border-borda px-5 py-3 text-xs">
+              {email!.porClassificacao.map((c) => (
+                <Selo key={c.classificacao}>{NOME_CLASSIFICACAO[c.classificacao] ?? c.classificacao}: {c.quantidade}</Selo>
+              ))}
+            </div>
+          )}
         </Cartao>
       </div>
 

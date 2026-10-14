@@ -9,6 +9,8 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
 import { Agentes, Cadencia, CamposDaFase, LinhaFase, ListaFeriados, ListaSimples, ResultadoLigacaoForm, Rubrica } from "./componentes";
 import { AbaPeloAncora } from "./aba-ancora";
+import { Copies, type DesempenhoCopy } from "./copies";
+import { hojeBR, somarDias } from "@/lib/datas";
 
 export const metadata: Metadata = { title: "Configurações do funil" };
 
@@ -19,14 +21,14 @@ const comRegra = <T extends { exige_comentario: boolean; marca_nao_contatar: boo
 
 export default async function PaginaConfiguracoes({ searchParams }: PageProps<"/funil/configuracoes">) {
   const sp = await searchParams;
-  const ver = sp.ver === "agentes" || sp.ver === "cadencia" ? sp.ver : "campos";
+  const ver = sp.ver === "agentes" || sp.ver === "cadencia" || sp.ver === "copy" ? sp.ver : "campos";
   const usuario = await obterUsuario();
   if (!usuario.ehDiretorDe("comercial")) redirect("/funil");
   const supabase = await criarClienteServidor();
   const { data: funil } = await supabase.from("funis").select("id").eq("diretoria", "comercial").eq("chave", "comercial").single();
   const [{ data: fases }, { data: campos }, { data: motivos }, { data: origens }, { data: segmentos }, { data: servicos },
     { data: resultados }, { data: tiposAtividade }, { data: feriados }, { data: passos }, { data: parametros },
-    { data: agentes }, { data: saude }, { data: trabalhos }, { data: rubrica }] = await Promise.all([
+    { data: agentes }, { data: saude }, { data: trabalhos }, { data: rubrica }, { data: copies }, { data: indicadoresEmail }] = await Promise.all([
     supabase.from("fases").select("*").eq("funil_id", funil!.id).is("excluida_em", null).order("ordem"),
     supabase.from("fase_campos").select("*").order("ordem"),
     supabase.from("motivos").select("*").eq("diretoria", "comercial").order("ordem"),
@@ -42,6 +44,8 @@ export default async function PaginaConfiguracoes({ searchParams }: PageProps<"/
     supabase.rpc("saude_fila"),
     supabase.from("trabalhos").select("id, agente, tipo, status, tentativas, erro, created_at, concluido_em").order("created_at", { ascending: false }).limit(8),
     supabase.from("rubrica_criterios").select("*").order("ordem"),
+    supabase.from("copies_email").select("*, mensagens:copies_email_mensagens(*)").eq("diretoria", "comercial").order("versao"),
+    ver === "copy" ? supabase.rpc("indicadores_email", { _de: somarDias(hojeBR(), -90), _ate: hojeBR() }) : Promise.resolve({ data: null }),
   ]);
   const listaFases = fases ?? [];
   // Quantos negócios estão em cada fase (para pedir o destino ao excluir)
@@ -57,7 +61,7 @@ export default async function PaginaConfiguracoes({ searchParams }: PageProps<"/
       <h1 className="mb-3 text-2xl font-bold text-texto">Configurações do funil</h1>
       <AbaPeloAncora />
       <BarraVisoes padrao="campos"
-        visoes={[{ chave: "campos", rotulo: "Campos" }, { chave: "agentes", rotulo: "Agentes" }, { chave: "cadencia", rotulo: "Cadência" }]} />
+        visoes={[{ chave: "campos", rotulo: "Campos" }, { chave: "agentes", rotulo: "Agentes" }, { chave: "cadencia", rotulo: "Cadência" }, { chave: "copy", rotulo: "Copy" }]} />
 
       {ver === "campos" && <>
       <Cartao className="mb-6">
@@ -134,6 +138,14 @@ export default async function PaginaConfiguracoes({ searchParams }: PageProps<"/
         <Cadencia passos={passos ?? []} parametros={parametros} />
         <div className="grid gap-6 lg:grid-cols-2"><ListaFeriados feriados={feriados ?? []} /></div>
       </>}
+
+      {ver === "copy" && (
+        <Copies copies={copies ?? []} passos={passos ?? []} parametros={parametros}
+          segmentos={(segmentos ?? []).filter((x) => x.ativo).map((x) => ({ id: x.id, nome: x.nome }))}
+          origens={(origens ?? []).filter((x) => x.ativo).map((x) => ({ id: x.id, nome: x.nome }))}
+          desempenho={((indicadoresEmail as { porCopy?: DesempenhoCopy[] } | null)?.porCopy) ?? []}
+          redatorAtivo={!!agentes?.find((a) => a.chave === "redator")?.ativo} />
+      )}
     </>
   );
 }

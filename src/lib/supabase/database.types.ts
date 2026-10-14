@@ -124,10 +124,12 @@ export type Database = {
           created_at: string
           decidido_em: string | null
           decidido_por: string | null
+          email_id: string | null
           id: string
           ligacao_id: string | null
           negocio_id: string | null
           responsavel_id: string | null
+          resposta_id: string | null
           resumo: string | null
           status: Database["public"]["Enums"]["status_aprovacao"]
           tipo: string
@@ -143,10 +145,12 @@ export type Database = {
           created_at?: string
           decidido_em?: string | null
           decidido_por?: string | null
+          email_id?: string | null
           id?: string
           ligacao_id?: string | null
           negocio_id?: string | null
           responsavel_id?: string | null
+          resposta_id?: string | null
           resumo?: string | null
           status?: Database["public"]["Enums"]["status_aprovacao"]
           tipo: string
@@ -162,10 +166,12 @@ export type Database = {
           created_at?: string
           decidido_em?: string | null
           decidido_por?: string | null
+          email_id?: string | null
           id?: string
           ligacao_id?: string | null
           negocio_id?: string | null
           responsavel_id?: string | null
+          resposta_id?: string | null
           resumo?: string | null
           status?: Database["public"]["Enums"]["status_aprovacao"]
           tipo?: string
@@ -189,6 +195,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "aprovacoes_email_id_fkey"
+            columns: ["email_id"]
+            isOneToOne: false
+            referencedRelation: "emails"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "aprovacoes_ligacao_id_fkey"
             columns: ["ligacao_id"]
             isOneToOne: false
@@ -207,6 +220,13 @@ export type Database = {
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aprovacoes_resposta_id_fkey"
+            columns: ["resposta_id"]
+            isOneToOne: false
+            referencedRelation: "respostas_email"
             referencedColumns: ["id"]
           },
           {
@@ -571,6 +591,105 @@ export type Database = {
           },
         ]
       }
+      copies_email: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          criado_por: string | null
+          diretoria: string
+          id: string
+          nome: string
+          regra: string
+          regra_valor: string | null
+          updated_at: string
+          uso: string
+          versao: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          criado_por?: string | null
+          diretoria?: string
+          id?: string
+          nome: string
+          regra?: string
+          regra_valor?: string | null
+          updated_at?: string
+          uso?: string
+          versao?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          criado_por?: string | null
+          diretoria?: string
+          id?: string
+          nome?: string
+          regra?: string
+          regra_valor?: string | null
+          updated_at?: string
+          uso?: string
+          versao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "copies_email_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "copies_email_diretoria_fkey"
+            columns: ["diretoria"]
+            isOneToOne: false
+            referencedRelation: "diretorias"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
+      copies_email_mensagens: {
+        Row: {
+          assunto: string
+          copy_id: string
+          corpo: string
+          id: string
+          passo_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          assunto?: string
+          copy_id: string
+          corpo?: string
+          id?: string
+          passo_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assunto?: string
+          copy_id?: string
+          corpo?: string
+          id?: string
+          passo_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "copies_email_mensagens_copy_id_fkey"
+            columns: ["copy_id"]
+            isOneToOne: false
+            referencedRelation: "copies_email"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "copies_email_mensagens_passo_id_fkey"
+            columns: ["passo_id"]
+            isOneToOne: false
+            referencedRelation: "cadencia_passos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diretorias: {
         Row: {
           ativa: boolean
@@ -591,6 +710,138 @@ export type Database = {
           slug?: string
         }
         Relationships: []
+      }
+      emails: {
+        Row: {
+          aprovado_por: string | null
+          assunto: string
+          contato_id: string | null
+          copy_id: string | null
+          corpo: string
+          created_at: string
+          d0: string | null
+          enviado_em: string | null
+          envio_trabalho_id: string | null
+          erro: string | null
+          gmail_id: string | null
+          id: string
+          membro_id: string | null
+          negocio_id: string
+          para: string
+          passo_id: string | null
+          responder_a: string | null
+          status: string
+          thread_id: string | null
+          trabalho_id: string | null
+          updated_at: string
+          uso: string
+        }
+        Insert: {
+          aprovado_por?: string | null
+          assunto: string
+          contato_id?: string | null
+          copy_id?: string | null
+          corpo: string
+          created_at?: string
+          d0?: string | null
+          enviado_em?: string | null
+          envio_trabalho_id?: string | null
+          erro?: string | null
+          gmail_id?: string | null
+          id?: string
+          membro_id?: string | null
+          negocio_id: string
+          para: string
+          passo_id?: string | null
+          responder_a?: string | null
+          status?: string
+          thread_id?: string | null
+          trabalho_id?: string | null
+          updated_at?: string
+          uso?: string
+        }
+        Update: {
+          aprovado_por?: string | null
+          assunto?: string
+          contato_id?: string | null
+          copy_id?: string | null
+          corpo?: string
+          created_at?: string
+          d0?: string | null
+          enviado_em?: string | null
+          envio_trabalho_id?: string | null
+          erro?: string | null
+          gmail_id?: string | null
+          id?: string
+          membro_id?: string | null
+          negocio_id?: string
+          para?: string
+          passo_id?: string | null
+          responder_a?: string | null
+          status?: string
+          thread_id?: string | null
+          trabalho_id?: string | null
+          updated_at?: string
+          uso?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emails_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_copy_id_fkey"
+            columns: ["copy_id"]
+            isOneToOne: false
+            referencedRelation: "copies_email"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_envio_trabalho_id_fkey"
+            columns: ["envio_trabalho_id"]
+            isOneToOne: false
+            referencedRelation: "trabalhos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_passo_id_fkey"
+            columns: ["passo_id"]
+            isOneToOne: false
+            referencedRelation: "cadencia_passos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_trabalho_id_fkey"
+            columns: ["trabalho_id"]
+            isOneToOne: false
+            referencedRelation: "trabalhos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       empresas: {
         Row: {
@@ -1582,19 +1833,31 @@ export type Database = {
         Row: {
           cadencia_dias_reciclagem: number
           diretoria: string
+          envio_hora_fim: number
+          envio_hora_inicio: number
+          follow_up_proposta_dias: number
           reciclagem_retorno_dias: number
+          remetente_nome: string
           updated_at: string
         }
         Insert: {
           cadencia_dias_reciclagem?: number
           diretoria: string
+          envio_hora_fim?: number
+          envio_hora_inicio?: number
+          follow_up_proposta_dias?: number
           reciclagem_retorno_dias?: number
+          remetente_nome?: string
           updated_at?: string
         }
         Update: {
           cadencia_dias_reciclagem?: number
           diretoria?: string
+          envio_hora_fim?: number
+          envio_hora_inicio?: number
+          follow_up_proposta_dias?: number
           reciclagem_retorno_dias?: number
+          remetente_nome?: string
           updated_at?: string
         }
         Relationships: [
@@ -1870,6 +2133,72 @@ export type Database = {
             columns: ["trabalho_id"]
             isOneToOne: false
             referencedRelation: "trabalhos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      respostas_email: {
+        Row: {
+          aplicada_em: string | null
+          assunto: string | null
+          classificacao: string | null
+          created_at: string
+          de: string | null
+          email_id: string | null
+          gmail_id: string
+          id: string
+          negocio_id: string
+          recebido_em: string
+          resumo: string | null
+          retorno_em: string | null
+          thread_id: string | null
+          trecho: string | null
+        }
+        Insert: {
+          aplicada_em?: string | null
+          assunto?: string | null
+          classificacao?: string | null
+          created_at?: string
+          de?: string | null
+          email_id?: string | null
+          gmail_id: string
+          id?: string
+          negocio_id: string
+          recebido_em?: string
+          resumo?: string | null
+          retorno_em?: string | null
+          thread_id?: string | null
+          trecho?: string | null
+        }
+        Update: {
+          aplicada_em?: string | null
+          assunto?: string | null
+          classificacao?: string | null
+          created_at?: string
+          de?: string | null
+          email_id?: string | null
+          gmail_id?: string
+          id?: string
+          negocio_id?: string
+          recebido_em?: string
+          resumo?: string | null
+          retorno_em?: string | null
+          thread_id?: string | null
+          trecho?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "respostas_email_email_id_fkey"
+            columns: ["email_id"]
+            isOneToOne: false
+            referencedRelation: "emails"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "respostas_email_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
             referencedColumns: ["id"]
           },
         ]
@@ -2430,6 +2759,10 @@ export type Database = {
         Args: { _ate: string; _de: string; _responsavel?: string }
         Returns: Json
       }
+      indicadores_email: {
+        Args: { _ate: string; _de: string; _responsavel?: string }
+        Returns: Json
+      }
       mover_negocio: {
         Args: {
           _comentario?: string
@@ -2471,6 +2804,10 @@ export type Database = {
       }
       n8n_registrar_chamadas: {
         Args: { _chamadas: Json; _segredo: string }
+        Returns: Json
+      }
+      n8n_registrar_respostas: {
+        Args: { _mensagens: Json; _segredo: string }
         Returns: Json
       }
       n8n_reservar: {

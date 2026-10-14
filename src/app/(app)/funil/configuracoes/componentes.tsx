@@ -367,7 +367,7 @@ export function Cadencia({ passos, parametros }: {
   return (
     <Cartao className="mb-6">
       <CabecalhoCartao titulo="Cadência padrão"
-        descricao="D0 é a entrada do card em E-mail. Todo dia útil às 7h30 o responsável recebe as tarefas dos toques do dia (fim de semana e feriado vão para o próximo dia útil). Contato efetivo numa ligação pausa a contagem." />
+        descricao="D0 é a entrada do card em E-mail. Todo dia útil às 7h30 o responsável recebe as tarefas dos toques do dia (fim de semana e feriado vão para o próximo dia útil). Com o Redator ligado, o toque de e-mail chega pronto para aprovar, a partir da copy da guia Copy. Contato efetivo numa ligação ou resposta ao e-mail pausa a contagem." />
       <div className="divide-y divide-borda">
         {passos.map((p) => linha(p))}
         {linha(null)}
