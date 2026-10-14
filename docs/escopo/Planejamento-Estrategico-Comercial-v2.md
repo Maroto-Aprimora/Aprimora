@@ -303,3 +303,7 @@ Tomadas com o Diretor Comercial no início da Fase 0. Prevalecem sobre o texto a
   quadro de colunas retráteis por prazo, com o card completo ao clicar. O Funil ganha o cabeçalho no estilo do Pipefy
   (Kanban e Lista à esquerda; busca e filtros à direita) e card retrátil. O **Agendador (A8)** fica desligado por
   enquanto.
+- **14/10/2026** — Fase 3 (cadência de e-mail): as copies ficam numa guia **Copy** em Config. do funil (um e-mail
+  por toque, regra de uso e alternância A/B entre copies da mesma regra). O envio sai da **comercial@** desde já,
+  conectada ao n8n por **OAuth do Google**. Resposta "interessado" ou "retornar depois" move o card sozinha; recusa e
+  pedido de descadastro passam pela aprovação do responsável.

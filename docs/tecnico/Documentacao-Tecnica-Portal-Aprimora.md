@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.17 |
+| Versão do documento | 1.18 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -104,7 +104,8 @@ Pipefy) e foi estruturado para receber as demais diretorias.
 | Comercial | Configurações do funil (fases, SLA, campos, cadastros auxiliares) | EM PRODUÇÃO |
 | Comercial | Agentes A1 Enriquecedor (botão no negócio, aprovação do decisor) e A4 Analista gerencial (Relatórios da R.I) | EM PRODUÇÃO no portal; fluxos 06 e 07 do n8n a publicar |
 | Projetos, Marketing | Telas próprias | FORA DO ESCOPO da v2 (diretorias mantidas no banco, sem telas) |
-| Integrações | n8n (ligações API4COM + Gemini + Drive; cadência de e-mail Gmail) | PRONTO, NÃO INSTALADO |
+| Comercial | Cadência de e-mail (Fase 3): copies do playbook (Config. do funil → Copy), A5 Redator, A6 Monitor de respostas, A7 Organizador do dia | EM PRODUÇÃO no portal; Redator e Monitor desligados até a credencial Gmail da comercial@ e os fluxos 10/11 serem publicados |
+| Integrações | n8n (ligações API4COM + Gemini; Enriquecedor; Analista; Redator e Monitor via Gmail API) | EM PRODUÇÃO (fluxos 06–09); 10 e 11 criados, a publicar |
 | Integrações | Importação de dados do Pipefy | NÃO IMPLEMENTADO |
 
 ---
@@ -343,10 +344,14 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `resultados_ligacao` | chave, nome, ordem, ativo, fase_destino_id, motivo_id, conta_tentativa, exige_retorno, registra_decisor, marca_telefone_invalido, tipo_atividade_id, tarefa_titulo, tarefa_prazo | Lista fechada de resultados de ligação e a ação de cada um (9 resultados iniciais) |
 | `ligacoes` | negocio_id, contato_id, membro_id, inicio, duracao_seg, resultado_id, proximo_passo, retorno_em, compromisso_em, decisor_nome, decisor_melhor_horario, comentario, origem, resultado_aplicado_em; reservadas para a Fase 2: api4com_id, gravacao_url, transcricao, resumo | Registro de cada ligação |
 | `cadencia_passos` | dia (D0 = entrada em E-mail), canal (email/ligacao), titulo, descricao, so_sem_contato, ativo | Cadência padrão (PE-PA-002, 3.2): cada toque vira tarefa no dia |
-| `parametros_comercial` | cadencia_dias_reciclagem (21), reciclagem_retorno_dias (90) | Prazos da cadência, editáveis pelo diretor |
+| `parametros_comercial` | cadencia_dias_reciclagem (21), reciclagem_retorno_dias (90), follow_up_proposta_dias (3), envio_hora_inicio (8), envio_hora_fim (18), remetente_nome | Prazos da cadência e do envio de e-mails, editáveis pelo diretor |
+| `copies_email` | versao (V1, V2… sequencial), nome, uso (cadencia/pediu_email/pos_proposta), regra (qualquer/segmento/origem/sem_site/com_dores), regra_valor, ativo | Copies do playbook. Regra específica ganha da "qualquer"; copies da mesma regra alternam (A/B, a menos usada primeiro); o lead fica com a mesma copy a cadência toda. Só o diretor comercial altera |
+| `copies_email_mensagens` | copy_id, passo_id (toque de e-mail da cadência; nulo fora dela), assunto, corpo | Um e-mail por toque, com `{{variáveis}}` que o Redator preenche |
+| `emails` | negocio_id, contato_id, membro_id, copy_id, passo_id, uso, d0, para, assunto, corpo, status (rascunho/aprovado/enviado/erro/cancelado), responder_a, gmail_id, thread_id, enviado_em, aprovado_por, erro | E-mails da cadência; só funções internas escrevem |
+| `respostas_email` | email_id, negocio_id, gmail_id (único), thread_id, de, assunto, trecho, recebido_em, classificacao (interessado/retornar_depois/recusa/descadastro/ausencia/outro), resumo, retorno_em, aplicada_em | Respostas dos leads (A6) |
 | `agentes` | chave, codigo (A1…A12), nome, descricao, tipo, prioridade, fase_roadmap, quem_aprova, ativo | Os 12 agentes do PE-PA-002 + "Teste da fila"; liga/desliga em Config. do funil |
 | `trabalhos` | agente, tipo, negocio_id, payload, status (pendente/processando/concluido/erro/cancelado), tentativas, max_tentativas, proximo_em, reservado_em, resultado, erro, chave | Fila que o n8n consome; só funções internas escrevem |
-| `aprovacoes` | agente, tipo, trabalho_id, negocio_id, ligacao_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação (coluna "Para aprovar" em Tarefas) |
+| `aprovacoes` | agente, tipo, trabalho_id, negocio_id, ligacao_id, email_id, resposta_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação (coluna "Para aprovar" em Tarefas) |
 | `relatorios` | tipo ('ri'), de, ate, dados (números calculados no banco), analise (texto do A4), texto_revisado, status (gerando/pronto/erro), erro, trabalho_id, revisado_por/em, criado_por | Relatórios da R.I; só o diretor comercial lê e revisa |
 | `rubrica_criterios` | chave, nome, descricao, ordem, ativo | Rubrica do Avaliador (PE-PA-002, 5.1), 7 critérios iniciais; o diretor edita |
 | `avaliacoes_ligacao` | ligacao_id (único), membro_id, notas (jsonb: chave, nome, nota 1–4, comentário), media, comentario | Avaliação de cada ligação pelo A3; o membro vê as suas, o diretor vê todas |
@@ -401,6 +406,8 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `agentes_ao_mudar_fase` (`negocio_historico`) | após inserir | Entrou em Enriquecimento: enfileira o trabalho do Enriquecedor (A1), se ligado |
 | `aplicar_aprovacao` (`aprovacoes`) | após mudar status | Aprovado `decisor_empresa`: cria ou atualiza o contato decisor (vira o contato do negócio, se vazio), completa os e-mails da empresa e acrescenta as hipóteses de dor ao negócio |
 | (A2) `privado.processar_eventos_api4com()` | chamado pelo webhook e pela consulta do n8n | Chamada encerrada → ligação no negócio aberto da empresa (telefone: últimos 10 dígitos, contato ou empresa; membro pelo e-mail da API4COM). Com conversa (≥ 15 s e gravação): trabalho do Agente de ligação; sem conversa: aprovação "Não atendeu" sem IA. Sem negócio: tenta de novo por 7 dias |
+| `aplicar_aprovacao` (tipos da Fase 3) | após mudar status | `email` aprovado (com as edições; recusa se sobrar `{{ }}`): e-mail vai para a fila de envio na próxima janela (dias úteis, horário do parâmetro), no mesmo fio do anterior; descartado: rascunho cancelado. `resposta_recusa` aprovada: encerra em Lead não qualificado com o motivo |
+| `agentes_apos_resultado_ligacao` (`ligacoes`) | após aplicar resultado | Resultado "Pediu e-mail": o Redator prepara o e-mail com material (copy de uso `pediu_email`) |
 | `*_updated_at` | antes de atualizar | Atualiza `updated_at` |
 
 ## 8.2 Funções chamáveis pelo app (RPC)
@@ -413,16 +420,18 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `excluir_fase(fase, destino)` | definer, exige diretor | Move os negócios e marca a fase como excluída (`excluida_em`), preservando o histórico; bloqueia a primeira fase e a última de ganho |
 | `remarcar_atividade(atividade, novo_inicio, novo_fim?, motivo?)` | invoker (respeita RLS) | Marca a atividade como `remarcada` e cria a nova (mesmos participantes) |
 | `enriquecer_negocio(negocio)` | definer, exige poder editar o negócio | Botão "Enriquecer agora": põe o negócio na fila do Enriquecedor (recusa se o agente estiver desligado ou já houver trabalho pendente) |
+| `indicadores_email(de, ate, responsavel?)` | invoker (respeita RLS) | Enviados, respondidos, taxa de resposta (automática não conta), por classificação e por copy (Painel comercial e guia Copy) |
+| `n8n_registrar_respostas(segredo, mensagens)` | definer, segredo do n8n | Mensagens da caixa da comercial@: guarda só as que respondem um fio enviado (uma vez cada), avisa o responsável e enfileira a classificação |
 | `gerar_relatorio_ri(de?, ate?)` | definer, exige diretor comercial | Cria o relatório com os números (`privado.dados_relatorio_ri`: semana, trimestre, cada membro, SLA estourado) e enfileira o Analista gerencial; agente desligado → relatório só com números |
 
-Funções internas (schema `privado`): `destinatario_negocio(negocio, reserva)` (responsável, senão quem pediu, senão o diretor comercial), `enfileirar_enriquecimento`, `aplicar_enriquecimento` (dados públicos só em campos vazios; aprovação `decisor_empresa`; tarefa "Completar dados do lead" com o que faltar), `aplicar_relatorio`, `aplicar_ligacao` (transcrição e resumo na ligação, aprovação "Confirmar resultado da ligação" e avaliação), `aprovacao_resultado_ligacao`, `aplicar_resultado_agente` (despacho por agente, chamado por `n8n_concluir`), `criar_tarefa(...)` (tarefa do sistema/agente com `chave` para não duplicar), `dia_util(data)`, `dia_util_anterior(data)`, `hoje()`.
+Funções internas (schema `privado`): `destinatario_negocio(negocio, reserva)` (responsável, senão quem pediu, senão o diretor comercial), `enfileirar_enriquecimento`, `aplicar_enriquecimento` (dados públicos só em campos vazios; aprovação `decisor_empresa`; tarefa "Completar dados do lead" com o que faltar), `aplicar_relatorio`, `aplicar_ligacao` (transcrição e resumo na ligação, aprovação "Confirmar resultado da ligação" e avaliação), `aprovacao_resultado_ligacao`, `aplicar_resultado_agente` (despacho por agente, chamado por `n8n_concluir`), `criar_tarefa(...)` (tarefa do sistema/agente com `chave` para não duplicar), `email_destino` (contato do negócio, decisor ou e-mail da empresa; "não contatar" bloqueia), `escolher_copy`, `enfileirar_redacao`, `aplicar_redacao`, `aplicar_envio`, `aplicar_classificacao` (interessado → Oportunidade e retornar depois → Retornar futuro, sozinhos e só para a frente; recusa/descadastro → aprovação; descadastro marca "não contatar"), `mover_por_chave`, `proxima_janela_envio`, `notificar`, `teve_contato` (ligação efetiva ou resposta real ao e-mail), `dia_util(data)`, `dia_util_anterior(data)`, `hoje()`.
 
 ## 8.3 Tarefas agendadas (pg_cron, horário UTC)
 
 | Job | Horário | Função | O que faz |
 |---|---|---|---|
 | `aplicar-slas-diario` | 11:05 UTC (08:05 Brasília) | `privado.aplicar_slas()` | Move negócios com SLA estourado em fases com ação "mover" (Oportunidade: 15 dias → E-mail); devolve ao funil os da Reciclagem com data de retorno vencida |
-| `tarefas-diarias` | 10:30 UTC (07:30 Brasília) | `privado.gerar_tarefas_diarias()` | Só em dia útil: tarefas dos toques da cadência que vencem no dia (ou nos dias não úteis anteriores), sem duplicar ligação já marcada por um resultado; D21 sem contato efetivo → Reciclagem com retorno em 90 dias; tarefa "Hoje às…" para cada compromisso ligado a lead |
+| `tarefas-diarias` | 10:30 UTC (07:30 Brasília) | `privado.gerar_tarefas_diarias()` | Só em dia útil: tarefas dos toques da cadência que vencem no dia (ou nos dias não úteis anteriores), sem duplicar ligação já marcada por um resultado; toque de e-mail com Redator ligado, copy e e-mail do lead vira trabalho do Redator (senão, tarefa manual); resposta real do lead pausa a contagem; follow-up pós-proposta N dias úteis depois de entrar em Apresentação de proposta; A7 Organizador: notificação "Seu dia" (`resumo_dia`) para cada membro; D21 sem contato efetivo → Reciclagem com retorno em 90 dias; tarefa "Hoje às…" para cada compromisso ligado a lead |
 | `notificacoes-diarias` | 11:10 UTC (08:10 Brasília) | `privado.gerar_notificacoes_diarias()` | SLA a 80% (`sla_proximo`) e estourado (`sla_estourado`); tarefa vencendo hoje (`tarefa_hoje`); R.I/R.G do dia (`reuniao_hoje`); atividade de amanhã ainda não confirmada, para os diretores (`atividade_sem_confirmacao`) |
 
 ---
@@ -706,7 +715,7 @@ Escopo v1.0 (Seção 14).
 | F-V2-12 | Desempenho individual (membro vê o seu, diretor vê todos; nota média da rubrica no coldcall; plano de melhoria liberado quando o diretor revisa a R.I) e rubrica editável | v2 F2 | EM PRODUÇÃO | `/desempenho`, `plano_melhoria`, Config. do funil → Rubrica |
 | F-V2-13 | Funil com cabeçalho estilo Pipefy (Kanban/Lista, busca, filtros) e card retrátil; Tarefas em quadro de colunas retráteis com card completo | v2 F2 | EM PRODUÇÃO | `/funil`, `/tarefas`, `components/app/barra-visoes.tsx` |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
-| F-INT-03 | Cadência de e-mail com aprovação e monitoramento de respostas | 5 | NÃO IMPLEMENTADO no portal | idem |
+| F-V2-14 | Cadência de e-mail (Fase 3): guia Copy (variáveis, regras, A/B, ativa/desativada, desempenho por copy, envio pela comercial@), A5 Redator com aprovação em Tarefas, envio pelo Gmail no mesmo fio, A6 Monitor de respostas (classifica e move o card), e-mails e respostas no negócio, cartão no Painel comercial, A7 resumo do dia | v2 F3 | EM PRODUÇÃO no portal; fluxos 10/11 a publicar após a credencial Gmail | `copies_email`, `emails`, `respostas_email`, `/funil/configuracoes?ver=copy`, `/api/n8n/emails/respostas`, `n8n/fluxos/10` e `11` |
 | F-INT-04 | Resumo semanal e passagem do ganho para Projetos/Presidência | 4 | NÃO IMPLEMENTADO | — |
 | F-INT-05 | Extração de leads e base de conhecimento com IA | 6 | NÃO IMPLEMENTADO | — |
 | F-EXP-01 | Módulos de Projetos (incl. Histórico de Projetos), Presidência, Marketing | 8+ | NÃO IMPLEMENTADO | — |
@@ -720,6 +729,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.18 | 14/10/2026 | Fase 3: cadência de e-mail (migração `20261014120000`, guia Copy, Redator, Monitor de respostas, Organizador do dia, fluxos 10 e 11) |
 | 1.17 | 13/10/2026 | Empresas e leads só em lista, com filtros de segmento, cidade e responsável; Config. do funil em abas (Campos, Agentes, Cadência); card do funil em janela; janelas mais claras sobre fundo escurecido |
 | 1.16 | 13/10/2026 | Desempenho individual; Caixa de aprovação dentro de Tarefas (quadro retrátil); Funil com cabeçalho estilo Pipefy, visão em lista e card retrátil; rubrica editável; Agendador (A8) desligado |
 | 1.15 | 13/10/2026 | A2 Agente de ligação e A3 Avaliador (migração `20261013160000`, fluxo 09, Caixa de aprovação com lista de resultados) |
