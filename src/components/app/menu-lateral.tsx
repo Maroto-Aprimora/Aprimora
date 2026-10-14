@@ -25,13 +25,15 @@ export type DadosMenu = {
   ehDiretor: boolean;
   diretorDe: string[];
   aprovacoesPendentes: number;
+  /** E-mails do Redator esperando aprovação: aparecem no card do Funil */
+  emailsPendentes: number;
 };
 
 /**
  * Menu da v2 (portal exclusivo do Comercial): seções gerais, o Comercial e o que permanece das outras diretorias
  * (Membros, Pontuação, Painel geral e Auditoria). Projetos e Marketing não têm telas.
  */
-function montarMenu({ ehDiretor, aprovacoesPendentes }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
+function montarMenu({ ehDiretor, aprovacoesPendentes, emailsPendentes }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
   return {
     gerais: [
       { href: "/painel", rotulo: "Início", icone: LayoutDashboard },
@@ -41,7 +43,7 @@ function montarMenu({ ehDiretor, aprovacoesPendentes }: DadosMenu): { gerais: It
     grupos: [
       { slug: "comercial", itens: [
         { href: "/comercial", rotulo: "Painel comercial", icone: BarChart3 },
-        { href: "/funil", rotulo: "Funil", icone: KanbanSquare },
+        { href: "/funil", rotulo: "Funil", icone: KanbanSquare, contador: emailsPendentes },
         { href: "/empresas", rotulo: "Empresas e leads", icone: Building2 },
         { href: "/desempenho", rotulo: "Desempenho individual", icone: TrendingUp },
         { href: "/metas", rotulo: "Metas", icone: Target },

@@ -28,6 +28,7 @@ function revalidar(negocioId?: string | null) {
   revalidatePath("/agenda");
   revalidatePath("/painel");
   if (negocioId) revalidatePath(`/negocios/${negocioId}`);
+  revalidatePath("/empresas", "layout");
 }
 
 export async function salvarAtividade(id: string | null, dados: Record<string, unknown>, participantes: string[]): Promise<Resultado> {

@@ -61,8 +61,8 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
   ]);
 
   const fase = config.fases.find((f) => f.id === negocio.fase_id);
-  const participantes = negocio.negocio_participantes.map((p) => p.membro_id);
-  const podeEditar = usuario.ehDiretorDe("comercial") || negocio.responsavel_id === usuario.id || participantes.includes(usuario.id);
+  // Todo membro do Comercial edita qualquer card (decisão de 14/10/2026)
+  const podeEditar = usuario.cargoEm("comercial") != null;
   const nomeMembro = (mid: string | null) => todosMembros.find((m) => m.id === mid)?.nome ?? "—";
   const nomeFase = (fid: string | null) => config.todasFases.find((f) => f.id === fid)?.nome ?? "—";
   const dias = diasDesde(negocio.entrou_na_fase_em);
@@ -135,7 +135,7 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
           <Cartao>
-            <CabecalhoCartao titulo="Dados do negócio" descricao={podeEditar ? undefined : "Somente leitura: você não é responsável nem participante."} />
+            <CabecalhoCartao titulo="Dados do negócio" descricao={podeEditar ? undefined : "Somente leitura: só membros do Comercial editam."} />
             <FormNegocio
               negocio={{
                 id: negocio.id, titulo: negocio.titulo, valor: negocio.valor, responsavel_id: negocio.responsavel_id,
@@ -143,8 +143,6 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
                 data_coldcall_1: negocio.data_coldcall_1, data_coldcall_2: negocio.data_coldcall_2, dores_identificadas: negocio.dores_identificadas,
               }}
               servicosSelecionados={negocio.negocio_servicos.map((s) => s.servico_id)}
-              valoresServicos={Object.fromEntries(negocio.negocio_servicos.map((s) => [s.servico_id, s.valor]))}
-              participantes={participantes}
               membros={config.membrosComercial}
               origens={config.origens}
               servicos={config.servicos}
@@ -254,7 +252,7 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
             nomes={Object.fromEntries(todosMembros.map((m) => [m.id, m.nome]))}
             podeEnviar={podeEditar}
             usuarioId={usuario.id}
-            ehDiretor={usuario.ehDiretorDe("comercial")}
+            podeExcluir={podeEditar}
           />
 
           <Cartao>

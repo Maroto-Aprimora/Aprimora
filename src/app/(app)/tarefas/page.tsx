@@ -21,7 +21,7 @@ export default async function PaginaTarefas() {
     supabase.from("diretorias").select("slug, nome").order("ordem"),
     supabase.from("aprovacoes")
       .select("id, titulo, resumo, tipo, conteudo, created_at, responsavel_id, agentes(nome), negocios(id, titulo), membros!aprovacoes_responsavel_id_fkey(nome)")
-      .eq("status", "pendente").order("created_at").limit(200),
+      .eq("status", "pendente").neq("tipo", "email").order("created_at").limit(200),
   ]);
 
   const lista = (tarefas ?? []).map((t) => ({

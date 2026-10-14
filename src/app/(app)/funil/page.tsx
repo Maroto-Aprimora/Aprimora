@@ -8,6 +8,7 @@ import { obterUsuario } from "@/lib/usuario";
 import { BarraFunil } from "./filtros";
 import { Kanban, type CartaoNegocio } from "./kanban";
 import { ListaNegocios } from "./lista";
+import type { ItemAprovacao } from "@/app/(app)/aprovacoes/item";
 
 export const metadata: Metadata = { title: "Funil" };
 
@@ -45,7 +46,25 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
   if (segmento) consulta = consulta.eq("empresas.segmento_id", segmento);
   if (busca) consulta = consulta.ilike("empresas.nome_normalizado", `%${busca.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")}%`);
 
-  const { data } = await consulta;
+  const [{ data }, { data: emailsPendentes }, { data: envio }] = await Promise.all([
+    consulta,
+    // E-mails do Redator esperando aprovação: aparecem no pop-up do card (cada um vê os seus; o diretor vê todos)
+    supabase.from("aprovacoes")
+      .select("id, titulo, resumo, tipo, conteudo, created_at, negocio_id, agentes(nome), negocios(id, titulo), membros!aprovacoes_responsavel_id_fkey(nome)")
+      .eq("status", "pendente").eq("tipo", "email").order("created_at"),
+    supabase.from("parametros_comercial").select("remetente_nome, envio_hora_inicio, envio_hora_fim").eq("diretoria", "comercial").maybeSingle(),
+  ]);
+  const emailPorNegocio = new Map<string, ItemAprovacao>();
+  for (const a of emailsPendentes ?? []) {
+    if (!a.negocio_id || emailPorNegocio.has(a.negocio_id)) continue;
+    emailPorNegocio.set(a.negocio_id, {
+      id: a.id, titulo: a.titulo, resumo: a.resumo, agente: a.agentes?.nome ?? "Redator", tipo: a.tipo, criadoEm: a.created_at,
+      conteudo: (a.conteudo ?? {}) as Record<string, unknown>, negocio: a.negocios, responsavel: a.membros?.nome ?? null,
+    });
+  }
+  const dadosEnvio = envio
+    ? `${envio.remetente_nome} <comercial@aprimoraej.com> · dias úteis, das ${envio.envio_hora_inicio}h às ${envio.envio_hora_fim}h`
+    : "comercial@aprimoraej.com · dias úteis, em horário comercial";
   const nomes = new Map(config.membrosComercial.map((m) => [m.id, m.nome]));
   const cartoes: CartaoNegocio[] = (data ?? []).map((n) => ({
     id: n.id,
@@ -65,6 +84,7 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
     segmento: n.empresas.segmentos?.nome ?? null,
     servicos: n.negocio_servicos.map((s) => s.servicos?.nome).filter((x): x is string => !!x),
     contato: n.contatos ? [n.contatos.nome, n.contatos.cargo].filter(Boolean).join(" · ") : null,
+    emailParaAprovar: emailPorNegocio.get(n.id) ?? null,
   }));
 
   const acoes = (
@@ -85,7 +105,7 @@ export default async function PaginaFunil({ searchParams }: PageProps<"/funil">)
       <BarraFunil membros={config.membrosComercial} origens={config.origens} segmentos={config.segmentos} acoes={acoes} />
       {ver === "lista"
         ? <ListaNegocios fases={config.fases} cartoes={cartoes} />
-        : <Kanban fases={config.fases} motivos={config.motivos} resultados={config.resultadosLigacao} cartoes={cartoes} />}
+        : <Kanban fases={config.fases} motivos={config.motivos} resultados={config.resultadosLigacao} cartoes={cartoes} dadosEnvio={dadosEnvio} />}
     </>
   );
 }

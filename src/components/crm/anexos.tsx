@@ -27,8 +27,8 @@ function nomeSeguro(nome: string) {
 }
 
 /** Propostas, contratos e outros arquivos do negócio (até 10 MB cada). */
-export function AnexosDoNegocio({ negocioId, anexos, nomes, podeEnviar, usuarioId, ehDiretor }: {
-  negocioId: string; anexos: Anexo[]; nomes: Record<string, string>; podeEnviar: boolean; usuarioId: string; ehDiretor: boolean;
+export function AnexosDoNegocio({ negocioId, anexos, nomes, podeEnviar, usuarioId, podeExcluir }: {
+  negocioId: string; anexos: Anexo[]; nomes: Record<string, string>; podeEnviar: boolean; usuarioId: string; podeExcluir: boolean;
 }) {
   const router = useRouter();
   const entrada = useRef<HTMLInputElement>(null);
@@ -116,7 +116,7 @@ export function AnexosDoNegocio({ negocioId, anexos, nomes, podeEnviar, usuarioI
             <button type="button" onClick={() => baixar(a)} disabled={pendente} className="rounded p-1 text-texto-suave hover:bg-superficie-2 hover:text-destaque" aria-label={`Baixar ${a.nome}`}>
               <Download className="h-4 w-4" />
             </button>
-            {(a.enviado_por === usuarioId || ehDiretor) && (
+            {(a.enviado_por === usuarioId || podeExcluir) && (
               <button type="button" onClick={() => excluir(a)} disabled={pendente} className="rounded p-1 text-texto-suave hover:bg-superficie-2 hover:text-perigo" aria-label={`Excluir ${a.nome}`}>
                 <Trash2 className="h-4 w-4" />
               </button>

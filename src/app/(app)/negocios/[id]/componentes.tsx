@@ -77,15 +77,13 @@ type DadosNegocio = {
 };
 
 export function FormNegocio({
-  negocio, servicosSelecionados, valoresServicos, participantes, membros, origens, servicos, contatos, podeEditar,
+  negocio, servicosSelecionados, membros, origens, servicos, contatos, podeEditar,
 }: {
-  negocio: DadosNegocio; servicosSelecionados: string[]; valoresServicos: Record<string, number | null>; participantes: string[]; membros: MembroResumo[];
+  negocio: DadosNegocio; servicosSelecionados: string[]; membros: MembroResumo[];
   origens: { id: string; nome: string }[]; servicos: { id: string; nome: string; area: keyof typeof NOME_AREA }[];
   contatos: { id: string; nome: string; cargo: string | null }[]; podeEditar: boolean;
 }) {
   const [pendente, iniciar] = useTransition();
-  const [marcados, setMarcados] = useState(() => new Set(servicosSelecionados));
-  const temValorPorServico = Object.values(valoresServicos).some((v) => v != null);
 
   function enviar(form: FormData) {
     iniciar(async () => {
@@ -93,12 +91,7 @@ export function FormNegocio({
         ["titulo", "valor", "responsavel_id", "origem_id", "origem_detalhe", "contato_id", "data_coldcall_1", "data_coldcall_2", "dores_identificadas"]
           .map((k) => [k, form.get(k)]),
       );
-      const servicosMarcados = form.getAll("servicos").map(String);
-      const valores = Object.fromEntries(servicosMarcados.map((id) => {
-        const bruto = String(form.get(`valor_servico_${id}`) ?? "").trim();
-        return [id, bruto ? Number(bruto.replace(/\./g, "").replace(",", ".")) : null];
-      }));
-      const r = await salvarNegocio(negocio.id, dados, servicosMarcados, form.getAll("participantes").map(String), valores);
+      const r = await salvarNegocio(negocio.id, dados, form.getAll("servicos").map(String));
       if (r.ok) toast.success("Negócio salvo.");
       else toast.error(r.erro);
     });
@@ -108,8 +101,8 @@ export function FormNegocio({
     <form action={enviar}>
       <fieldset disabled={!podeEditar || pendente} className="grid gap-4 px-5 py-4 sm:grid-cols-2">
         <Campo rotulo="Título" obrigatorio className="sm:col-span-2"><Entrada name="titulo" defaultValue={negocio.titulo} required /></Campo>
-        <Campo rotulo="Valor (R$)" dica={temValorPorServico ? "Soma dos valores por serviço (edite nos serviços abaixo)." : "Valor da proposta. Ou informe o valor de cada serviço abaixo."}>
-          <Entrada name="valor" inputMode="decimal" defaultValue={negocio.valor ?? ""} placeholder="0" readOnly={temValorPorServico} />
+        <Campo rotulo="Valor (R$)" dica="Valor da proposta, definido depois do diagnóstico e do escopo.">
+          <Entrada name="valor" inputMode="decimal" defaultValue={negocio.valor ?? ""} placeholder="0" />
         </Campo>
         <Campo rotulo="Responsável" dica="Vazio = distribuído pelo rodízio ao entrar em E-mail.">
           <Selecao name="responsavel_id" defaultValue={negocio.responsavel_id ?? ""}>
@@ -134,44 +127,20 @@ export function FormNegocio({
           <Campo rotulo="Coldcall 1"><Entrada type="date" name="data_coldcall_1" defaultValue={negocio.data_coldcall_1 ?? ""} /></Campo>
           <Campo rotulo="Coldcall 2"><Entrada type="date" name="data_coldcall_2" defaultValue={negocio.data_coldcall_2 ?? ""} /></Campo>
         </div>
-        <Campo rotulo="Dores identificadas" className="sm:col-span-2">
-          <AreaTexto name="dores_identificadas" defaultValue={negocio.dores_identificadas ?? ""} />
-        </Campo>
-
         <div className="sm:col-span-2">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-texto-suave">Serviços de interesse e valor de cada um (R$)</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-texto-suave">Dores identificadas</p>
           <div className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
             {servicos.map((s) => (
-              <div key={s.id} className="flex items-center gap-2 text-sm">
-                <label className="flex min-w-0 flex-1 items-center gap-2">
-                  <input type="checkbox" name="servicos" value={s.id} checked={marcados.has(s.id)}
-                    onChange={(e) => setMarcados((atual) => {
-                      const novo = new Set(atual);
-                      if (e.target.checked) novo.add(s.id); else novo.delete(s.id);
-                      return novo;
-                    })} />
-                  <span className="truncate">{s.nome} <span className="text-xs text-texto-suave">· {NOME_AREA[s.area]}</span></span>
-                </label>
-                {marcados.has(s.id) && (
-                  <Entrada name={`valor_servico_${s.id}`} inputMode="decimal" defaultValue={valoresServicos[s.id] ?? ""}
-                    placeholder="Valor" aria-label={`Valor de ${s.nome}`} className="h-8 w-28" />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="sm:col-span-2">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-texto-suave">Participantes (também podem editar)</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-            {membros.map((m) => (
-              <label key={m.id} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="participantes" value={m.id} defaultChecked={participantes.includes(m.id)} />
-                {m.nome}
+              <label key={s.id} className="flex min-w-0 items-center gap-2 text-sm">
+                <input type="checkbox" name="servicos" value={s.id} defaultChecked={servicosSelecionados.includes(s.id)} />
+                <span className="truncate">{s.nome} <span className="text-xs text-texto-suave">· {NOME_AREA[s.area]}</span></span>
               </label>
             ))}
           </div>
         </div>
+        <Campo rotulo="Detalhes das dores" dica="Anotações das ligações e do Enriquecedor sobre as dores do lead." className="sm:col-span-2">
+          <AreaTexto name="dores_identificadas" defaultValue={negocio.dores_identificadas ?? ""} className="min-h-20" />
+        </Campo>
       </fieldset>
       {podeEditar && (
         <div className="flex justify-end border-t border-borda px-5 py-3">

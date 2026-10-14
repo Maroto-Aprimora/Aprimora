@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.18 |
+| Versão do documento | 1.19 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -95,7 +95,7 @@ Pipefy) e foi estruturado para receber as demais diretorias.
 | Área | Módulo | Status |
 |---|---|---|
 | Geral | Painel geral, Agenda, Tarefas (com a Caixa de aprovação: quadro de colunas retráteis ou lista), Notificações (sino + push), PWA | EM PRODUÇÃO |
-| Comercial | Desempenho individual (indicadores, rubrica por critério e por semana, ligações avaliadas, plano de melhoria) | EM PRODUÇÃO |
+| Comercial | Desempenho individual, aberto a todo o time (indicadores, rubrica por critério e por semana, ligações avaliadas, plano de melhoria) | EM PRODUÇÃO |
 | Presidência | Auditoria (só diretores) | EM PRODUÇÃO |
 | Vice-Presidência | Membros (pré-cadastro, cargos, data de entrada, processos seletivos, transferência de carteira) | EM PRODUÇÃO |
 | Vice-Presidência | Pontuação (0 a 12, marco em 6) | EM PRODUÇÃO |
@@ -267,7 +267,7 @@ Funções auxiliares no schema `privado`, todas `security definer` com `search_p
 | `pertence_a(d)` | tem qualquer cargo em `d` |
 | `diretoria_do_funil(f)` / `diretoria_da_fase(f)` | (retornam a diretoria dona) |
 | `participa_do_negocio(n)` | é responsável ou participante do negócio |
-| `pode_editar_negocio(n)` / `pode_editar_empresa(e)` | diretor da diretoria do funil, responsável/participante, ou quem criou a empresa |
+| `pode_editar_negocio(n)` / `pode_editar_empresa(e)` | qualquer membro da diretoria do funil (Comercial), desde 14/10/2026 |
 | `participa_da_atividade(a)` / `pode_gerir_atividade(a)` | responsável/participante da atividade; ou diretor da diretoria dela |
 | `responsavel_da_tarefa(t)` | é um dos responsáveis da tarefa |
 
@@ -277,15 +277,15 @@ Resumo das regras:
 |---|---|---|---|---|
 | Membros, cargos, diretorias | membros ativos | diretor (pré-cadastro, cargos) | diretor da diretoria; o próprio membro edita dados básicos | diretor |
 | Empresas e contatos | membros ativos | membros da diretoria | `pode_editar_empresa` | diretor |
-| Negócios | membros ativos | membros da diretoria do funil | `pode_editar_negocio` (assessor/trainee: só os seus) | diretor |
+| Negócios | membros ativos | membros da diretoria do funil | `pode_editar_negocio` (todo membro do Comercial, inclusive trocar o responsável) | diretor |
 | Histórico de negócio | membros ativos | só gatilhos | — | — |
 | Configurações (fases, campos, motivos, origens, segmentos, serviços, metas, tipos de atividade, reuniões) | membros ativos | diretor da diretoria | diretor da diretoria | diretor da diretoria |
-| Atividades | membros ativos | membros da diretoria do tipo (R.G: só diretores) | participante ou diretor | idem, exceto trainee |
+| Atividades | membros ativos | membros da diretoria do tipo (R.G: só diretores) | participante, quem edita o negócio ligado ou diretor | idem, exceto trainee |
 | Tarefas | diretoria, diretores e responsáveis | diretor; qualquer membro cria tarefa pessoal (manual, para si); sistema e agentes via `privado.criar_tarefa` | diretor (tudo), autor da tarefa pessoal (tudo) ou responsável (só `status`) | diretor ou autor da tarefa pessoal |
 | Notificações | só as próprias | só gatilhos | só `lida_em` | só as próprias |
 | Pontuação | o próprio; diretores veem todas | diretor da Vice-Presidência (`rh`) | só cancelamento, pela Vice-Presidência | não existe exclusão |
 | Auditoria | diretores | só funções internas | — | — |
-| Anexos (tabela e Storage) | membros ativos | quem pode editar o negócio | — | quem enviou ou o diretor |
+| Anexos (tabela e Storage) | membros ativos | quem pode editar o negócio | — | quem pode editar o negócio |
 
 Regras extras por gatilho: trainee não marca ganho; só diretor muda `ativo`, `email` e `data_entrada` de um membro;
 uma diretoria nunca fica sem diretor ativo (`garantir_diretor`).
@@ -354,7 +354,7 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `aprovacoes` | agente, tipo, trabalho_id, negocio_id, ligacao_id, email_id, resposta_id, responsavel_id, titulo, resumo, conteudo, conteudo_original, status, decidido_por/em, comentario | Caixa de aprovação (coluna "Para aprovar" em Tarefas) |
 | `relatorios` | tipo ('ri'), de, ate, dados (números calculados no banco), analise (texto do A4), texto_revisado, status (gerando/pronto/erro), erro, trabalho_id, revisado_por/em, criado_por | Relatórios da R.I; só o diretor comercial lê e revisa |
 | `rubrica_criterios` | chave, nome, descricao, ordem, ativo | Rubrica do Avaliador (PE-PA-002, 5.1), 7 critérios iniciais; o diretor edita |
-| `avaliacoes_ligacao` | ligacao_id (único), membro_id, notas (jsonb: chave, nome, nota 1–4, comentário), media, comentario | Avaliação de cada ligação pelo A3; o membro vê as suas, o diretor vê todas |
+| `avaliacoes_ligacao` | ligacao_id (único), membro_id, notas (jsonb: chave, nome, nota 1–4, comentário), media, comentario | Avaliação de cada ligação pelo A3; todo o time vê (desde 14/10/2026) |
 | `eventos_integracoes` | origem, recebido_em, payload, externo_id (id da chamada na API4COM, único por origem), processado_em, ligacao_id, erro | Eventos recebidos de sistemas externos (API4COM), como chegaram; só o diretor lê |
 | `feriados` | data, nome | Dias não úteis (nacionais 2026–2027 e aniversário de Londrina); tarefas automáticas pulam fins de semana e feriados |
 | `metas` | diretoria, trimestre (`1T2026`), objetivo, codigo, titulo, alvo, unidade, realizado_manual, indicador, membro_id, peso | OKRs trimestrais; `indicador` liga a meta a um cálculo automático |
@@ -729,6 +729,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.19 | 14/10/2026 | Edição compartilhada (migração `20261014150000`): todo membro do Comercial edita qualquer card e empresa, troca o responsável, registra atividades e envia/exclui anexos; "Participantes" sai do card; "Dores identificadas" vira o checklist da Carta de Serviços (sem valor por item; anotações dos agentes em "Detalhes das dores"); página da empresa com "Atividade" (linha do tempo do lead), atividades e anexos; Desempenho individual aberto a todo o time; aprovação de e-mail no pop-up do card do Funil (contador no menu Funil); cards sem iniciais |
 | 1.18 | 14/10/2026 | Fase 3: cadência de e-mail (migração `20261014120000`, guia Copy, Redator, Monitor de respostas, Organizador do dia, fluxos 10 e 11) |
 | 1.17 | 13/10/2026 | Empresas e leads só em lista, com filtros de segmento, cidade e responsável; Config. do funil em abas (Campos, Agentes, Cadência); card do funil em janela; janelas mais claras sobre fundo escurecido |
 | 1.16 | 13/10/2026 | Desempenho individual; Caixa de aprovação dentro de Tarefas (quadro retrátil); Funil com cabeçalho estilo Pipefy, visão em lista e card retrátil; rubrica editável; Agendador (A8) desligado |

@@ -57,42 +57,22 @@ export async function salvarNegocio(
   negocioId: string,
   dados: Record<string, unknown>,
   servicos: string[],
-  participantes: string[],
-  valoresServicos: Record<string, number | null> = {},
 ): Promise<Resultado> {
   const v = esquemaNegocio.safeParse(dados);
   if (!v.success) return { ok: false, erro: v.error.issues[0].message };
   const supabase = await criarClienteServidor();
 
-  // Serviços e participantes primeiro: se o responsável for trocado, quem edita pode perder a permissão depois.
-  const [{ data: atuaisServ }, { data: atuaisPart }] = await Promise.all([
-    supabase.from("negocio_servicos").select("servico_id").eq("negocio_id", negocioId),
-    supabase.from("negocio_participantes").select("membro_id").eq("negocio_id", negocioId),
-  ]);
+  // Dores identificadas (serviços da Carta): só marca e desmarca; o valor vem depois do diagnóstico e do escopo
+  const { data: atuaisServ } = await supabase.from("negocio_servicos").select("servico_id").eq("negocio_id", negocioId);
   const servAtuais = new Set((atuaisServ ?? []).map((s) => s.servico_id));
-  const partAtuais = new Set((atuaisPart ?? []).map((p) => p.membro_id));
   const novosServ = servicos.filter((s) => !servAtuais.has(s));
   const remServ = [...servAtuais].filter((s) => !servicos.includes(s));
-  const novosPart = participantes.filter((p) => !partAtuais.has(p));
-  const remPart = [...partAtuais].filter((p) => !participantes.includes(p));
-
-  const valorDe = (id: string) => {
-    const x = valoresServicos[id];
-    return x == null || Number.isNaN(x) || x < 0 ? null : x;
-  };
   const ops = [];
-  if (novosServ.length) ops.push(supabase.from("negocio_servicos").insert(novosServ.map((servico_id) => ({ negocio_id: negocioId, servico_id, valor: valorDe(servico_id) }))));
-  for (const id of servicos.filter((x) => servAtuais.has(x)))
-    ops.push(supabase.from("negocio_servicos").update({ valor: valorDe(id) }).eq("negocio_id", negocioId).eq("servico_id", id));
+  if (novosServ.length) ops.push(supabase.from("negocio_servicos").insert(novosServ.map((servico_id) => ({ negocio_id: negocioId, servico_id }))));
   if (remServ.length) ops.push(supabase.from("negocio_servicos").delete().eq("negocio_id", negocioId).in("servico_id", remServ));
-  if (novosPart.length) ops.push(supabase.from("negocio_participantes").insert(novosPart.map((membro_id) => ({ negocio_id: negocioId, membro_id }))));
-  if (remPart.length) ops.push(supabase.from("negocio_participantes").delete().eq("negocio_id", negocioId).in("membro_id", remPart));
   for (const r of await Promise.all(ops)) if (r.error) return { ok: false, erro: mensagemDeErro(r.error) };
 
-  // Com valor por serviço, o valor do negócio é a soma (gatilho somar_valor_servicos) e não vem do formulário
-  const { valor, ...resto } = v.data;
-  const somaPorServico = servicos.some((id) => valorDe(id) != null);
-  const { data, error } = await supabase.from("negocios").update(somaPorServico ? resto : { ...resto, valor }).eq("id", negocioId).select("id");
+  const { data, error } = await supabase.from("negocios").update(v.data).eq("id", negocioId).select("id");
   if (error) return { ok: false, erro: mensagemDeErro(error) };
   if (!data?.length) return { ok: false, erro: "Você não tem permissão para editar este negócio." };
 

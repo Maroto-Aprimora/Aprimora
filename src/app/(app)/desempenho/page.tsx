@@ -21,16 +21,15 @@ const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round
 const nota = (v: number | null | undefined) => (v == null ? "—" : formatarNumero(Math.round(Number(v) * 100) / 100));
 
 /**
- * Desempenho individual (PE-PA-002, Seção 6): o membro vê o seu; o diretor vê todos. Indicadores do período,
+ * Desempenho individual (PE-PA-002, Seção 6): todo o time vê o desempenho de todos (decisão de 14/10/2026). Indicadores do período,
  * notas da rubrica do Avaliador (por critério e ao longo das semanas), as ligações com transcrição e avaliação e o
  * plano de melhoria depois que o diretor revisa o relatório da R.I.
  */
 export default async function PaginaDesempenho({ searchParams }: PageProps<"/desempenho">) {
   const sp = await searchParams;
   const [usuario, config, supabase] = await Promise.all([obterUsuario(), carregarConfiguracaoComercial(), criarClienteServidor()]);
-  const ehDiretor = usuario.ehDiretorDe("comercial");
   const pedido = typeof sp.m === "string" ? sp.m : "";
-  const membro = ehDiretor && config.membrosComercial.some((m) => m.id === pedido) ? pedido : usuario.id;
+  const membro = config.membrosComercial.some((m) => m.id === pedido) ? pedido : usuario.id;
   const nomeMembro = config.membrosComercial.find((m) => m.id === membro)?.nome ?? usuario.nome;
   const periodo = periodoDosParametros({ periodo: typeof sp.periodo === "string" ? sp.periodo : "30d" });
   const { inicio, fim } = limitesIso(periodo);
@@ -69,8 +68,8 @@ export default async function PaginaDesempenho({ searchParams }: PageProps<"/des
   return (
     <>
       <TituloPagina titulo="Desempenho individual"
-        descricao={`${nomeMembro} · ${periodo.rotulo.toLowerCase()}. ${ehDiretor ? "Você vê todos os membros." : "Só você e o diretor veem esta página."}`} />
-      <FiltrosDesempenho periodo={periodo.chave} membro={membro} membros={ehDiretor ? config.membrosComercial : null} />
+        descricao={`${nomeMembro} · ${periodo.rotulo.toLowerCase()}. Todo o time vê o desempenho de todos.`} />
+      <FiltrosDesempenho periodo={periodo.chave} membro={membro} membros={config.membrosComercial} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Numero rotulo="Ligações" valor={String(c.ligacoes)} detalhe={`${c.negocios} leads · ${pct(c.pctDiagnostico)} viram diagnóstico`} />
