@@ -5,6 +5,7 @@ import { classeBotao } from "@/components/ui/botao";
 import { TituloPagina } from "@/components/ui/cartao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { obterUsuario } from "@/lib/usuario";
+import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
 import { consultarLeads, lerFiltros, NOME_SITUACAO, TERMOS_PADRAO } from "./dados";
 import { Buscas, FiltrosStockFacil, TabelaLeads } from "./componentes";
 
@@ -12,12 +13,12 @@ export const metadata: Metadata = { title: "Leads StockFacil" };
 
 /**
  * Temporário: prospecção do SaaS StockFacil (controle de estoque no celular do dono) em comércios de Londrina com
- * muitos itens. A busca roda o google-maps-scraper (gosom) pelo n8n; a lista é só do Diretor Comercial.
+ * muitos itens. A busca roda o google-maps-scraper (gosom) pelo n8n; todo o time vê e edita (decisão de 15/10/2026).
  */
 export default async function PaginaStockFacil({ searchParams }: PageProps<"/stockfacil">) {
   const sp = await searchParams;
-  const usuario = await obterUsuario();
-  if (!usuario.ehDiretorDe("comercial")) redirect("/painel");
+  const [usuario, config] = await Promise.all([obterUsuario(), carregarConfiguracaoComercial()]);
+  if (usuario.cargoEm("comercial") == null) redirect("/painel");
   const filtros = lerFiltros(sp);
   const supabase = await criarClienteServidor();
   const [{ data: leads }, { data: buscas }, { data: todas }, { count: total }] = await Promise.all([
@@ -46,12 +47,12 @@ export default async function PaginaStockFacil({ searchParams }: PageProps<"/sto
           <span key={x.s} className="rounded-full bg-superficie-2 px-3 py-1 text-texto-suave">{NOME_SITUACAO[x.s]}: {x.n}</span>
         ))}
       </div>
-      <FiltrosStockFacil filtros={filtros} categorias={contar("categoria")} bairros={contar("bairro")} />
+      <FiltrosStockFacil filtros={filtros} categorias={contar("categoria")} bairros={contar("bairro")} membros={config.membrosComercial} />
       <TabelaLeads leads={(leads ?? []).map((l) => ({
         id: l.id, nome: l.nome, categoria: l.categoria, telefone: l.telefone, telefoneDigitos: l.telefone_digitos, endereco: l.endereco,
         bairro: l.bairro, site: l.site, nota: l.nota != null ? Number(l.nota) : null, avaliacoes: l.avaliacoes, linkMaps: l.link_maps,
-        situacao: l.situacao, observacoes: l.observacoes,
-      }))} />
+        situacao: l.situacao, responsavelId: l.responsavel_id,
+      }))} membros={config.membrosComercial} />
     </>
   );
 }

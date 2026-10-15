@@ -2903,6 +2903,7 @@ export type Database = {
           nota: number | null
           observacoes: string | null
           place_id: string | null
+          responsavel_id: string | null
           site: string | null
           situacao: string
           telefone: string | null
@@ -2927,6 +2928,7 @@ export type Database = {
           nota?: number | null
           observacoes?: string | null
           place_id?: string | null
+          responsavel_id?: string | null
           site?: string | null
           situacao?: string
           telefone?: string | null
@@ -2951,6 +2953,7 @@ export type Database = {
           nota?: number | null
           observacoes?: string | null
           place_id?: string | null
+          responsavel_id?: string | null
           site?: string | null
           situacao?: string
           telefone?: string | null
@@ -2971,6 +2974,13 @@ export type Database = {
             columns: ["busca_id"]
             isOneToOne: false
             referencedRelation: "stockfacil_buscas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stockfacil_leads_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "membros"
             referencedColumns: ["id"]
           },
         ]

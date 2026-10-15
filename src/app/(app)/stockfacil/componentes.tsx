@@ -78,14 +78,14 @@ export function Buscas({ buscas, termosPadrao }: { buscas: Busca[]; termosPadrao
   );
 }
 
-export function FiltrosStockFacil({ filtros, categorias, bairros }: {
-  filtros: FiltrosLeads; categorias: { valor: string; n: number }[]; bairros: { valor: string; n: number }[];
+export function FiltrosStockFacil({ filtros, categorias, bairros, membros }: {
+  filtros: FiltrosLeads; categorias: { valor: string; n: number }[]; bairros: { valor: string; n: number }[]; membros: Membro[];
 }) {
   const router = useRouter();
   const { params, montar } = useParametros();
   const [q, setQ] = useState(filtros.q);
   const ir = (m: Record<string, string | null>) => router.replace(montar(m), { scroll: false });
-  const ativos = [filtros.situacao, filtros.categoria, filtros.bairro].filter(Boolean).length;
+  const ativos = [filtros.situacao, filtros.categoria, filtros.bairro, filtros.resp].filter(Boolean).length;
   useEffect(() => {
     if (q === (params.get("q") ?? "")) return;
     const t = setTimeout(() => ir({ q: q || null }), 350);
@@ -95,11 +95,18 @@ export function FiltrosStockFacil({ filtros, categorias, bairros }: {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
       <CampoBusca valor={q} aoMudar={setQ} placeholder="Procurar por nome ou endereço" />
-      <BotaoFiltros ativos={ativos} aoLimpar={() => ir({ situacao: null, categoria: null, bairro: null })}>
+      <BotaoFiltros ativos={ativos} aoLimpar={() => ir({ situacao: null, categoria: null, bairro: null, resp: null })}>
         <Campo rotulo="Situação">
           <Selecao value={filtros.situacao} onChange={(e) => ir({ situacao: e.target.value || null })} className="h-9">
             <option value="">Todas</option>
             {Object.entries(NOME_SITUACAO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </Selecao>
+        </Campo>
+        <Campo rotulo="Responsável">
+          <Selecao value={filtros.resp} onChange={(e) => ir({ resp: e.target.value || null })} className="h-9">
+            <option value="">Todos</option>
+            <option value="sem">Sem responsável</option>
+            {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
           </Selecao>
         </Campo>
         <Campo rotulo="Categoria">
@@ -122,30 +129,30 @@ export function FiltrosStockFacil({ filtros, categorias, bairros }: {
 type Lead = {
   id: string; nome: string; categoria: string | null; telefone: string | null; telefoneDigitos: string | null; endereco: string | null;
   bairro: string | null; site: string | null; nota: number | null; avaliacoes: number | null; linkMaps: string | null;
-  situacao: string; observacoes: string | null;
+  situacao: string; responsavelId: string | null;
 };
+type Membro = { id: string; nome: string };
 
-export function TabelaLeads({ leads }: { leads: Lead[] }) {
+export function TabelaLeads({ leads, membros }: { leads: Lead[]; membros: Membro[] }) {
   if (!leads.length) return <Cartao className="p-6 text-center text-sm text-texto-suave">Nenhum lead ainda. Faça uma busca acima.</Cartao>;
   return (
     <Cartao className="overflow-x-auto">
       <table className="w-full min-w-[900px] text-sm">
         <thead className="bg-superficie-2 text-left text-xs uppercase tracking-wide text-texto-suave">
           <tr><th className="px-3 py-2">Comércio</th><th className="px-3 py-2">Contato</th><th className="px-3 py-2">Endereço</th>
-            <th className="px-3 py-2">Google</th><th className="px-3 py-2">Situação</th><th className="px-3 py-2">Observações</th><th /></tr>
+            <th className="px-3 py-2">Google</th><th className="px-3 py-2">Situação</th><th className="px-3 py-2">Responsável</th><th /></tr>
         </thead>
-        <tbody className="divide-y divide-borda">{leads.map((l) => <LinhaLead key={l.id} lead={l} />)}</tbody>
+        <tbody className="divide-y divide-borda">{leads.map((l) => <LinhaLead key={l.id} lead={l} membros={membros} />)}</tbody>
       </table>
     </Cartao>
   );
 }
 
-function LinhaLead({ lead }: { lead: Lead }) {
+function LinhaLead({ lead, membros }: { lead: Lead; membros: Membro[] }) {
   const [pendente, iniciar] = useTransition();
-  const [obs, setObs] = useState(lead.observacoes ?? "");
   const dig = (lead.telefoneDigitos ?? "").replace(/^0+/, "");
   const celular = dig.length === 11 && dig[2] === "9";
-  const salvar = (dados: { situacao?: string; observacoes?: string }) => iniciar(async () => {
+  const salvar = (dados: { situacao?: string; responsavel_id?: string | null }) => iniciar(async () => {
     const r = await atualizarLead(lead.id, dados);
     if (!r.ok) toast.error(r.erro);
   });
@@ -179,8 +186,11 @@ function LinhaLead({ lead }: { lead: Lead }) {
         <Selo tom={TOM[lead.situacao]} className="mt-1">{NOME_SITUACAO[lead.situacao]}</Selo>
       </td>
       <td className="px-3 py-2.5">
-        <Entrada value={obs} onChange={(e) => setObs(e.target.value)} onBlur={() => obs !== (lead.observacoes ?? "") && salvar({ observacoes: obs })}
-          placeholder="Anotação" className="h-8 min-w-48 text-xs" />
+        <Selecao defaultValue={lead.responsavelId ?? ""} disabled={pendente} aria-label="Responsável"
+          onChange={(e) => salvar({ responsavel_id: e.target.value || null })} className="h-8 w-44 text-xs">
+          <option value="">Sem responsável</option>
+          {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+        </Selecao>
       </td>
       <td className="px-2 py-2.5">
         <button type="button" aria-label="Excluir lead" className="p-1 text-texto-suave hover:text-perigo" disabled={pendente}

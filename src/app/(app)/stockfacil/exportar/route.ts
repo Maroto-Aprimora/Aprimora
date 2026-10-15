@@ -1,9 +1,10 @@
 import { gerarCsv, gerarXlsx, type Planilha } from "@/lib/exportar";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { hojeBR } from "@/lib/datas";
+import { carregarConfiguracaoComercial } from "@/lib/crm-servidor";
 import { consultarLeads, lerFiltros, NOME_SITUACAO } from "../dados";
 
-/** Exporta os Leads StockFacil (com os filtros da página) em .xlsx ou .csv. Só o Diretor Comercial (RLS). */
+/** Exporta os Leads StockFacil (com os filtros da página) em .xlsx ou .csv. Todo o time (RLS). */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const sp = Object.fromEntries(url.searchParams.entries());
@@ -11,16 +12,17 @@ export async function GET(request: Request) {
   const { data: sessao } = await supabase.auth.getClaims();
   if (!sessao?.claims?.sub) return new Response("Não autorizado", { status: 401 });
 
-  const { data: leads } = await consultarLeads(supabase, lerFiltros(sp), 20000);
+  const [{ data: leads }, config] = await Promise.all([consultarLeads(supabase, lerFiltros(sp), 20000), carregarConfiguracaoComercial()]);
+  const nomeMembro = new Map(config.membrosComercial.map((m) => [m.id, m.nome]));
   const planilhas: Planilha[] = [{
     nome: "Leads StockFacil",
-    colunas: ["Nome", "Categoria", "Situação", "Telefone", "WhatsApp", "Endereço", "Bairro", "Site", "E-mails", "Nota", "Avaliações",
+    colunas: ["Nome", "Categoria", "Situação", "Responsável", "Telefone", "WhatsApp", "Endereço", "Bairro", "Site", "E-mails", "Nota", "Avaliações",
       "Google Maps", "Observações", "Encontrado em"],
     linhas: (leads ?? []).map((l) => {
       const dig = (l.telefone_digitos ?? "").replace(/^0+/, "");
       const celular = dig.length === 11 && dig[2] === "9";
       return [
-        l.nome, l.categoria ?? "", NOME_SITUACAO[l.situacao] ?? l.situacao, l.telefone ?? "",
+        l.nome, l.categoria ?? "", NOME_SITUACAO[l.situacao] ?? l.situacao, l.responsavel_id ? nomeMembro.get(l.responsavel_id) ?? "" : "", l.telefone ?? "",
         celular ? `https://wa.me/55${dig}` : "", l.endereco ?? "", l.bairro ?? "", l.site ?? "", l.emails ?? "",
         l.nota != null ? Number(l.nota) : null, l.avaliacoes, l.link_maps ?? "", l.observacoes ?? "",
         l.created_at.slice(0, 10),

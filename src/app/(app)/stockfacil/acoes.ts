@@ -7,7 +7,7 @@ import { mensagemDeErro } from "@/lib/erros";
 
 type Resultado = { ok: true } | { ok: false; erro: string };
 
-/** Pede uma busca ao n8n (google-maps-scraper). Cada linha é um tipo de comércio. */
+/** Pede uma busca ao n8n (google-maps-scraper). Cada linha é um tipo de comércio. Qualquer membro do Comercial. */
 export async function buscarLeads(termos: string[], cidade: string): Promise<Resultado> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("buscar_leads_stockfacil", { _termos: termos, _cidade: cidade });
@@ -18,12 +18,12 @@ export async function buscarLeads(termos: string[], cidade: string): Promise<Res
 
 const SITUACOES = ["novo", "contatado", "interessado", "demonstracao", "cliente", "descartado"] as const;
 
-export async function atualizarLead(id: string, dados: { situacao?: string; observacoes?: string }): Promise<Resultado> {
-  const v = z.object({ situacao: z.enum(SITUACOES).optional(), observacoes: z.string().max(2000).optional() }).safeParse(dados);
+export async function atualizarLead(id: string, dados: { situacao?: string; responsavel_id?: string | null }): Promise<Resultado> {
+  const v = z.object({ situacao: z.enum(SITUACOES).optional(), responsavel_id: z.string().uuid().nullable().optional() }).safeParse(dados);
   if (!v.success) return { ok: false, erro: "Dados inválidos." };
   const supabase = await criarClienteServidor();
   const { data: { user } } = await supabase.auth.getUser();
-  const campos = { ...v.data, ...(v.data.observacoes !== undefined ? { observacoes: v.data.observacoes.trim() || null } : {}), atualizado_por: user?.id ?? null };
+  const campos = { ...v.data, atualizado_por: user?.id ?? null };
   const { data, error } = await supabase.from("stockfacil_leads").update(campos).eq("id", id).select("id");
   if (error) return { ok: false, erro: mensagemDeErro(error) };
   if (!data?.length) return { ok: false, erro: "Sem permissão." };

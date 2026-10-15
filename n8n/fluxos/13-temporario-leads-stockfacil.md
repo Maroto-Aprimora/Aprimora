@@ -8,7 +8,7 @@ Fluxo criado no n8n pelo conector em 15/10/2026 (id `hSJfnqVuBNx0sDCE`, publicad
   `lang: pt`, `depth: 2`, `max_time` de 10 a 22 min) → espera em ciclos de 1 min (até 26) → baixa o CSV → converte
   (título, categoria, endereço, bairro, telefone, site, nota, avaliações, place_id, link) → devolve ao portal
   (`privado.aplicar_stockfacil` tira duplicados por place_id/telefone e fechados de vez) → apaga o job no gosom.
-- **Portal:** página `/stockfacil` (só o Diretor Comercial), exportação em `/stockfacil/exportar` (.xlsx ou `?formato=csv`).
+- **Portal:** página `/stockfacil` (todo o time do Comercial vê, busca, edita e escolhe o responsável de cada lead), exportação em `/stockfacil/exportar` (.xlsx ou `?formato=csv`).
 
 Para desmontar quando acabar: arquivar o fluxo no n8n, apagar o projeto `gmaps-aprimora` no Docker Manager da Hostinger e,
 se quiser, as tabelas `stockfacil_buscas` e `stockfacil_leads` com uma nova migração.

@@ -15,11 +15,11 @@ export const TERMOS_PADRAO = [
   "distribuidora de bebidas", "bicicletaria",
 ];
 
-export type FiltrosLeads = { q: string; situacao: string; categoria: string; bairro: string };
+export type FiltrosLeads = { q: string; situacao: string; categoria: string; bairro: string; resp: string };
 
 export function lerFiltros(sp: Record<string, string | string[] | undefined>): FiltrosLeads {
   const t = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string).trim() : "");
-  return { q: t("q"), situacao: t("situacao"), categoria: t("categoria"), bairro: t("bairro") };
+  return { q: t("q"), situacao: t("situacao"), categoria: t("categoria"), bairro: t("bairro"), resp: t("resp") };
 }
 
 /** Consulta com os filtros da página (mesma usada na exportação). */
@@ -28,6 +28,8 @@ export function consultarLeads(supabase: SupabaseClient<Database>, f: FiltrosLea
   if (f.situacao) q = q.eq("situacao", f.situacao);
   if (f.categoria) q = q.eq("categoria", f.categoria);
   if (f.bairro) q = q.eq("bairro", f.bairro);
+  if (f.resp === "sem") q = q.is("responsavel_id", null);
+  else if (f.resp) q = q.eq("responsavel_id", f.resp);
   if (f.q) q = q.or(`nome.ilike.%${f.q.replace(/[%,()]/g, " ")}%,endereco.ilike.%${f.q.replace(/[%,()]/g, " ")}%`);
   return q;
 }
