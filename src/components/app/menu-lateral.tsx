@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
   BarChart3, Building2, CalendarDays, ChevronDown, Gauge, History, KanbanSquare, LayoutDashboard, ListChecks, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
-  Target, TrendingUp, Trophy, Users, X,
+  PackageSearch, Target, TrendingUp, Trophy, Users, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sair } from "@/app/acoes-sessao";
@@ -33,7 +33,7 @@ export type DadosMenu = {
  * Menu da v2 (portal exclusivo do Comercial): seções gerais, o Comercial e o que permanece das outras diretorias
  * (Membros, Pontuação, Painel geral e Auditoria). Projetos e Marketing não têm telas.
  */
-function montarMenu({ ehDiretor, aprovacoesPendentes, emailsPendentes }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
+function montarMenu({ ehDiretor, diretorDe, aprovacoesPendentes, emailsPendentes }: DadosMenu): { gerais: Item[]; grupos: Grupo[] } {
   return {
     gerais: [
       { href: "/painel", rotulo: "Início", icone: LayoutDashboard },
@@ -47,6 +47,8 @@ function montarMenu({ ehDiretor, aprovacoesPendentes, emailsPendentes }: DadosMe
         { href: "/empresas", rotulo: "Empresas e leads", icone: Building2 },
         { href: "/desempenho", rotulo: "Desempenho individual", icone: TrendingUp },
         { href: "/metas", rotulo: "Metas", icone: Target },
+        // Temporário: prospecção do SaaS StockFacil (só o Diretor Comercial)
+        ...(diretorDe.includes("comercial") ? [{ href: "/stockfacil", rotulo: "Leads StockFacil", icone: PackageSearch }] : []),
       ] },
       { slug: "rh", itens: [
         { href: "/membros", rotulo: "Membros", icone: Users },
