@@ -15,14 +15,14 @@ export async function GET(request: Request) {
   const planilhas: Planilha[] = [{
     nome: "Leads StockFacil",
     colunas: ["Nome", "Categoria", "Situação", "Telefone", "WhatsApp", "Endereço", "Bairro", "Site", "E-mails", "Nota", "Avaliações",
-      "Google Maps", "Observações", "Termo da busca", "Encontrado em"],
+      "Google Maps", "Observações", "Encontrado em"],
     linhas: (leads ?? []).map((l) => {
       const dig = (l.telefone_digitos ?? "").replace(/^0+/, "");
       const celular = dig.length === 11 && dig[2] === "9";
       return [
         l.nome, l.categoria ?? "", NOME_SITUACAO[l.situacao] ?? l.situacao, l.telefone ?? "",
         celular ? `https://wa.me/55${dig}` : "", l.endereco ?? "", l.bairro ?? "", l.site ?? "", l.emails ?? "",
-        l.nota != null ? Number(l.nota) : null, l.avaliacoes, l.link_maps ?? "", l.observacoes ?? "", l.termo ?? "",
+        l.nota != null ? Number(l.nota) : null, l.avaliacoes, l.link_maps ?? "", l.observacoes ?? "",
         l.created_at.slice(0, 10),
       ];
     }),
