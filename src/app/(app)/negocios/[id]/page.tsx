@@ -13,6 +13,7 @@ import { AtividadesDoNegocio } from "@/components/agenda/atividades-negocio";
 import { AnexosDoNegocio } from "@/components/crm/anexos";
 import { RegistrarLigacao } from "@/components/crm/registrar-ligacao";
 import { AcoesTopoNegocio, BotaoEnriquecer, FormCamposFase, FormNegocio } from "./componentes";
+import { JornadaVenda } from "./jornada";
 
 export const metadata: Metadata = { title: "Negócio" };
 
@@ -42,6 +43,11 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
   ]);
   if (!negocio) notFound();
 
+  const [{ data: diagnostico }, { data: precificacao }, { data: proposta }] = await Promise.all([
+    supabase.from("diagnosticos").select("status, analise_status, maturidade").eq("negocio_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("precificacoes").select("preco_minimo, preco_maximo, preco_final").eq("negocio_id", id).maybeSingle(),
+    supabase.from("propostas").select("status").eq("negocio_id", id).maybeSingle(),
+  ]);
   const [{ data: contatos }, { data: historico }, { data: atividades }, { data: tipos }, { data: anexos }, { data: ligacoes }, { data: agenteEnriquecedor }, { count: naFilaEnriquecedor }, { data: emails }, { data: respostas }] = await Promise.all([
     supabase.from("contatos").select("id, nome, cargo, decisor, telefone, telefone_invalido, nao_contatar").eq("empresa_id", negocio.empresa_id).order("decisor", { ascending: false }),
     supabase.from("negocio_historico").select("id, fase_origem_id, fase_destino_id, autor_id, automatico, comentario, created_at, motivos(nome)")
@@ -131,6 +137,13 @@ export default async function PaginaNegocio({ params }: PageProps<"/negocios/[id
       {negocio.retorno_em && fase?.tipo === "aberta" && (
         <Cartao className="mb-6 p-4 text-sm">Retornar a ligação em <strong>{formatarData(negocio.retorno_em)}</strong>.</Cartao>
       )}
+
+      <JornadaVenda negocioId={negocio.id}
+        diagnostico={diagnostico ? (diagnostico.status === "concluido" ? (diagnostico.analise_status === "gerando" ? "Concluído · Assistente escrevendo" : "Concluído") : "Em andamento") : null}
+        precificacao={precificacao ? (precificacao.preco_final != null ? `Preço final ${formatarMoeda(Number(precificacao.preco_final))}`
+          : `${formatarMoeda(Number(precificacao.preco_minimo))} a ${formatarMoeda(Number(precificacao.preco_maximo))}`) : null}
+        proposta={proposta ? (proposta.status === "revisada" ? "Revisada" : "Rascunho") : null}
+        ganho={fase?.tipo === "ganho"} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">

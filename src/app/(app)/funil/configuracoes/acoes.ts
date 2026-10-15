@@ -343,3 +343,53 @@ export async function salvarParametrosEmail(dados: {
   revalidatePath("/funil/configuracoes");
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------
+// Diagnóstico (áreas e perguntas) e precificação (Fase 4)
+// ---------------------------------------------------------------------
+export async function salvarAreaDiagnostico(id: string, dados: { nome: string; servico_id: string | null; ativo: boolean }): Promise<Resultado> {
+  const v = z.object({ nome: z.string().trim().min(2, "Informe o nome da área."), servico_id: z.string().uuid().nullable(), ativo: z.boolean() }).safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("diagnostico_areas").update(v.data).eq("id", id).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera o diagnóstico." };
+  revalidatePath("/funil/configuracoes");
+  return { ok: true };
+}
+
+export async function salvarPerguntaDiagnostico(id: string | null, dados: { area_id: string; texto: string; ordem: number; ativo: boolean }): Promise<Resultado> {
+  const v = z.object({
+    area_id: z.string().uuid(), texto: z.string().trim().min(5, "Escreva a pergunta."), ordem: z.number().int().min(0), ativo: z.boolean(),
+  }).safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { data, error } = id
+    ? await supabase.from("diagnostico_perguntas").update(v.data).eq("id", id).select("id")
+    : await supabase.from("diagnostico_perguntas").insert(v.data).select("id");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera o diagnóstico." };
+  revalidatePath("/funil/configuracoes");
+  return { ok: true };
+}
+
+const esquemaParamPreco = z.object({
+  valor_hora_consultor: z.number().min(0), valor_hora_gerente: z.number().min(0),
+  margem_minima: z.number().min(0).max(10), margem_maxima: z.number().min(0).max(10), imposto: z.number().min(0).max(0.99),
+  fatores: z.array(z.object({
+    chave: z.string().min(1), nome: z.string().trim().min(2, "Dê nome a cada fator."),
+    opcoes: z.array(z.object({ rotulo: z.string().trim().min(1, "Toda opção precisa de rótulo."), multiplicador: z.number().min(0.01).max(10) })).min(1),
+  })),
+}).refine((d) => d.margem_maxima >= d.margem_minima, "A margem máxima precisa ser maior ou igual à mínima.");
+
+export async function salvarParametrosPrecificacao(dados: z.input<typeof esquemaParamPreco>): Promise<Resultado> {
+  const v = esquemaParamPreco.safeParse(dados);
+  if (!v.success) return { ok: false, erro: v.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("parametros_precificacao")
+    .update({ ...v.data, updated_at: new Date().toISOString() }).eq("diretoria", "comercial").select("diretoria");
+  if (error) return { ok: false, erro: mensagemDeErro(error) };
+  if (!data?.length) return { ok: false, erro: "Só o Diretor Comercial altera a precificação." };
+  revalidatePath("/funil/configuracoes");
+  return { ok: true };
+}

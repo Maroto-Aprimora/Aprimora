@@ -690,6 +690,156 @@ export type Database = {
           },
         ]
       }
+      diagnostico_areas: {
+        Row: {
+          ativo: boolean
+          chave: string
+          id: string
+          nome: string
+          ordem: number
+          servico_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          id?: string
+          nome: string
+          ordem?: number
+          servico_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          servico_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnostico_areas_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diagnostico_perguntas: {
+        Row: {
+          area_id: string
+          ativo: boolean
+          id: string
+          ordem: number
+          texto: string
+        }
+        Insert: {
+          area_id: string
+          ativo?: boolean
+          id?: string
+          ordem?: number
+          texto: string
+        }
+        Update: {
+          area_id?: string
+          ativo?: boolean
+          id?: string
+          ordem?: number
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnostico_perguntas_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "diagnostico_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diagnosticos: {
+        Row: {
+          analise_erro: string | null
+          analise_status: string | null
+          concluido_em: string | null
+          concluido_por: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          maturidade: Json | null
+          negocio_id: string
+          observacoes: string | null
+          realizado_em: string
+          respostas: Json
+          status: string
+          trabalho_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          analise_erro?: string | null
+          analise_status?: string | null
+          concluido_em?: string | null
+          concluido_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          maturidade?: Json | null
+          negocio_id: string
+          observacoes?: string | null
+          realizado_em?: string
+          respostas?: Json
+          status?: string
+          trabalho_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          analise_erro?: string | null
+          analise_status?: string | null
+          concluido_em?: string | null
+          concluido_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          maturidade?: Json | null
+          negocio_id?: string
+          observacoes?: string | null
+          realizado_em?: string
+          respostas?: Json
+          status?: string
+          trabalho_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnosticos_concluido_por_fkey"
+            columns: ["concluido_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnosticos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnosticos_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnosticos_trabalho_id_fkey"
+            columns: ["trabalho_id"]
+            isOneToOne: false
+            referencedRelation: "trabalhos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diretorias: {
         Row: {
           ativa: boolean
@@ -1870,6 +2020,47 @@ export type Database = {
           },
         ]
       }
+      parametros_precificacao: {
+        Row: {
+          diretoria: string
+          fatores: Json
+          imposto: number
+          margem_maxima: number
+          margem_minima: number
+          updated_at: string
+          valor_hora_consultor: number
+          valor_hora_gerente: number
+        }
+        Insert: {
+          diretoria: string
+          fatores?: Json
+          imposto?: number
+          margem_maxima?: number
+          margem_minima?: number
+          updated_at?: string
+          valor_hora_consultor?: number
+          valor_hora_gerente?: number
+        }
+        Update: {
+          diretoria?: string
+          fatores?: Json
+          imposto?: number
+          margem_maxima?: number
+          margem_minima?: number
+          updated_at?: string
+          valor_hora_consultor?: number
+          valor_hora_gerente?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parametros_precificacao_diretoria_fkey"
+            columns: ["diretoria"]
+            isOneToOne: true
+            referencedRelation: "diretorias"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       pontuacoes: {
         Row: {
           cancelado_em: string | null
@@ -2002,6 +2193,88 @@ export type Database = {
           },
         ]
       }
+      precificacoes: {
+        Row: {
+          atualizado_por: string | null
+          created_at: string
+          custo_base: number | null
+          custos: Json
+          definido_em: string | null
+          definido_por: string | null
+          fatores: Json
+          horas_consultor: number
+          horas_gerente: number
+          id: string
+          multiplicador: number | null
+          negocio_id: string
+          observacoes: string | null
+          preco_final: number | null
+          preco_maximo: number | null
+          preco_minimo: number | null
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          created_at?: string
+          custo_base?: number | null
+          custos?: Json
+          definido_em?: string | null
+          definido_por?: string | null
+          fatores?: Json
+          horas_consultor?: number
+          horas_gerente?: number
+          id?: string
+          multiplicador?: number | null
+          negocio_id: string
+          observacoes?: string | null
+          preco_final?: number | null
+          preco_maximo?: number | null
+          preco_minimo?: number | null
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          created_at?: string
+          custo_base?: number | null
+          custos?: Json
+          definido_em?: string | null
+          definido_por?: string | null
+          fatores?: Json
+          horas_consultor?: number
+          horas_gerente?: number
+          id?: string
+          multiplicador?: number | null
+          negocio_id?: string
+          observacoes?: string | null
+          preco_final?: number | null
+          preco_maximo?: number | null
+          preco_minimo?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "precificacoes_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precificacoes_definido_por_fkey"
+            columns: ["definido_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precificacoes_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: true
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       processos_seletivos: {
         Row: {
           created_at: string
@@ -2022,6 +2295,76 @@ export type Database = {
           nome?: string
         }
         Relationships: []
+      }
+      propostas: {
+        Row: {
+          created_at: string
+          diagnostico_id: string | null
+          escopo: string | null
+          gerado_em: string | null
+          id: string
+          negocio_id: string
+          resumo_diagnostico: string | null
+          revisado_em: string | null
+          revisado_por: string | null
+          servicos_sugeridos: Json
+          status: string
+          texto: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          diagnostico_id?: string | null
+          escopo?: string | null
+          gerado_em?: string | null
+          id?: string
+          negocio_id: string
+          resumo_diagnostico?: string | null
+          revisado_em?: string | null
+          revisado_por?: string | null
+          servicos_sugeridos?: Json
+          status?: string
+          texto?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          diagnostico_id?: string | null
+          escopo?: string | null
+          gerado_em?: string | null
+          id?: string
+          negocio_id?: string
+          resumo_diagnostico?: string | null
+          revisado_em?: string | null
+          revisado_por?: string | null
+          servicos_sugeridos?: Json
+          status?: string
+          texto?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propostas_diagnostico_id_fkey"
+            columns: ["diagnostico_id"]
+            isOneToOne: false
+            referencedRelation: "diagnosticos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: true
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_revisado_por_fkey"
+            columns: ["revisado_por"]
+            isOneToOne: false
+            referencedRelation: "membros"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_assinaturas: {
         Row: {
@@ -2729,6 +3072,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      concluir_diagnostico: { Args: { _diagnostico: string }; Returns: Json }
       empresas_semelhantes: {
         Args: {
           _cnpj?: string
@@ -2817,6 +3161,10 @@ export type Database = {
       n8n_saude: { Args: { _segredo: string }; Returns: Json }
       normalizar: { Args: { _t: string }; Returns: string }
       plano_melhoria: { Args: { _membro: string }; Returns: Json }
+      reabrir_diagnostico: {
+        Args: { _diagnostico: string }
+        Returns: undefined
+      }
       registrar_evento_integracao: {
         Args: { _origem: string; _payload: Json; _token: string }
         Returns: Json

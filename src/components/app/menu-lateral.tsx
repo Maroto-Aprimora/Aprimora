@@ -125,7 +125,7 @@ export function MenuLateral(dados: DadosMenu) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-borda bg-superficie px-4 py-3 lg:hidden">
+      <header className="sticky top-0 z-30 flex print:hidden items-center justify-between border-b border-borda bg-superficie px-4 py-3 lg:hidden">
         <button onClick={() => setAberto(true)} aria-label="Abrir menu" className="rounded p-1 hover:bg-superficie-2">
           <Menu className="h-6 w-6" />
         </button>
@@ -137,7 +137,7 @@ export function MenuLateral(dados: DadosMenu) {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-menu text-menu-texto transition-[transform,width] lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col print:hidden bg-menu text-menu-texto transition-[transform,width] lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
           aberto ? "translate-x-0" : "-translate-x-full",
           so("lg:w-16"),
         )}

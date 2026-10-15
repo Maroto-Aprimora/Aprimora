@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | DT-PA-001 — Documentação Técnica do Portal Aprimora |
-| Versão do documento | 1.19 |
+| Versão do documento | 1.20 |
 | Data | 09/10/2026 |
 | Versão do sistema descrita | `main` no commit `af20f1c` (mescla do PR #7, 05/10/2026) |
 | Repositório | `Maroto-Aprimora/PortalAprimora` (privado, GitHub; transferido de `AgenciaValkz/Aprimora`) |
@@ -104,6 +104,7 @@ Pipefy) e foi estruturado para receber as demais diretorias.
 | Comercial | Configurações do funil (fases, SLA, campos, cadastros auxiliares) | EM PRODUÇÃO |
 | Comercial | Agentes A1 Enriquecedor (botão no negócio, aprovação do decisor) e A4 Analista gerencial (Relatórios da R.I) | EM PRODUÇÃO no portal; fluxos 06 e 07 do n8n a publicar |
 | Projetos, Marketing | Telas próprias | FORA DO ESCOPO da v2 (diretorias mantidas no banco, sem telas) |
+| Comercial | Da oportunidade à venda (Fase 4): Diagnóstico (`/negocios/[id]/diagnostico`), Precificação (`/precificacao`), Proposta com o A9 (`/proposta`), Dossiê de passagem (`/dossie`); guias Diagnóstico e Precificação em Config. do funil | EM PRODUÇÃO |
 | Comercial | Cadência de e-mail (Fase 3): copies do playbook (Config. do funil → Copy), A5 Redator, A6 Monitor de respostas, A7 Organizador do dia | EM PRODUÇÃO no portal; Redator e Monitor desligados até a credencial Gmail da comercial@ e os fluxos 10/11 serem publicados |
 | Integrações | n8n (ligações API4COM + Gemini; Enriquecedor; Analista; Redator e Monitor via Gmail API) | EM PRODUÇÃO (fluxos 06–09); 10 e 11 criados, a publicar |
 | Integrações | Importação de dados do Pipefy | NÃO IMPLEMENTADO |
@@ -345,6 +346,11 @@ identity). Colunas `created_at`/`updated_at` em `timestamptz`.
 | `ligacoes` | negocio_id, contato_id, membro_id, inicio, duracao_seg, resultado_id, proximo_passo, retorno_em, compromisso_em, decisor_nome, decisor_melhor_horario, comentario, origem, resultado_aplicado_em; reservadas para a Fase 2: api4com_id, gravacao_url, transcricao, resumo | Registro de cada ligação |
 | `cadencia_passos` | dia (D0 = entrada em E-mail), canal (email/ligacao), titulo, descricao, so_sem_contato, ativo | Cadência padrão (PE-PA-002, 3.2): cada toque vira tarefa no dia |
 | `parametros_comercial` | cadencia_dias_reciclagem (21), reciclagem_retorno_dias (90), follow_up_proposta_dias (3), envio_hora_inicio (8), envio_hora_fim (18), remetente_nome | Prazos da cadência e do envio de e-mails, editáveis pelo diretor |
+| `diagnostico_areas`, `diagnostico_perguntas` | chave, nome, servico_id (serviço sugerido), ordem, ativo / area_id, texto, ordem, ativo | Checklist de diagnóstico (10 áreas, 50 perguntas iniciais; nota 4 é sempre o melhor). Só o diretor altera |
+| `diagnosticos` | negocio_id, realizado_em, respostas (jsonb: pergunta → nota 1–4 e comentário), observacoes, status (rascunho/concluido), maturidade (jsonb por área ao concluir), analise_status (gerando/pronto/erro), trabalho_id | Diagnóstico do negócio; o app só altera respostas, observações e data (o resto é do banco) |
+| `propostas` | negocio_id (único), diagnostico_id, resumo_diagnostico, servicos_sugeridos (jsonb), escopo, texto, status (rascunho/revisada), gerado_em, revisado_por/em | Rascunho do A9 e revisão do responsável; o A9 não sobrescreve escopo e texto depois de revisados |
+| `parametros_precificacao` | valor_hora_consultor, valor_hora_gerente, margem_minima, margem_maxima, imposto, fatores (jsonb: nome e opções com multiplicador; a primeira é a padrão) | Parâmetros da precificação, editáveis pelo diretor |
+| `precificacoes` | negocio_id (único), fatores (escolhas), horas_consultor, horas_gerente, custos (jsonb), multiplicador, custo_base, preco_minimo, preco_maximo, preco_final, definido_por/em, observacoes | Calculadora do negócio. `calcular_precificacao` (gatilho) faz a conta; preço final só do diretor comercial e vira `negocios.valor` |
 | `copies_email` | versao (V1, V2… sequencial), nome, uso (cadencia/pediu_email/pos_proposta), regra (qualquer/segmento/origem/sem_site/com_dores), regra_valor, ativo | Copies do playbook. Regra específica ganha da "qualquer"; copies da mesma regra alternam (A/B, a menos usada primeiro); o lead fica com a mesma copy a cadência toda. Só o diretor comercial altera |
 | `copies_email_mensagens` | copy_id, passo_id (toque de e-mail da cadência; nulo fora dela), assunto, corpo | Um e-mail por toque, com `{{variáveis}}` que o Redator preenche |
 | `emails` | negocio_id, contato_id, membro_id, copy_id, passo_id, uso, d0, para, assunto, corpo, status (rascunho/aprovado/enviado/erro/cancelado), responder_a, gmail_id, thread_id, enviado_em, aprovado_por, erro | E-mails da cadência; só funções internas escrevem |
@@ -407,6 +413,8 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `aplicar_aprovacao` (`aprovacoes`) | após mudar status | Aprovado `decisor_empresa`: cria ou atualiza o contato decisor (vira o contato do negócio, se vazio), completa os e-mails da empresa e acrescenta as hipóteses de dor ao negócio |
 | (A2) `privado.processar_eventos_api4com()` | chamado pelo webhook e pela consulta do n8n | Chamada encerrada → ligação no negócio aberto da empresa (telefone: últimos 10 dígitos, contato ou empresa; membro pelo e-mail da API4COM). Com conversa (≥ 15 s e gravação): trabalho do Agente de ligação; sem conversa: aprovação "Não atendeu" sem IA. Sem negócio: tenta de novo por 7 dias |
 | `aplicar_aprovacao` (tipos da Fase 3) | após mudar status | `email` aprovado (com as edições; recusa se sobrar `{{ }}`): e-mail vai para a fila de envio na próxima janela (dias úteis, horário do parâmetro), no mesmo fio do anterior; descartado: rascunho cancelado. `resposta_recusa` aprovada: encerra em Lead não qualificado com o motivo |
+| `calcular_precificacao` / `preco_final_no_negocio` (`precificacoes`) | antes / depois de salvar | Custo base = horas × valor da hora + custos; multiplicador = produto dos fatores; mínimo e máximo = custo × multiplicador × (1 + margem) ÷ (1 − imposto). Preço final: só o diretor; copia para o valor do negócio |
+| `passagem_para_projetos` (`negocio_historico`) | após inserir | A10: card entra em fase de ganho (agente "Passagem" ligado) → tarefa "Receber projeto" de prioridade alta para o diretor de Projetos (sem ninguém lá, para o diretor comercial) e aviso ao responsável com o link do dossiê |
 | `agentes_apos_resultado_ligacao` (`ligacoes`) | após aplicar resultado | Resultado "Pediu e-mail": o Redator prepara o e-mail com material (copy de uso `pediu_email`) |
 | `*_updated_at` | antes de atualizar | Atualiza `updated_at` |
 
@@ -420,6 +428,7 @@ vendido e Lead não qualificado (perdas, exigem motivo).
 | `excluir_fase(fase, destino)` | definer, exige diretor | Move os negócios e marca a fase como excluída (`excluida_em`), preservando o histórico; bloqueia a primeira fase e a última de ganho |
 | `remarcar_atividade(atividade, novo_inicio, novo_fim?, motivo?)` | invoker (respeita RLS) | Marca a atividade como `remarcada` e cria a nova (mesmos participantes) |
 | `enriquecer_negocio(negocio)` | definer, exige poder editar o negócio | Botão "Enriquecer agora": põe o negócio na fila do Enriquecedor (recusa se o agente estiver desligado ou já houver trabalho pendente) |
+| `concluir_diagnostico(diagnostico)` / `reabrir_diagnostico(diagnostico)` | definer, exige poder editar o negócio | Calcula o mapa de maturidade (média por área) e enfileira o A9; reabrir volta a rascunho |
 | `indicadores_email(de, ate, responsavel?)` | invoker (respeita RLS) | Enviados, respondidos, taxa de resposta (automática não conta), por classificação e por copy (Painel comercial e guia Copy) |
 | `n8n_registrar_respostas(segredo, mensagens)` | definer, segredo do n8n | Mensagens da caixa da comercial@: guarda só as que respondem um fio enviado (uma vez cada), avisa o responsável e enfileira a classificação |
 | `gerar_relatorio_ri(de?, ate?)` | definer, exige diretor comercial | Cria o relatório com os números (`privado.dados_relatorio_ri`: semana, trimestre, cada membro, SLA estourado) e enfileira o Analista gerencial; agente desligado → relatório só com números |
@@ -715,6 +724,7 @@ Escopo v1.0 (Seção 14).
 | F-V2-12 | Desempenho individual (membro vê o seu, diretor vê todos; nota média da rubrica no coldcall; plano de melhoria liberado quando o diretor revisa a R.I) e rubrica editável | v2 F2 | EM PRODUÇÃO | `/desempenho`, `plano_melhoria`, Config. do funil → Rubrica |
 | F-V2-13 | Funil com cabeçalho estilo Pipefy (Kanban/Lista, busca, filtros) e card retrátil; Tarefas em quadro de colunas retráteis com card completo | v2 F2 | EM PRODUÇÃO | `/funil`, `/tarefas`, `components/app/barra-visoes.tsx` |
 | F-INT-02 | Ligações API4COM com transcrição e avaliação por IA | 4/5 | NÃO IMPLEMENTADO no portal | contrato em `n8n/README.md` |
+| F-V2-15 | Da oportunidade à venda (Fase 4): diagnóstico no celular com mapa de maturidade, precificação com preço mínimo e máximo e projetos parecidos, A9 Assistente de proposta, A10 passagem para Projetos com dossiê em PDF | v2 F4 | EM PRODUÇÃO | `diagnosticos`, `precificacoes`, `propostas`, `/negocios/[id]/(diagnostico|precificacao|proposta|dossie)`, `n8n/fluxos/12` |
 | F-V2-14 | Cadência de e-mail (Fase 3): guia Copy (variáveis, regras, A/B, ativa/desativada, desempenho por copy, envio pela comercial@), A5 Redator com aprovação em Tarefas, envio pelo Gmail no mesmo fio, A6 Monitor de respostas (classifica e move o card), e-mails e respostas no negócio, cartão no Painel comercial, A7 resumo do dia | v2 F3 | EM PRODUÇÃO no portal; fluxos 10/11 a publicar após a credencial Gmail | `copies_email`, `emails`, `respostas_email`, `/funil/configuracoes?ver=copy`, `/api/n8n/emails/respostas`, `n8n/fluxos/10` e `11` |
 | F-INT-04 | Resumo semanal e passagem do ganho para Projetos/Presidência | 4 | NÃO IMPLEMENTADO | — |
 | F-INT-05 | Extração de leads e base de conhecimento com IA | 6 | NÃO IMPLEMENTADO | — |
@@ -729,6 +739,7 @@ Escopo v1.0 (Seção 14).
 | 1.0 | 09/10/2026 | Primeira versão, descrevendo a `main` no commit `af20f1c` |
 | 1.1 | 12/10/2026 | Repositório transferido para `Maroto-Aprimora/PortalAprimora`; início da v2 (PE-PA-002) |
 | 1.2 | 12/10/2026 | v2 Fase 0, PR 1: portal exclusivo do Comercial no menu; `/painel` vira Início; Painel geral em `/vice-presidencia/painel-geral` |
+| 1.20 | 15/10/2026 | Fase 4: diagnóstico digital (checklist de 10 áreas e mapa de maturidade), precificação (preço mínimo e máximo no banco, preço final só do diretor), A9 Assistente de proposta (fluxo 12), A10 Passagem para Projetos e dossiê em PDF (migração `20261015120000`) |
 | 1.19 | 14/10/2026 | Edição compartilhada (migração `20261014150000`): todo membro do Comercial edita qualquer card e empresa, troca o responsável, registra atividades e envia/exclui anexos; "Participantes" sai do card; "Dores identificadas" vira o checklist da Carta de Serviços (sem valor por item; anotações dos agentes em "Detalhes das dores"); página da empresa com "Atividade" (linha do tempo do lead), atividades e anexos; Desempenho individual aberto a todo o time; aprovação de e-mail no pop-up do card do Funil (contador no menu Funil); cards sem iniciais |
 | 1.18 | 14/10/2026 | Fase 3: cadência de e-mail (migração `20261014120000`, guia Copy, Redator, Monitor de respostas, Organizador do dia, fluxos 10 e 11) |
 | 1.17 | 13/10/2026 | Empresas e leads só em lista, com filtros de segmento, cidade e responsável; Config. do funil em abas (Campos, Agentes, Cadência); card do funil em janela; janelas mais claras sobre fundo escurecido |

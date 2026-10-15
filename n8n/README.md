@@ -46,6 +46,10 @@ Padrão de nome: `APRIMORA | Área | Ação`. Coloque a etiqueta `aprimora` em t
 Os fluxos 10 e 11 estão guardados como código do **Workflow SDK** do n8n (`.sdk.js`), o mesmo que foi usado para
 criá-los pelo conector. Os fluxos 02 e 03 são da versão antiga e foram substituídos por eles.
 
+| `12-agente-assistente-proposta.sdk.js` | Agente · A9 Assistente de proposta (Fase 4) | A cada 2 min | Reserva 1 diagnóstico concluído; o Gemini gratuito devolve resumo do diagnóstico, até 3 serviços sugeridos (só ids da Carta, pelo `responseSchema`), rascunho de escopo e de proposta. Publicado em 15/10/2026 (id `Qi0qL10XvG89MQHf`) |
+
+O A10 Passagem para Projetos não usa o n8n: é uma regra no banco (tarefa + aviso quando o card entra em Projetos Aprimora) e o dossiê é a página `/negocios/[id]/dossie`, salva em PDF pelo navegador.
+
 ### Modo de espera para muitas ligações ao mesmo tempo
 
 Três camadas, da mais importante para a menos:

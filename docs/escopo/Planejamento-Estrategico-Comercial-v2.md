@@ -307,3 +307,7 @@ Tomadas com o Diretor Comercial no início da Fase 0. Prevalecem sobre o texto a
   por toque, regra de uso e alternância A/B entre copies da mesma regra). O envio sai da **comercial@** desde já,
   conectada ao n8n por **OAuth do Google**. Resposta "interessado" ou "retornar depois" move o card sozinha; recusa e
   pedido de descadastro passam pela aprovação do responsável.
+- **15/10/2026** — Fase 4 sem o Agendador (A8 segue desligado). O checklist de diagnóstico e os parâmetros da
+  precificação começam com uma versão inicial editável em Config. do funil (guias Diagnóstico e Precificação), para
+  serem ajustados com o formulário impresso e a planilha atuais. O dossiê de passagem é uma página do portal salva em
+  PDF pelo navegador.

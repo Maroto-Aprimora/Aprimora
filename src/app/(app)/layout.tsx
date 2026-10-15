@@ -30,7 +30,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       />
       <div className="min-w-0 flex-1">
         {/* No computador, o sino fica no canto superior direito; no celular ele está na barra do topo */}
-        <div className="hidden justify-end px-8 pt-4 lg:flex">
+        <div className="hidden justify-end px-8 pt-4 lg:flex print:hidden">
           <Sino />
         </div>
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:pt-2">{children}</main>
